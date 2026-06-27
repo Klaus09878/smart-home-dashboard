@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartHome Climate Dashboard | ClimateFlow</title>
+  <!-- SEO & Meta Tags -->
+  <meta name="description" content="Visualisiere und analysiere deine Smart-Home-Klimadaten in Echtzeit. Erhalte intelligente Lüftungsempfehlungen basierend auf der absoluten Luftfeuchtigkeit.">
+  <meta name="theme-color" content="#0f172a">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'fade-in': 'fadeIn 0.5s ease-out forwards',
+            'slide-up': 'slideUp 0.6s ease-out forwards',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+            slideUp: {
+              '0%': { transform: 'translateY(12px)', opacity: '0' },
+              '100%': { transform: 'translateY(0)', opacity: '1' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts (Outfit) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Custom Scrollbar for modern feel */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Glassmorphism utility classes */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .glass-card-hover {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-card-hover:hover {
+      transform: translateY(-2px);
+      border-color: rgba(20, 184, 166, 0.3);
+      box-shadow: 0 10px 25px -5px rgba(20, 184, 166, 0.1), 0 8px 10px -6px rgba(20, 184, 166, 0.1);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
+
+  <!-- Background Ambient Glows -->
+  <div class="absolute top-0 left-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+  <div class="absolute top-1/3 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+  <div class="absolute bottom-10 left-10 w-80 h-80 bg-purple-500/5 rounded-full blur-[80px] pointer-events-none -z-10"></div>
+
+  <!-- Main Container -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col min-h-screen">
+    
+    <!-- Top Alert Banner (for Demo mode notification) -->
+    <div id="demo-banner" class="hidden mb-4 p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-sm flex items-center justify-between animate-fade-in">
+      <div class="flex items-center gap-2">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>
+        <span><strong>Demo-Modus aktiv:</strong> Keine echten Daten empfangen. Es werden simulierte Messwerte angezeigt.</span>
+      </div>
+      <button onclick="retryLoadingData()" class="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 rounded-lg text-xs font-semibold transition-colors">
+        Erneut versuchen
+      </button>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="relative z-30 glass-panel rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-lg">
+      <div class="flex items-center gap-3">
+        <!-- Logo Icon -->
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20">
+          <i data-lucide="home" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">ClimateFlow</h1>
+          <p class="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+            <span class="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_8px_#14b8a6] animate-pulse" id="status-dot"></span>
+            <span id="status-text">ThingSpeak API live</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Action & Location Controls -->
+      <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
+        <!-- Location Picker Button -->
+        <div class="relative w-full sm:w-auto">
+          <button id="location-btn" onclick="toggleLocationModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-sm font-medium flex items-center justify-between sm:justify-start gap-2.5 transition-all text-slate-200">
+            <i data-lucide="map-pin" class="w-4 h-4 text-teal-400"></i>
+            <span id="current-location-name">Standort wird ermittelt...</span>
+            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-500"></i>
+          </button>
+          
+          <!-- Quick search panel dropdown (Hidden by default) -->
+          <div id="location-dropdown" class="hidden absolute right-0 mt-2 w-72 rounded-xl glass-panel shadow-2xl z-50 p-3 flex flex-col gap-2">
+            <div class="relative">
+              <input type="text" id="city-search" placeholder="Stadt suchen (z.B. Stuttgart)..." onkeyup="searchCity(event)" class="w-full px-3 py-2 bg-slate-900/90 border border-slate-800 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 rounded-lg text-sm outline-none text-slate-200 placeholder-slate-500 transition-all">
+              <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute right-3 top-2.5"></i>
+            </div>
+            <!-- Search Results list -->
+            <div id="search-results" class="max-h-40 overflow-y-auto flex flex-col gap-1 text-xs text-slate-400 mt-1">
+              <!-- Dynamically populated or default list -->
+              <span class="px-2 py-1.5 font-semibold text-slate-500 uppercase tracking-wider">Häufige Standorte</span>
+              <button onclick="setLocation(48.7758, 9.1829, 'Stuttgart, DE')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-800/80 hover:text-white transition-colors flex items-center justify-between">
+                <span>Stuttgart</span><span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">DE</span>
+              </button>
+              <button onclick="setLocation(52.5200, 13.4050, 'Berlin, DE')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-800/80 hover:text-white transition-colors flex items-center justify-between">
+                <span>Berlin</span><span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">DE</span>
+              </button>
+              <button onclick="setLocation(48.1351, 11.5820, 'München, DE')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-800/80 hover:text-white transition-colors flex items-center justify-between">
+                <span>München</span><span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">DE</span>
+              </button>
+              <button onclick="setLocation(50.1109, 8.6821, 'Frankfurt, DE')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-800/80 hover:text-white transition-colors flex items-center justify-between">
+                <span>Frankfurt</span><span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">DE</span>
+              </button>
+              <button onclick="requestGeolocation()" class="w-full text-left px-2 py-1.5 mt-1 border-t border-slate-800/60 rounded-lg hover:bg-teal-500/10 hover:text-teal-400 text-teal-500 transition-colors flex items-center gap-1.5">
+                <i data-lucide="locate-fixed" class="w-3.5 h-3.5"></i>
+                <span>Meinen Standort orten</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reload Data Button -->
+        <button onclick="reloadData()" id="reload-btn" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Daten aktualisieren">
+          <i data-lucide="refresh-cw" class="w-4.5 h-4.5 transition-transform" id="reload-icon"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="flex-1 flex flex-col gap-6 animate-slide-up">
+      
+      <!-- KPI Hero Section (3 Cards) -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        <!-- Inside Temp Card -->
+        <div class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md">
+          <!-- Top row -->
+          <div class="flex items-start justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Innentemperatur</p>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-4xl font-bold tracking-tight text-white" id="kpi-temp-in">--.-</span>
+                <span class="text-2xl font-medium text-slate-400">°C</span>
+              </div>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400">
+              <i data-lucide="thermometer" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <!-- Decorative curve line behind -->
+          <div class="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-orange-500/5 to-transparent pointer-events-none"></div>
+          <!-- Info row -->
+          <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-10">
+            <span class="flex items-center gap-1 text-slate-400">
+              Comfort: <span id="kpi-temp-comfort" class="font-semibold text-teal-400">Optimal</span>
+            </span>
+            <span class="flex items-center gap-0.5 font-medium text-orange-400" id="kpi-temp-in-trend">
+              <i data-lucide="trending-up" class="w-3.5 h-3.5 inline"></i> <span id="kpi-temp-in-trend-val">--</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Inside Humidity Card -->
+        <div class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md">
+          <!-- Top row -->
+          <div class="flex items-start justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Innenluftfeuchtigkeit</p>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-4xl font-bold tracking-tight text-white" id="kpi-humidity-in">--.-</span>
+                <span class="text-2xl font-medium text-slate-400">%</span>
+              </div>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+              <i data-lucide="droplets" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <div class="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-blue-500/5 to-transparent pointer-events-none"></div>
+          <!-- Info row -->
+          <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-10">
+            <span class="flex items-center gap-1 text-slate-400">
+              Qualität: <span id="kpi-humidity-comfort" class="font-semibold text-emerald-400">Optimal</span>
+            </span>
+            <span class="flex items-center gap-0.5 font-medium text-blue-400" id="kpi-humidity-in-trend">
+              <i data-lucide="trending-flat" class="w-3.5 h-3.5 inline"></i> <span id="kpi-humidity-in-trend-val">--</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Outside Weather Card -->
+        <div class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md sm:col-span-2 lg:col-span-1">
+          <!-- Top row -->
+          <div class="flex items-start justify-between">
+            <div>
+              <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Außenklima (Wetter)</p>
+              <div class="flex items-baseline gap-2 mt-1">
+                <span class="text-4xl font-bold tracking-tight text-white" id="kpi-temp-out">--.-</span>
+                <span class="text-2xl font-medium text-slate-400">°C</span>
+              </div>
+            </div>
+            <div class="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400" id="weather-icon-container">
+              <i data-lucide="cloud-sun" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <div class="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-teal-500/5 to-transparent pointer-events-none"></div>
+          <!-- Info row -->
+          <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-10">
+            <span class="flex items-center gap-1 text-slate-400" id="weather-desc">
+              Bewölkt
+            </span>
+            <span class="flex items-center gap-1 text-slate-400">
+              Feuchte: <span class="font-semibold text-slate-300" id="kpi-humidity-out">--%</span>
+            </span>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Advanced Analytics: Ventilation Advice + 24h Stats -->
+      <section class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        
+        <!-- Ventilation Advisor Card (Col span 3) -->
+        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col justify-between lg:col-span-3 min-h-[300px]">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i data-lucide="wind" class="w-5 h-5 text-teal-400"></i>
+                Intelligenter Lüftungsberater
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">Vergleicht absolute Feuchte drinnen/draußen, um Schimmelbildung zu vermeiden.</p>
+            </div>
+            <div class="px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-slate-900 border border-slate-800" id="ventilation-badge">
+              <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+              <span>Berechne...</span>
+            </div>
+          </div>
+
+          <!-- Advisor Central Area -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 my-auto items-center">
+            <!-- Recommendation Indicator Circle -->
+            <div class="flex flex-col items-center justify-center p-4 border border-slate-800/60 rounded-2xl bg-slate-900/40 relative">
+              <div class="w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-slate-800 bg-slate-950 shadow-inner relative transition-colors duration-500" id="ventilation-circle">
+                <i data-lucide="wind" class="w-8 h-8 text-slate-500 transition-colors duration-500" id="ventilation-icon"></i>
+                <span class="text-xs font-bold mt-1 text-slate-400 transition-colors duration-500" id="ventilation-verdict">Unklar</span>
+              </div>
+              <h3 class="text-sm font-semibold mt-4 text-center text-slate-200" id="ventilation-title">Feuchtigkeitsausgleich</h3>
+              <p class="text-xs text-slate-400 mt-1 text-center max-w-[200px]" id="ventilation-short-desc">Lade Klimadaten...</p>
+            </div>
+
+            <!-- Absolute Humidity Visualizer -->
+            <div class="flex flex-col gap-4">
+              <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Absolute Luftfeuchtigkeit (Wassergehalt)</h4>
+              
+              <!-- Inside Air water weight -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs">
+                  <span class="text-slate-300 font-medium">Innenluft (Raum)</span>
+                  <span class="font-bold text-white" id="abs-hum-in">--.- g/m³</span>
+                </div>
+                <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                  <div class="bg-gradient-to-r from-teal-500 to-indigo-500 h-full rounded-full transition-all duration-500" id="bar-abs-hum-in" style="width: 0%"></div>
+                </div>
+              </div>
+
+              <!-- Outside Air water weight -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs">
+                  <span class="text-slate-300 font-medium">Außenluft (Umgebung)</span>
+                  <span class="font-bold text-white" id="abs-hum-out">--.- g/m³</span>
+                </div>
+                <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                  <div class="bg-gradient-to-r from-blue-500 to-indigo-400 h-full rounded-full transition-all duration-500" id="bar-abs-hum-out" style="width: 0%"></div>
+                </div>
+              </div>
+
+              <!-- Explanation text -->
+              <p class="text-xs text-slate-400 bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/40" id="ventilation-explanation">
+                Die absolute Feuchtigkeit bestimmt, ob Lüften Feuchtigkeit abgibt oder aufnimmt. Warme Luft kann mehr Wasser speichern als kalte Luft.
+              </p>
+            </div>
+          </div>
+
+          <!-- Advice Tip -->
+          <div class="mt-4 pt-3 border-t border-slate-800/60 flex items-start gap-2 text-xs text-slate-400">
+            <i data-lucide="info" class="w-4 h-4 text-teal-400 shrink-0"></i>
+            <span id="ventilation-tip">Warte auf Berechnungen für spezifische Lüftungshinweise...</span>
+          </div>
+
+        </div>
+
+        <!-- 24h Climate Statistics (Col span 2) -->
+        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col justify-between lg:col-span-2 min-h-[300px]">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2 mb-1">
+              <i data-lucide="bar-chart-3" class="w-5 h-5 text-indigo-400"></i>
+              Historische Analyse (24h)
+            </h2>
+            <p class="text-xs text-slate-400">Statistische Auswertung der Raumwerte der letzten 24 Stunden.</p>
+          </div>
+
+          <div class="flex flex-col gap-5 my-4">
+            
+            <!-- Temperature stats -->
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-slate-300 font-medium">Innentemperatur</span>
+                <span class="text-slate-400">Soll: 19 - 22 °C</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2">
+                  <p class="text-[10px] text-slate-500 uppercase font-semibold">Min</p>
+                  <p class="text-sm font-bold text-blue-400 mt-0.5" id="stat-temp-min">--.-°C</p>
+                </div>
+                <div class="bg-slate-900/60 border border-teal-500/20 rounded-xl p-2 shadow-sm shadow-teal-500/5">
+                  <p class="text-[10px] text-teal-400 uppercase font-semibold">Mittel</p>
+                  <p class="text-sm font-bold text-white mt-0.5" id="stat-temp-avg">--.-°C</p>
+                </div>
+                <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2">
+                  <p class="text-[10px] text-slate-500 uppercase font-semibold">Max</p>
+                  <p class="text-sm font-bold text-orange-400 mt-0.5" id="stat-temp-max">--.-°C</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Humidity stats -->
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-slate-300 font-medium">Luftfeuchtigkeit</span>
+                <span class="text-slate-400">Soll: 40 - 60 %</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2">
+                  <p class="text-[10px] text-slate-500 uppercase font-semibold">Min</p>
+                  <p class="text-sm font-bold text-amber-500 mt-0.5" id="stat-hum-min">--%</p>
+                </div>
+                <div class="bg-slate-900/60 border border-indigo-500/20 rounded-xl p-2 shadow-sm shadow-indigo-500/5">
+                  <p class="text-[10px] text-indigo-400 uppercase font-semibold">Mittel</p>
+                  <p class="text-sm font-bold text-white mt-0.5" id="stat-hum-avg">--%</p>
+                </div>
+                <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2">
+                  <p class="text-[10px] text-slate-500 uppercase font-semibold">Max</p>
+                  <p class="text-sm font-bold text-teal-400 mt-0.5" id="stat-hum-max">--%</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Comparison info -->
+          <div class="text-[11px] text-slate-400 bg-slate-900/50 p-2.5 border border-slate-850 rounded-xl">
+            <span class="font-medium text-slate-300">Temperaturvergleich:</span> Die durchschnittliche Innentemperatur lag in den letzten 24 Stunden um <span id="stat-temp-diff-out" class="font-bold text-white">--.-°C</span> <span id="stat-temp-diff-desc">höher</span> als die Außentemperatur.
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Visualisation: Interactive Chart.js Section -->
+      <section class="glass-panel rounded-2xl p-6 shadow-lg">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i data-lucide="area-chart" class="w-5 h-5 text-teal-400"></i>
+              Klimaverlauf im Detail
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Historischer Vergleich von Temperatur und Feuchtigkeit.</p>
+          </div>
+
+          <!-- Filter & View Controls -->
+          <div class="flex flex-wrap gap-2 items-center w-full sm:w-auto">
+            <button onclick="setChartTimeframe(24)" id="btn-tf-24" class="px-3.5 py-1.5 rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 text-xs font-semibold transition-all">24h</button>
+            <button onclick="setChartTimeframe(72)" id="btn-tf-72" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all">3 Tage</button>
+            <button onclick="setChartTimeframe(168)" id="btn-tf-168" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all">7 Tage</button>
+            <button onclick="setChartTimeframe(-1)" id="btn-tf-all" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all">Alle (8000)</button>
+          </div>
+        </div>
+
+        <!-- Chart Canvas Container -->
+        <div class="w-full relative h-[320px] md:h-[400px]">
+          <canvas id="climateChart"></canvas>
+        </div>
+
+        <!-- Custom Chart Legend & Info -->
+        <div class="mt-4 pt-4 border-t border-slate-800/60 flex flex-wrap justify-center gap-6 text-xs text-slate-400">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-0.5 bg-gradient-to-r from-orange-400 to-orange-500 rounded"></span>
+            <span>Innentemperatur (°C)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-0.5 bg-teal-400 rounded"></span>
+            <span>Außentemperatur (°C)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-1 border-t border-dashed border-indigo-400"></span>
+            <span>Innenluftfeuchtigkeit (%)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Collapsible Historical Feed Data Table -->
+      <section class="glass-panel rounded-2xl shadow-lg transition-all duration-300">
+        <button onclick="toggleTableCollapse()" class="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none">
+          <div class="flex items-center gap-2">
+            <i data-lucide="list" class="w-5 h-5 text-indigo-400"></i>
+            <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Rohdaten-Tabelle (Neueste 10 Einträge)</h2>
+          </div>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform duration-300" id="table-arrow"></i>
+        </button>
+
+        <div id="table-container" class="hidden border-t border-slate-800/60 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-slate-900/80 text-slate-400 border-b border-slate-800 font-medium">
+                  <th class="p-3">Zeitstempel</th>
+                  <th class="p-3">Innentemp. (°C)</th>
+                  <th class="p-3">Innenfeuchte (%)</th>
+                  <th class="p-3">Abs. Feuchte (Drinnen)</th>
+                  <th class="p-3 text-right">Eintrag-ID</th>
+                </tr>
+              </thead>
+              <tbody id="feed-table-body" class="divide-y divide-slate-850">
+                <!-- Data populated dynamically -->
+                <tr>
+                  <td colspan="5" class="p-4 text-center text-slate-500">Lade Tabellendaten...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-8 py-6 border-t border-slate-900/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
+      <p>© 2026 ClimateFlow. Entwickelt für optimierte Raumnutzung & Energieeffizienz.</p>
+      <p class="flex items-center gap-4">
+        <span>Quelle: <a href="https://thingspeak.com/" target="_blank" class="hover:text-teal-400 underline decoration-teal-500/30 transition-colors">ThingSpeak API</a></span>
+        <span>Wetter: <a href="https://open-meteo.com/" target="_blank" class="hover:text-teal-400 underline decoration-teal-500/30 transition-colors">Open-Meteo API</a></span>
+      </p>
+    </footer>
+
+  </div>
+
+  <!-- Core JavaScript Logic -->
+  <script>
+    // Constants
+    const THINGSPEAK_URL = 'https://api.thingspeak.com/channels/3417815/feeds.json?api_key=79KYAS8DHBA01ZO2&results=8000';
+    
+    // Global Application State
+    const appState = {
+      isDemoMode: false,
+      location: {
+        lat: 48.7758, // Default Stuttgart
+        lon: 9.1829,
+        name: 'Stuttgart, DE'
+      },
+      insideData: [],   // Feeds from ThingSpeak
+      outsideData: {},  // Open-Meteo Current & Hourly Forecast
+      chartInstance: null,
+      currentChartTimeframe: 24 // hours
+    };
+
+    // Initialize UI Icons
+    function updateIcons() {
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    }
+
+    // Toggle Location Search Panel
+    function toggleLocationModal() {
+      const dropdown = document.getElementById('location-dropdown');
+      dropdown.classList.toggle('hidden');
+    }
+
+    // Close dropdown on outside click
+    document.addEventListener('click', (event) => {
+      const dropdown = document.getElementById('location-dropdown');
+      const locationBtn = document.getElementById('location-btn');
+      if (dropdown && !dropdown.classList.contains('hidden') && 
+          !locationBtn.contains(event.target) && !dropdown.contains(event.target)) {
+        dropdown.classList.add('hidden');
+      }
+    });
+
+    // Request Geolocation from Browser
+    function requestGeolocation() {
+      const dropdown = document.getElementById('location-dropdown');
+      dropdown.classList.add('hidden');
+
+      const nameEl = document.getElementById('current-location-name');
+      nameEl.innerText = 'Orte Standort...';
+
+      if (!navigator.geolocation) {
+        showNotification('Ortung nicht unterstützt.', 'error');
+        nameEl.innerText = appState.location.name;
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          
+          nameEl.innerText = 'Benenne Standort...';
+          
+          // Reverse-geocoding using Nominatim (free, keyless OpenStreetMap API)
+          let cityName = 'Mein Standort';
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=de`);
+            if (res.ok) {
+              const data = await res.json();
+              cityName = data.address.city || data.address.town || data.address.village || 'Mein Standort';
+              if (data.address.country_code) {
+                cityName += `, ${data.address.country_code.toUpperCase()}`;
+              }
+            }
+          } catch (e) {
+            console.warn('Reverse geocoding failed, using generic name.', e);
+          }
+
+          setLocation(lat, lon, cityName);
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+          showNotification('Standort konnte nicht ermittelt werden. Geolocation blockiert?', 'error');
+          nameEl.innerText = appState.location.name;
+        },
+        { timeout: 6000 }
+      );
+    }
+
+    // Search Cities using Open-Meteo Geocoding API
+    async function searchCity(event) {
+      const query = event.target.value.trim();
+      const resultsDiv = document.getElementById('search-results');
+
+      if (query.length < 2) {
+        return; // wait for more characters
+      }
+
+      try {
+        const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=de&format=json`);
+        if (!res.ok) throw new Error('Geocoding API fail');
+        
+        const data = await res.json();
+        if (!data.results || data.results.length === 0) {
+          return;
+        }
+
+        // Rebuild results listing
+        resultsDiv.innerHTML = '<span class="px-2 py-1 font-semibold text-slate-500 uppercase tracking-wider">Suchergebnisse</span>';
+        
+        data.results.forEach(city => {
+          const countryCode = city.country_code ? city.country_code.toUpperCase() : '';
+          const state = city.admin1 ? `, ${city.admin1}` : '';
+          const name = `${city.name}${state} (${countryCode})`;
+          const shortName = `${city.name}, ${countryCode}`;
+
+          const btn = document.createElement('button');
+          btn.className = 'w-full text-left px-2 py-1.5 rounded-lg hover:bg-slate-800/80 hover:text-white transition-colors flex items-center justify-between text-[11px]';
+          btn.innerHTML = `
+            <span class="truncate pr-1">${city.name}<span class="text-slate-500 text-[10px]"> ${state}</span></span>
+            <span class="text-[9px] bg-slate-850 border border-slate-800 px-1 py-0.5 rounded text-slate-400">${countryCode}</span>
+          `;
+          btn.onclick = () => {
+            setLocation(city.latitude, city.longitude, shortName);
+            document.getElementById('location-dropdown').classList.add('hidden');
+          };
+          resultsDiv.appendChild(btn);
+        });
+
+      } catch (err) {
+        console.error('Error fetching city search:', err);
+      }
+    }
+
+    // Set custom coordinates and reload weather
+    function setLocation(lat, lon, name) {
+      appState.location = { lat, lon, name };
+      document.getElementById('current-location-name').innerText = name;
+      showNotification(`Standort geändert auf: ${name}`);
+      reloadData();
+    }
+
+    // Helper for Toast Notifications
+    function showNotification(msg, type = 'success') {
+      console.log(`[Notification] ${type.toUpperCase()}: ${msg}`);
+      // Standard logging works, but let's animate the title color briefly as indicator
+      const locBtn = document.getElementById('location-btn');
+      if (locBtn) {
+        locBtn.classList.add(type === 'success' ? 'border-teal-500' : 'border-red-500');
+        setTimeout(() => {
+          locBtn.classList.remove('border-teal-500', 'border-red-500');
+        }, 1500);
+      }
+    }
+
+    // Absolute Humidity Calculator ($AH = g/m^3$) using Magnus Formula
+    function getAbsoluteHumidity(temp, rh) {
+      if (temp === null || rh === null) return 0;
+      // Saturation water vapor pressure in hPa
+      const es = 6.112 * Math.exp((17.67 * temp) / (temp + 243.5));
+      // Actual water vapor pressure in hPa
+      const e = (rh / 100) * es;
+      // Absolute humidity in g/m³ (water mass per volume air)
+      return (216.74 * e) / (temp + 273.15);
+    }
+
+    // Load Data trigger
+    async function reloadData() {
+      const reloadIcon = document.getElementById('reload-icon');
+      if (reloadIcon) reloadIcon.classList.add('animate-spin');
+      
+      try {
+        await Promise.all([
+          loadIndoorData(),
+          loadOutdoorWeather()
+        ]);
+        
+        processClimateData();
+      } catch (error) {
+        console.error('Error reloading dashboard data:', error);
+      } finally {
+        if (reloadIcon) {
+          setTimeout(() => {
+            reloadIcon.classList.remove('animate-spin');
+          }, 800);
+        }
+      }
+    }
+
+    // Retry button click
+    function retryLoadingData() {
+      appState.isDemoMode = false;
+      document.getElementById('demo-banner').classList.add('hidden');
+      reloadData();
+    }
+
+    // Fetch ThingSpeak indoor sensor data
+    async function loadIndoorData() {
+      try {
+        const response = await fetch(THINGSPEAK_URL);
+        if (!response.ok) throw new Error('ThingSpeak API failed');
+        
+        const data = await response.json();
+        
+        if (data && data.feeds && data.feeds.length > 0) {
+          // Parse values properly and forward-fill temperature and humidity 
+          // because the sensor writes fields at separate times (one field per entry)
+          // and some sensor versions write decimals with commas (e.g. "30,5").
+          let lastTemp = null;
+          let lastHum = null;
+          const alignedFeeds = [];
+
+          data.feeds.forEach(feed => {
+            const f1 = feed.field1;
+            const f2 = feed.field2;
+
+            if (f1 !== null && f1 !== undefined && f1.toString().trim() !== '') {
+              const parsedTemp = parseFloat(f1.toString().replace(',', '.'));
+              if (!isNaN(parsedTemp)) lastTemp = parsedTemp;
+            }
+            if (f2 !== null && f2 !== undefined && f2.toString().trim() !== '') {
+              const parsedHum = parseFloat(f2.toString().replace(',', '.'));
+              if (!isNaN(parsedHum)) lastHum = parsedHum;
+            }
+
+            // Only add data points if we have at least one valid reading of both
+            if (lastTemp !== null && lastHum !== null) {
+              alignedFeeds.push({
+                time: new Date(feed.created_at),
+                temp: lastTemp,
+                humidity: lastHum,
+                id: feed.entry_id
+              });
+            }
+          });
+
+          if (alignedFeeds.length > 0) {
+            appState.insideData = alignedFeeds;
+            appState.isDemoMode = false;
+            updateStatusText(true);
+          } else {
+            throw new Error('No valid aligned feeds found');
+          }
+        } else {
+          throw new Error('Empty feeds array');
+        }
+      } catch (err) {
+        console.warn('ThingSpeak load failed or yielded no valid data, activating demo fallback', err);
+        activateDemoMode();
+      }
+    }
+
+    // Fetch Local Outdoor Weather from Open-Meteo
+    async function loadOutdoorWeather() {
+      const { lat, lon } = appState.location;
+      try {
+        // Query Open-Meteo for: current temp/humidity + hourly forecast for line chart match
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,relative_humidity_2m&timezone=auto`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Open-Meteo API failed');
+        
+        const data = await res.json();
+        appState.outsideData = data;
+      } catch (err) {
+        console.error('Error loading outdoor weather:', err);
+        // Load mock weather data to match demo mode
+        appState.outsideData = generateMockWeather();
+      }
+    }
+
+    // Generate Mock Weather (Fallback)
+    function generateMockWeather() {
+      // Simulate normal day/night weather sequence
+      const currentHour = new Date().getHours();
+      const isNight = currentHour < 6 || currentHour > 21;
+      const baseTemp = isNight ? 12.0 : 21.5;
+      
+      const hourlyTimes = [];
+      const hourlyTemp = [];
+      const hourlyHum = [];
+      const now = new Date();
+      
+      for (let i = 168; i >= 0; i--) {
+        const time = new Date(now.getTime() - i * 60 * 60 * 1000);
+        const hour = time.getHours();
+        // Sine wave matching time of day
+        const tempOffset = Math.sin((hour - 8) / 24 * 2 * Math.PI) * 5;
+        hourlyTimes.push(time.toISOString());
+        hourlyTemp.push(parseFloat((16 + tempOffset).toFixed(1)));
+        hourlyHum.push(parseFloat((65 - tempOffset * 2).toFixed(0)));
+      }
+
+      return {
+        current: {
+          temperature_2m: baseTemp + (Math.random() * 2 - 1),
+          relative_humidity_2m: 65,
+          weather_code: 3 // Cloud sun
+        },
+        hourly: {
+          time: hourlyTimes,
+          temperature_2m: hourlyTemp,
+          relative_humidity_2m: hourlyHum
+        }
+      };
+    }
+
+    // Set demo mode active & generate full historical set
+    function activateDemoMode() {
+      appState.isDemoMode = true;
+      document.getElementById('demo-banner').classList.remove('hidden');
+      updateStatusText(false);
+
+      // Generate 5 days of simulated internal sensor readings (5-minute intervals)
+      const mockFeeds = [];
+      const now = new Date();
+      const totalFeeds = 1440; // 5 days at 5-minute ticks
+      let lastTemp = 21.8;
+      let lastHum = 48.0;
+
+      for (let i = totalFeeds; i > 0; i--) {
+        const time = new Date(now.getTime() - i * 5 * 60 * 1000);
+        const hour = time.getHours();
+        
+        // Inside Temperature oscillates slightly with outdoor temp (lagged) plus household spikes (cooking/heating)
+        const dailyOsc = Math.sin((hour - 10) / 24 * 2 * Math.PI) * 0.8;
+        const randomFluct = (Math.random() * 2 - 1) * 0.05;
+        
+        // Simulate a window opening sometimes: big drop if temp is high, humidity equilibrates
+        let windowEffect = 0;
+        if (hour === 8 && time.getMinutes() < 15) windowEffect = -0.6; // Morning venting
+        if (hour === 18 && time.getMinutes() < 20) windowEffect = -0.4; // Evening venting
+        
+        let temp = parseFloat((21.5 + dailyOsc + windowEffect + randomFluct).toFixed(1));
+        
+        // Humidity behaves inversely to temperature, rises when people active (cooking, sleeping)
+        const humOsc = -Math.sin((hour - 10) / 24 * 2 * Math.PI) * 4;
+        const humRandom = (Math.random() * 2 - 1) * 0.3;
+        let humidity = parseFloat((45 + humOsc + (windowEffect * -6) + humRandom).toFixed(1));
+        
+        mockFeeds.push({
+          time: time,
+          temp: temp,
+          humidity: humidity,
+          id: 100000 + (totalFeeds - i)
+        });
+      }
+
+      appState.insideData = mockFeeds;
+    }
+
+    // Update Banner Status UI
+    function updateStatusText(isLive) {
+      const dot = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+      
+      if (isLive) {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-teal-500 shadow-[0_0_8px_#14b8a6] animate-pulse';
+        text.innerText = 'ThingSpeak API live';
+      } else {
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_#f59e0b] animate-pulse-slow';
+        text.innerText = 'Demo-Modus aktiv';
+      }
+    }
+
+    // Format Date / Times nicely
+    function formatTime(date) {
+      return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    function formatDate(date) {
+      return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+    }
+
+    // Process Loaded Data & Perform Analytics
+    function processClimateData() {
+      const feeds = appState.insideData;
+      if (feeds.length === 0) return;
+
+      // 1. Current Inside Values (latest feed)
+      const currentInside = feeds[feeds.length - 1];
+      const curTempIn = currentInside.temp;
+      const curHumIn = currentInside.humidity;
+      
+      document.getElementById('kpi-temp-in').innerText = curTempIn.toFixed(1);
+      document.getElementById('kpi-humidity-in').innerText = curHumIn.toFixed(0);
+
+      // Comfort Index calculations
+      let tempComfort = 'Behaglich';
+      let tempComfortClass = 'text-teal-400';
+      if (curTempIn < 19) {
+        tempComfort = 'Kühl';
+        tempComfortClass = 'text-blue-400';
+      } else if (curTempIn > 24) {
+        tempComfort = 'Warm';
+        tempComfortClass = 'text-orange-400';
+      }
+      const tempComfortEl = document.getElementById('kpi-temp-comfort');
+      tempComfortEl.innerText = tempComfort;
+      tempComfortEl.className = `font-semibold ${tempComfortClass}`;
+
+      let humComfort = 'Optimal';
+      let humComfortClass = 'text-emerald-400';
+      if (curHumIn < 40) {
+        humComfort = 'Trocken';
+        humComfortClass = 'text-amber-500';
+      } else if (curHumIn > 60) {
+        humComfort = 'Feucht';
+        humComfortClass = 'text-red-400';
+      }
+      const humComfortEl = document.getElementById('kpi-humidity-comfort');
+      humComfortEl.innerText = humComfort;
+      humComfortEl.className = `font-semibold ${humComfortClass}`;
+
+      // 2. Trend Calculation (compare last 3 feeds vs feeds from 1 to 2 hours ago)
+      calculateTrends(feeds);
+
+      // 3. Current Outside Values
+      const currentWeather = appState.outsideData.current;
+      let curTempOut = 0;
+      let curHumOut = 0;
+      let weatherCode = 0;
+
+      if (currentWeather) {
+        curTempOut = currentWeather.temperature_2m;
+        curHumOut = currentWeather.relative_humidity_2m;
+        weatherCode = currentWeather.weather_code;
+        
+        document.getElementById('kpi-temp-out').innerText = curTempOut.toFixed(1);
+        document.getElementById('kpi-humidity-out').innerText = curHumOut.toFixed(0) + '%';
+        document.getElementById('weather-desc').innerText = getWeatherDescription(weatherCode);
+        
+        // Update weather icon based on code
+        updateWeatherIcon(weatherCode);
+      }
+
+      // 4. Ventilation calculation
+      computeVentilationAdvisor(curTempIn, curHumIn, curTempOut, curHumOut);
+
+      // 5. Historical Stats (Last 24 Hours)
+      compute24hStats(feeds, curTempOut);
+
+      // 6. Draw / Refresh the line chart
+      drawChart();
+
+      // 7. Update raw data list
+      populateTable(feeds);
+
+      // Re-trigger Lucide icon instantiation to render changes
+      updateIcons();
+    }
+
+    // Weather Description Codes (WMO Codes)
+    function getWeatherDescription(code) {
+      if (code === 0) return 'Klarer Himmel';
+      if (code === 1 || code === 2 || code === 3) return 'Leicht bewölkt';
+      if (code === 45 || code === 48) return 'Nebel';
+      if (code === 51 || code === 53 || code === 55) return 'Nieselregen';
+      if (code === 61 || code === 63 || code === 65) return 'Regen';
+      if (code === 71 || code === 73 || code === 75) return 'Schneefall';
+      if (code === 80 || code === 81 || code === 82) return 'Regenschauer';
+      if (code === 95 || code === 96 || code === 99) return 'Gewitter';
+      return 'Heiter';
+    }
+
+    // Dynamic Weather Icon mapping
+    function updateWeatherIcon(code) {
+      const container = document.getElementById('weather-icon-container');
+      let icon = 'cloud-sun';
+      let colorClass = 'text-teal-400';
+
+      if (code === 0) {
+        icon = 'sun';
+        colorClass = 'text-amber-400';
+      } else if (code >= 1 && code <= 3) {
+        icon = 'cloud-sun';
+        colorClass = 'text-teal-400';
+      } else if (code === 45 || code === 48) {
+        icon = 'cloud-fog';
+        colorClass = 'text-slate-400';
+      } else if ((code >= 51 && code <= 55) || (code >= 61 && code <= 65) || (code >= 80 && code <= 82)) {
+        icon = 'cloud-rain';
+        colorClass = 'text-blue-400';
+      } else if (code >= 71 && code <= 75) {
+        icon = 'snowflake';
+        colorClass = 'text-sky-300';
+      } else if (code >= 95) {
+        icon = 'cloud-lightning';
+        colorClass = 'text-indigo-400';
+      }
+
+      container.className = `w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center ${colorClass}`;
+      container.innerHTML = `<i data-lucide="${icon}" class="w-6 h-6"></i>`;
+    }
+
+    // Trend calculator
+    function calculateTrends(feeds) {
+      if (feeds.length < 15) return;
+
+      const recentFeeds = feeds.slice(-3);
+      const avgRecentTemp = recentFeeds.reduce((acc, f) => acc + f.temp, 0) / 3;
+      const avgRecentHum = recentFeeds.reduce((acc, f) => acc + f.humidity, 0) / 3;
+
+      // Look back about 1 to 2 hours. Assuming 1 entry per 5 mins = 12-24 feeds.
+      // We take a 3-feed average around index -20.
+      const indexBack = Math.max(0, feeds.length - 20);
+      const pastFeeds = feeds.slice(indexBack, indexBack + 3);
+      const avgPastTemp = pastFeeds.reduce((acc, f) => acc + f.temp, 0) / 3;
+      const avgPastHum = pastFeeds.reduce((acc, f) => acc + f.humidity, 0) / 3;
+
+      const tempDelta = avgRecentTemp - avgPastTemp;
+      const humDelta = avgRecentHum - avgPastHum;
+
+      // Update Temp Trend DOM
+      const tempTrendEl = document.getElementById('kpi-temp-in-trend');
+      const tempTrendVal = document.getElementById('kpi-temp-in-trend-val');
+      
+      let tempArrow = 'trending-flat';
+      let tempColor = 'text-slate-400';
+      let tempSign = tempDelta > 0.05 ? '+' : '';
+      
+      if (tempDelta > 0.08) {
+        tempArrow = 'trending-up';
+        tempColor = 'text-orange-400';
+      } else if (tempDelta < -0.08) {
+        tempArrow = 'trending-down';
+        tempColor = 'text-blue-400';
+      }
+      
+      tempTrendEl.className = `flex items-center gap-0.5 font-medium ${tempColor}`;
+      tempTrendVal.innerText = `${tempSign}${tempDelta.toFixed(1)}°C/h`;
+      tempTrendEl.innerHTML = `<i data-lucide="${tempArrow}" class="w-3.5 h-3.5 inline"></i> ${tempSign}${tempDelta.toFixed(1)}°C/h`;
+
+      // Update Hum Trend DOM
+      const humTrendEl = document.getElementById('kpi-humidity-in-trend');
+      const humTrendVal = document.getElementById('kpi-humidity-in-trend-val');
+      
+      let humArrow = 'trending-flat';
+      let humColor = 'text-slate-400';
+      let humSign = humDelta > 0.5 ? '+' : '';
+
+      if (humDelta > 1) {
+        humArrow = 'trending-up';
+        humColor = 'text-blue-400';
+      } else if (humDelta < -1) {
+        humArrow = 'trending-down';
+        humColor = 'text-emerald-400';
+      }
+      
+      humTrendEl.className = `flex items-center gap-0.5 font-medium ${humColor}`;
+      humTrendVal.innerText = `${humSign}${humDelta.toFixed(0)}%/h`;
+      humTrendEl.innerHTML = `<i data-lucide="${humArrow}" class="w-3.5 h-3.5 inline"></i> ${humSign}${humDelta.toFixed(0)}%/h`;
+    }
+
+    // Ventilation Recommendation Algorithm
+    function computeVentilationAdvisor(inTemp, inRh, outTemp, outRh) {
+      // Calculate absolute humidity
+      const ahIn = getAbsoluteHumidity(inTemp, inRh);
+      const ahOut = getAbsoluteHumidity(outTemp, outRh);
+      const diff = ahIn - ahOut; // Difference in g/m^3
+
+      document.getElementById('abs-hum-in').innerText = `${ahIn.toFixed(1)} g/m³`;
+      document.getElementById('abs-hum-out').innerText = `${ahOut.toFixed(1)} g/m³`;
+
+      // Visual progress bars (max expected abs hum = 25 g/m³)
+      const widthIn = Math.min(100, (ahIn / 20) * 100);
+      const widthOut = Math.min(100, (ahOut / 20) * 100);
+      document.getElementById('bar-abs-hum-in').style.width = `${widthIn}%`;
+      document.getElementById('bar-abs-hum-out').style.width = `${widthOut}%`;
+
+      // DOM Elements for recommendation
+      const badge = document.getElementById('ventilation-badge');
+      const circle = document.getElementById('ventilation-circle');
+      const icon = document.getElementById('ventilation-icon');
+      const verdict = document.getElementById('ventilation-verdict');
+      const title = document.getElementById('ventilation-title');
+      const desc = document.getElementById('ventilation-short-desc');
+      const expl = document.getElementById('ventilation-explanation');
+      const tip = document.getElementById('ventilation-tip');
+
+      // Algorithm Logic
+      // 1. Dryness logic
+      if (diff > 0.8) {
+        // Air outside is significantly drier than inside. Airing out will dry the room.
+        if (inRh > 58) {
+          // URGENT AIRING (Prevent Mold)
+          badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400';
+          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span><span>Wichtig!</span>';
+          circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-emerald-500 bg-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.3)] relative transition-all duration-500';
+          icon.className = 'w-8 h-8 text-emerald-400 transition-colors duration-500';
+          icon.setAttribute('data-lucide', 'wind');
+          verdict.innerText = 'LÜFTEN';
+          verdict.className = 'text-xs font-bold mt-1 text-emerald-400';
+          title.innerText = 'Lüften empfohlen';
+          desc.innerText = 'Gefahr von Schimmelbildung im Raum!';
+          expl.innerText = `Die Außenluft ist deutlich trockener (${ahOut.toFixed(1)} g/m³) als die Raumluft (${ahIn.toFixed(1)} g/m³). Durch Lüften wird die Luftfeuchte im Raum schnell gesenkt.`;
+          
+          if (outTemp < 6) {
+            tip.innerText = 'Tipp: Wegen der Kälte draußen nur Stoßlüften (3-5 Minuten), um die Wände nicht auszukühlen.';
+          } else {
+            tip.innerText = 'Tipp: Öffne die Fenster weit (Stoß- oder Querlüften) für ca. 10-15 Minuten.';
+          }
+        } else {
+          // Normal Airing recommended
+          badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400';
+          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>Empfohlen</span>';
+          circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-emerald-500 bg-slate-950 shadow-inner relative transition-all duration-500';
+          icon.className = 'w-8 h-8 text-emerald-400 transition-colors duration-500';
+          icon.setAttribute('data-lucide', 'wind');
+          verdict.innerText = 'LÜFTEN';
+          verdict.className = 'text-xs font-bold mt-1 text-emerald-400';
+          title.innerText = 'Lüften empfohlen';
+          desc.innerText = 'Entfeuchtet den Raum effektiv.';
+          expl.innerText = `Durch das Lüften strömt trockene Außenluft ein (${ahOut.toFixed(1)} g/m³ im Vergleich zu ${ahIn.toFixed(1)} g/m³ drinnen), was das Raumklima verbessert.`;
+          tip.innerText = 'Tipp: Ein regelmäßiger Luftaustausch sorgt für frischen Sauerstoff und verringert Virenkonzentrationen.';
+        }
+      } else if (diff < -0.4) {
+        // Air outside is wetter than inside. Airing out will bring moisture in.
+        badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400';
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span><span>Geschlossen halten</span>';
+        circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-red-500 bg-slate-950 shadow-inner relative transition-all duration-500';
+        icon.className = 'w-8 h-8 text-red-400 transition-colors duration-500';
+        icon.setAttribute('data-lucide', 'lock');
+        verdict.innerText = 'SCHLIESSEN';
+        verdict.className = 'text-xs font-bold mt-1 text-red-400';
+        title.innerText = 'Fenster schließen';
+        desc.innerText = 'Außenluft bringt Feuchtigkeit hinein.';
+        expl.innerText = `Die Außenluft trägt mehr Feuchtigkeit (${ahOut.toFixed(1)} g/m³) als deine Raumluft (${ahIn.toFixed(1)} g/m³). Das Öffnen der Fenster würde die Raumfeuchtigkeit ansteigen lassen.`;
+        
+        if (inTemp > 24) {
+          tip.innerText = 'Tipp: Halte die Fenster tagsüber geschlossen, um die sommerliche Hitze und Schwüle draußen zu lassen.';
+        } else {
+          tip.innerText = 'Tipp: Warte mit dem Lüften auf die kühleren, trockeneren Abend- oder Morgenstunden.';
+        }
+      } else {
+        // Minimal difference, no major humidity change
+        badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-slate-900 border border-slate-800 text-slate-400';
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-slate-500"></span><span>Neutral</span>';
+        circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-slate-700 bg-slate-950 shadow-inner relative transition-all duration-500';
+        icon.className = 'w-8 h-8 text-slate-400 transition-colors duration-500';
+        icon.setAttribute('data-lucide', 'minus');
+        verdict.innerText = 'EGAL';
+        verdict.className = 'text-xs font-bold mt-1 text-slate-400';
+        title.innerText = 'Lüften optional';
+        desc.innerText = 'Kein Feuchte-Unterschied vorhanden.';
+        expl.innerText = `Die absolute Feuchte ist innen (${ahIn.toFixed(1)} g/m³) und außen (${ahOut.toFixed(1)} g/m³) nahezu identisch. Lüften führt zu keiner nennenswerten Ent- oder Befeuchtung.`;
+        tip.innerText = 'Tipp: Lüfte bei Bedarf, um Kohlendioxid (CO2) abzutransportieren und frische Luft zuzuführen.';
+      }
+    }
+
+    // 24-Hour Statistical Calculations
+    function compute24hStats(feeds, curTempOut) {
+      const now = new Date();
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      
+      const feeds24h = feeds.filter(feed => feed.time >= oneDayAgo);
+      
+      if (feeds24h.length === 0) return;
+
+      const temps = feeds24h.map(f => f.temp);
+      const hums = feeds24h.map(f => f.humidity);
+
+      const tMin = Math.min(...temps);
+      const tMax = Math.max(...temps);
+      const tAvg = temps.reduce((acc, v) => acc + v, 0) / temps.length;
+
+      const hMin = Math.min(...hums);
+      const hMax = Math.max(...hums);
+      const hAvg = hums.reduce((acc, v) => acc + v, 0) / hums.length;
+
+      document.getElementById('stat-temp-min').innerText = `${tMin.toFixed(1)}°C`;
+      document.getElementById('stat-temp-max').innerText = `${tMax.toFixed(1)}°C`;
+      document.getElementById('stat-temp-avg').innerText = `${tAvg.toFixed(1)}°C`;
+
+      document.getElementById('stat-hum-min').innerText = `${hMin.toFixed(0)}%`;
+      document.getElementById('stat-hum-max').innerText = `${hMax.toFixed(0)}%`;
+      document.getElementById('stat-hum-avg').innerText = `${hAvg.toFixed(0)}%`;
+
+      // Compare room average temp with outdoor current temp
+      const diffOut = Math.abs(tAvg - curTempOut);
+      document.getElementById('stat-temp-diff-out').innerText = `${diffOut.toFixed(1)}°C`;
+      document.getElementById('stat-temp-diff-desc').innerText = tAvg > curTempOut ? 'höher' : 'tiefer';
+    }
+
+    // Draw Chart using Chart.js with dual-axes & gradient styling
+    function drawChart() {
+      const ctx = document.getElementById('climateChart').getContext('2d');
+      const timeframeHours = appState.currentChartTimeframe;
+      
+      // Filter feeds based on selected timeframe
+      const now = new Date();
+      let filteredFeeds = appState.insideData;
+      if (timeframeHours > 0) {
+        const threshold = new Date(now.getTime() - timeframeHours * 60 * 60 * 1000);
+        filteredFeeds = appState.insideData.filter(feed => feed.time >= threshold);
+      }
+
+      // If datasets are too dense, downsample for smoother rendering and performance
+      const maxPoints = 500;
+      if (filteredFeeds.length > maxPoints) {
+        const step = Math.ceil(filteredFeeds.length / maxPoints);
+        filteredFeeds = filteredFeeds.filter((_, idx) => idx % step === 0);
+      }
+
+      // Generate timestamps & data points
+      const labels = filteredFeeds.map(feed => {
+        // If timeframe is 24h, show only hours. Otherwise show date + hour.
+        if (timeframeHours <= 24 && timeframeHours > 0) {
+          return formatTime(feed.time);
+        } else {
+          return `${formatDate(feed.time)} ${formatTime(feed.time)}`;
+        }
+      });
+
+      const insideTempData = filteredFeeds.map(feed => feed.temp);
+      const insideHumData = filteredFeeds.map(feed => feed.humidity);
+
+      // Outdoor data mapping
+      // Open-Meteo provides hourly forecast values. We match outdoor temperatures by time.
+      const outsideTempData = [];
+      const hourlyData = appState.outsideData.hourly;
+      
+      if (hourlyData && hourlyData.time && hourlyData.time.length > 0) {
+        filteredFeeds.forEach(feed => {
+          // Find closest hourly coordinate in weather forecast
+          const feedTimeStr = feed.time.toISOString().substring(0, 14) + '00'; // Round to hour prefix e.g. "2026-06-27T13:00"
+          
+          let matchIdx = hourlyData.time.findIndex(t => t.startsWith(feedTimeStr));
+          if (matchIdx === -1) {
+            // Find closest index by absolute ms difference
+            let minDiff = Infinity;
+            let closestIdx = 0;
+            const feedMs = feed.time.getTime();
+            for (let i = 0; i < hourlyData.time.length; i++) {
+              const hourlyMs = new Date(hourlyData.time[i]).getTime();
+              const diff = Math.abs(feedMs - hourlyMs);
+              if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = i;
+              }
+            }
+            matchIdx = closestIdx;
+          }
+          
+          outsideTempData.push(hourlyData.temperature_2m[matchIdx]);
+        });
+      } else {
+        // Fallback placeholder zeroes if no weather
+        filteredFeeds.forEach(() => outsideTempData.push(18.0));
+      }
+
+      // Setup gradients for background fills
+      const tempGradient = ctx.createLinearGradient(0, 0, 0, 400);
+      tempGradient.addColorStop(0, 'rgba(249, 115, 22, 0.15)');
+      tempGradient.addColorStop(1, 'rgba(249, 115, 22, 0)');
+
+      const humGradient = ctx.createLinearGradient(0, 0, 0, 400);
+      humGradient.addColorStop(0, 'rgba(99, 102, 241, 0.05)');
+      humGradient.addColorStop(1, 'rgba(99, 102, 241, 0)');
+
+      const chartConfig = {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Innentemperatur (°C)',
+              data: insideTempData,
+              borderColor: '#f97316',
+              borderWidth: 2.5,
+              backgroundColor: tempGradient,
+              fill: true,
+              tension: 0.35,
+              pointRadius: filteredFeeds.length > 50 ? 0 : 2.5,
+              pointHoverRadius: 5,
+              yAxisID: 'yTemp',
+            },
+            {
+              label: 'Außentemperatur (°C)',
+              data: outsideTempData,
+              borderColor: '#14b8a6',
+              borderWidth: 2,
+              borderDash: [],
+              backgroundColor: 'transparent',
+              fill: false,
+              tension: 0.35,
+              pointRadius: filteredFeeds.length > 50 ? 0 : 2,
+              pointHoverRadius: 5,
+              yAxisID: 'yTemp',
+            },
+            {
+              label: 'Innenfeuchtigkeit (%)',
+              data: insideHumData,
+              borderColor: '#6366f1',
+              borderWidth: 2,
+              borderDash: [5, 5],
+              backgroundColor: humGradient,
+              fill: true,
+              tension: 0.35,
+              pointRadius: filteredFeeds.length > 50 ? 0 : 2.5,
+              pointHoverRadius: 5,
+              yAxisID: 'yHum',
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false,
+          },
+          plugins: {
+            legend: {
+              display: false // We use custom legends underneath
+            },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              titleColor: '#f8fafc',
+              bodyColor: '#cbd5e1',
+              borderColor: 'rgba(255,255,255,0.08)',
+              borderWidth: 1,
+              padding: 12,
+              boxPadding: 6,
+              usePointStyle: true,
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  if (context.parsed.y !== null) {
+                    label += context.parsed.y.toFixed(1);
+                  }
+                  return label;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                color: 'rgba(255, 255, 255, 0.03)',
+              },
+              ticks: {
+                color: '#64748b',
+                font: { size: 10 },
+                maxTicksLimit: 8
+              }
+            },
+            yTemp: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: {
+                display: true,
+                text: 'Temperatur (°C)',
+                color: '#64748b',
+                font: { size: 10, weight: 'bold' }
+              },
+              grid: {
+                color: 'rgba(255, 255, 255, 0.04)',
+              },
+              ticks: {
+                color: '#94a3b8',
+                callback: value => value.toFixed(1) + '°'
+              }
+            },
+            yHum: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: 'Luftfeuchtigkeit (%)',
+                color: '#64748b',
+                font: { size: 10, weight: 'bold' }
+              },
+              grid: {
+                drawOnChartArea: false, // Prevents duplicate lines overlapping with left Y-axis grids
+              },
+              min: 0,
+              max: 100,
+              ticks: {
+                color: '#94a3b8',
+                callback: value => value.toFixed(0) + '%'
+              }
+            }
+          }
+        }
+      };
+
+      // Handle chart recreation to avoid Canvas leaks
+      if (appState.chartInstance) {
+        appState.chartInstance.destroy();
+      }
+      appState.chartInstance = new Chart(ctx, chartConfig);
+    }
+
+    // Toggle Timeframe selectors styling and refresh chart
+    function setChartTimeframe(hours) {
+      appState.currentChartTimeframe = hours;
+
+      const ids = {
+        24: 'btn-tf-24',
+        72: 'btn-tf-72',
+        168: 'btn-tf-168',
+        '-1': 'btn-tf-all'
+      };
+
+      // Reset all buttons
+      Object.keys(ids).forEach(key => {
+        const btn = document.getElementById(ids[key]);
+        if (btn) {
+          btn.className = 'px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all';
+        }
+      });
+
+      // Highlight active button
+      const activeBtn = document.getElementById(ids[hours.toString()]);
+      if (activeBtn) {
+        activeBtn.className = 'px-3.5 py-1.5 rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 text-xs font-semibold transition-all';
+      }
+
+      drawChart();
+    }
+
+    // Toggle raw database table collapse
+    function toggleTableCollapse() {
+      const container = document.getElementById('table-container');
+      const arrow = document.getElementById('table-arrow');
+      
+      container.classList.toggle('hidden');
+      
+      if (container.classList.contains('hidden')) {
+        arrow.style.transform = 'rotate(0deg)';
+      } else {
+        arrow.style.transform = 'rotate(180deg)';
+      }
+    }
+
+    // Populate the Rohdaten-Tabelle with latest 10 items
+    function populateTable(feeds) {
+      const tbody = document.getElementById('feed-table-body');
+      tbody.innerHTML = '';
+
+      // Get latest 10 feeds, reverse order (newest first)
+      const latestFeeds = feeds.slice(-10).reverse();
+
+      latestFeeds.forEach(feed => {
+        const ah = getAbsoluteHumidity(feed.temp, feed.humidity);
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-900/40 text-slate-300 transition-colors';
+        row.innerHTML = `
+          <td class="p-3 font-mono">${formatDate(feed.time)} ${formatTime(feed.time)}</td>
+          <td class="p-3 text-orange-400 font-semibold">${feed.temp.toFixed(1)} °C</td>
+          <td class="p-3 text-indigo-400 font-semibold">${feed.humidity.toFixed(0)} %</td>
+          <td class="p-3 text-slate-400">${ah.toFixed(2)} g/m³</td>
+          <td class="p-3 text-right font-mono text-slate-500">${feed.id}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Initialize App
+    async function init() {
+      updateIcons();
+      
+      // Auto-detect Geolocation on load
+      const nameEl = document.getElementById('current-location-name');
+      nameEl.innerText = 'Ermittle Standort...';
+      
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            
+            let cityName = 'Mein Standort';
+            try {
+              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=de`);
+              if (res.ok) {
+                const data = await res.json();
+                cityName = data.address.city || data.address.town || data.address.village || 'Mein Standort';
+                if (data.address.country_code) {
+                  cityName += `, ${data.address.country_code.toUpperCase()}`;
+                }
+              }
+            } catch (e) {
+              console.warn('Reverse geocoding error during init:', e);
+            }
+            
+            appState.location = { lat, lon, name: cityName };
+            nameEl.innerText = cityName;
+            await reloadData();
+          },
+          async (error) => {
+            console.warn('Geolocation blocked or failed on load, using default location (Stuttgart).', error);
+            // Default Stuttgart coords
+            appState.location = { lat: 48.7758, lon: 9.1829, name: 'Stuttgart, DE' };
+            nameEl.innerText = appState.location.name;
+            await reloadData();
+          },
+          { timeout: 5000 }
+        );
+      } else {
+        // Fallback Stuttgart
+        appState.location = { lat: 48.7758, lon: 9.1829, name: 'Stuttgart, DE' };
+        nameEl.innerText = appState.location.name;
+        await reloadData();
+      }
+
+      // Auto-refresh every 5 minutes (ThingSpeak updates every ~15s to 1min)
+      setInterval(() => {
+        console.log('[Interval] Auto-refreshing dashboard...');
+        reloadData();
+      }, 5 * 60 * 1000);
+    }
+
+    // Start everything
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
