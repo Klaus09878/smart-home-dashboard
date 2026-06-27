@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SmartHome Climate Dashboard | ClimateFlow</title>
   <!-- SEO & Meta Tags -->
-  <meta name="description" content="Visualisiere und analysiere deine Smart-Home-Klimadaten in Echtzeit. Erhalte intelligente Lüftungsempfehlungen basierend auf der absoluten Luftfeuchtigkeit für mehrere Standorte.">
+  <meta name="description" content="Visualisiere und analysiere deine Smart-Home-Klimadaten in Echtzeit. Erhalte intelligente Lüftungsempfehlungen basierend auf der absoluten Luftfeuchtigkeit.">
   <meta name="theme-color" content="#0f172a">
   
   <!-- Tailwind CSS CDN -->
@@ -84,6 +84,18 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
 
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 transition-all duration-300">
+    <div class="relative w-16 h-16 flex items-center justify-center">
+      <div class="w-16 h-16 rounded-full border-4 border-slate-800 border-t-teal-500 animate-spin absolute"></div>
+      <i data-lucide="wind" class="w-6 h-6 text-teal-400"></i>
+    </div>
+    <div class="text-center">
+      <p class="text-base font-bold text-white tracking-tight" id="loading-text">Klimadaten werden geladen...</p>
+      <p class="text-xs text-slate-500 mt-1">ThingSpeak Abfrage läuft (results=8000)</p>
+    </div>
+  </div>
+
   <!-- Background Ambient Glows -->
   <div class="absolute top-0 left-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
   <div class="absolute top-1/3 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
@@ -103,17 +115,16 @@
       </button>
     </div>
 
-    <!-- HEADER: Always visible, adjusts content dynamically -->
+    <!-- HEADER: Dynamic navigation and location switching -->
     <header class="relative z-30 glass-panel rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-lg">
       <div class="flex items-center gap-3">
         <!-- Logo Icon -->
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20 cursor-pointer" onclick="showView('home')">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20">
           <i data-lucide="home" class="w-5 h-5"></i>
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent cursor-pointer" onclick="showView('home')">ClimateFlow</h1>
-            <span class="text-xs bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-lg text-slate-400" id="current-view-badge">Zentrale</span>
+            <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">ClimateFlow</h1>
           </div>
           <p class="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
             <span class="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_8px_#14b8a6] animate-pulse" id="status-dot"></span>
@@ -124,20 +135,14 @@
 
       <!-- Action & Location Controls -->
       <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
-        <!-- Home / Overview Button (Hidden on Home) -->
-        <button id="nav-home-btn" onclick="showView('home')" class="hidden px-3.5 py-2 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-sm font-medium items-center gap-2 transition-all text-slate-200">
-          <i data-lucide="arrow-left" class="w-4 h-4"></i>
-          <span>Übersicht</span>
-        </button>
-
-        <!-- Location Selector Tabs (Hidden on Home) -->
-        <div id="nav-location-tabs" class="hidden bg-slate-950 p-1 rounded-xl border border-slate-850 flex gap-1">
+        <!-- Location Selector Tabs (Persisted in localStorage) -->
+        <div id="nav-location-tabs" class="bg-slate-950 p-1 rounded-xl border border-slate-850 flex gap-1">
           <button onclick="switchLocation('gillian')" id="tab-gillian" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">Gillian</button>
           <button onclick="switchLocation('sean')" id="tab-sean" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">Sean</button>
         </div>
 
-        <!-- Weather Location Picker Button (Hidden on Home) -->
-        <div class="relative w-full sm:w-auto hidden" id="nav-weather-picker">
+        <!-- Weather Location Picker Button -->
+        <div class="relative w-full sm:w-auto" id="nav-weather-picker">
           <button id="location-btn" onclick="toggleLocationModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-sm font-medium flex items-center justify-between sm:justify-start gap-2.5 transition-all text-slate-200">
             <i data-lucide="map-pin" class="w-4 h-4 text-teal-400"></i>
             <span id="current-location-name">Standort wird ermittelt...</span>
@@ -176,119 +181,16 @@
       </div>
     </header>
 
-    <!-- VIEW 1: HOME / OVERVIEW PAGE -->
-    <main id="view-home" class="flex-1 flex flex-col gap-6 animate-slide-up">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-2xl font-bold tracking-tight text-white">Deine Klimazentrale</h2>
-          <p class="text-xs text-slate-400 mt-1">Alle überwachten Standorte im direkten Überblick.</p>
-        </div>
-      </div>
-
-      <!-- Grid of Locations -->
-      <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        <!-- Gillian Card -->
-        <div onclick="showView('gillian')" class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-lg cursor-pointer group">
-          <!-- Top row: Editable title & Status Badge -->
-          <div class="flex items-start justify-between">
-            <div class="space-y-1" onclick="event.stopPropagation()">
-              <div class="flex items-center gap-2">
-                <span id="title-gillian" class="text-lg font-bold text-white leading-tight">Schlafzimmer Gillian</span>
-                <button onclick="renameLocation('gillian')" class="text-slate-500 hover:text-teal-400 transition-colors">
-                  <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
-                </button>
-              </div>
-              <p class="text-[10px] text-slate-500 tracking-wider uppercase font-semibold">Standort 1</p>
-            </div>
-            
-            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 bg-slate-900 border border-slate-850" id="card-badge-gillian">
-              <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>Lade...
-            </span>
-          </div>
-
-          <!-- Mid row: live figures -->
-          <div class="grid grid-cols-3 gap-2 mt-4">
-            <div class="bg-slate-900/40 border border-slate-850 rounded-xl p-2.5 text-center">
-              <p class="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">Raumtemp.</p>
-              <p class="text-xl font-bold text-white mt-1"><span id="card-temp-gillian">--.-</span>°C</p>
-            </div>
-            <div class="bg-slate-900/40 border border-slate-855 rounded-xl p-2.5 text-center">
-              <p class="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">Feuchte</p>
-              <p class="text-xl font-bold text-white mt-1"><span id="card-hum-gillian">--</span>%</p>
-            </div>
-            <div class="bg-slate-900/40 border border-slate-850 rounded-xl p-2.5 text-center">
-              <p class="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">Außentemp.</p>
-              <p class="text-xl font-bold text-teal-400 mt-1"><span id="card-out-gillian">--.-</span>°C</p>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between text-xs text-slate-400 mt-4 pt-3 border-t border-slate-800/50">
-            <span class="flex items-center gap-1 text-[11px]" id="card-weather-desc-gillian">
-              Lade Wetter...
-            </span>
-            <span class="text-teal-400 font-semibold flex items-center gap-1 text-[11px] group-hover:translate-x-1 transition-transform">
-              Anzeigen <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-            </span>
-          </div>
-        </div>
-
-        <!-- Sean Card -->
-        <div onclick="showView('sean')" class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px] shadow-lg cursor-pointer group">
-          <!-- Top row: Editable title & Status Badge -->
-          <div class="flex items-start justify-between">
-            <div class="space-y-1" onclick="event.stopPropagation()">
-              <div class="flex items-center gap-2">
-                <span id="title-sean" class="text-lg font-bold text-white leading-tight">Schlafzimmer Sean</span>
-                <button onclick="renameLocation('sean')" class="text-slate-500 hover:text-teal-400 transition-colors">
-                  <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
-                </button>
-              </div>
-              <p class="text-[10px] text-slate-500 tracking-wider uppercase font-semibold">Standort 2</p>
-            </div>
-            
-            <span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 bg-slate-900 border border-slate-850" id="card-badge-sean">
-              <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>Lade...
-            </span>
-          </div>
-
-          <!-- Mid row: live figures -->
-          <div class="grid grid-cols-3 gap-2 mt-4">
-            <div class="bg-slate-900/40 border border-slate-850 rounded-xl p-2.5 text-center">
-              <p class="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">Raumtemp.</p>
-              <p class="text-xl font-bold text-white mt-1"><span id="card-temp-sean">--.-</span>°C</p>
-            </div>
-            <div class="bg-slate-900/40 border border-slate-850 rounded-xl p-2.5 text-center">
-              <p class="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">Feuchte</p>
-              <p class="text-xl font-bold text-white mt-1"><span id="card-hum-sean">--</span>%</p>
-            </div>
-            <div class="bg-slate-900/40 border border-slate-850 rounded-xl p-2.5 text-center">
-              <p class="text-[9px] text-slate-500 uppercase tracking-wider font-semibold">Außentemp.</p>
-              <p class="text-xl font-bold text-teal-400 mt-1"><span id="card-out-sean">--.-</span>°C</p>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between text-xs text-slate-400 mt-4 pt-3 border-t border-slate-800/50">
-            <span class="flex items-center gap-1 text-[11px]" id="card-weather-desc-sean">
-              Lade Wetter...
-            </span>
-            <span class="text-teal-400 font-semibold flex items-center gap-1 text-[11px] group-hover:translate-x-1 transition-transform">
-              Anzeigen <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-            </span>
-          </div>
-        </div>
-
-      </section>
-    </main>
-
-    <!-- VIEW 2: LOCATION DETAILED DASHBOARD -->
-    <main id="view-detail" class="hidden flex-1 flex flex-col gap-6 animate-slide-up">
+    <!-- MAIN VIEW: LOCATION DETAILED DASHBOARD -->
+    <main class="flex-1 flex flex-col gap-6 animate-slide-up">
       
-      <!-- Current Location Info Header -->
+      <!-- Current Location Info Header (Editable Name) -->
       <div class="flex items-center justify-between">
-        <div>
+        <div class="flex items-center gap-3">
           <h2 class="text-2xl font-bold tracking-tight text-white" id="detail-loc-title">Standort Name</h2>
-          <p class="text-xs text-slate-400 mt-1">Detaillierter Klimaverlauf und Lüftungsempfehlung.</p>
+          <button onclick="renameActiveLocation()" class="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Standort umbenennen">
+            <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+          </button>
         </div>
       </div>
 
@@ -399,12 +301,12 @@
                 <span class="text-xs font-bold mt-1 text-slate-400 transition-colors duration-500" id="ventilation-verdict">Unklar</span>
               </div>
               <h3 class="text-sm font-semibold mt-4 text-center text-slate-200" id="ventilation-title">Feuchtigkeitsausgleich</h3>
-              <p class="text-xs text-slate-400 mt-1 text-center max-w-[200px]" id="ventilation-short-desc font-normal">Lade Klimadaten...</p>
+              <p class="text-xs text-slate-400 mt-1 text-center max-w-[200px]" id="ventilation-short-desc">Lade Klimadaten...</p>
             </div>
 
             <!-- Absolute Humidity Visualizer -->
             <div class="flex flex-col gap-4">
-              <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider font-normal">Absolute Luftfeuchtigkeit (Wassergehalt)</h4>
+              <h4 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Absolute Luftfeuchtigkeit (Wassergehalt)</h4>
               
               <div class="space-y-1">
                 <div class="flex justify-between text-xs">
@@ -434,7 +336,7 @@
 
           <div class="mt-4 pt-3 border-t border-slate-800/60 flex items-start gap-2 text-xs text-slate-400">
             <i data-lucide="info" class="w-4 h-4 text-teal-400 shrink-0"></i>
-            <span id="ventilation-tip font-normal">Warte auf Berechnungen...</span>
+            <span id="ventilation-tip">Warte auf Berechnungen...</span>
           </div>
         </div>
 
@@ -607,29 +509,32 @@
 
     // Global State
     const appState = {
-      currentView: 'home',      // 'home' | 'gillian' | 'sean'
+      activeLocId: localStorage.getItem('selected_location') || 'gillian',
       isDemoMode: false,
-      locationsData: {
-        gillian: { insideData: [], outsideData: {}, weatherConfig: null },
-        sean: { insideData: [], outsideData: {}, weatherConfig: null }
-      },
+      insideData: [],
+      outsideData: {},
+      weatherConfig: null,
       chartInstance: null,
       currentChartTimeframe: 24 // hours
     };
 
     // Load custom names and weather configs from localStorage
     function initConfigs() {
-      LOCATIONS.forEach(loc => {
-        // Load Weather
-        const savedWeather = localStorage.getItem(`loc_weather_${loc.id}`);
-        appState.locationsData[loc.id].weatherConfig = savedWeather ? JSON.parse(savedWeather) : { ...loc.defaultWeather };
+      // Restore weather configs
+      const savedWeather = localStorage.getItem(`loc_weather_${appState.activeLocId}`);
+      if (savedWeather) {
+        appState.weatherConfig = JSON.parse(savedWeather);
+      } else {
+        const activeLoc = LOCATIONS.find(l => l.id === appState.activeLocId);
+        appState.weatherConfig = { ...activeLoc.defaultWeather };
+      }
 
-        // Apply custom names to DOM on home page
-        const nameEl = document.getElementById(`title-${loc.id}`);
-        if (nameEl) {
-          nameEl.innerText = getLocationName(loc.id);
-        }
-      });
+      // Set titles & tab buttons labels
+      updateTabLabels();
+      updateWeatherButtonName();
+      
+      // Select correct Tab highlight on UI
+      highlightActiveTab();
     }
 
     function getLocationName(locId) {
@@ -637,21 +542,16 @@
       return localStorage.getItem(`loc_name_${locId}`) || (loc ? loc.defaultName : '');
     }
 
-    function renameLocation(locId) {
+    function renameActiveLocation() {
+      const locId = appState.activeLocId;
       const currentName = getLocationName(locId);
-      const newName = prompt(`Neuen Namen für Standort eingeben:`, currentName);
+      const newName = prompt(`Neuen Namen für diesen Standort eingeben:`, currentName);
+      
       if (newName !== null && newName.trim() !== '') {
         localStorage.setItem(`loc_name_${locId}`, newName.trim());
         
-        // Update DOM
-        const nameEl = document.getElementById(`title-${locId}`);
-        if (nameEl) nameEl.innerText = newName.trim();
-        
-        // If we are currently on the detail page of this location, update the title there as well
-        if (appState.currentView === locId) {
-          document.getElementById('detail-loc-title').innerText = newName.trim();
-        }
-        
+        // Update DOM Elements
+        document.getElementById('detail-loc-title').innerText = newName.trim();
         updateTabLabels();
         showNotification('Name erfolgreich geändert!');
       }
@@ -662,6 +562,20 @@
       const tabS = document.getElementById('tab-sean');
       if (tabG) tabG.innerText = getLocationName('gillian').replace('Schlafzimmer ', '');
       if (tabS) tabS.innerText = getLocationName('sean').replace('Schlafzimmer ', '');
+      document.getElementById('detail-loc-title').innerText = getLocationName(appState.activeLocId);
+    }
+
+    function highlightActiveTab() {
+      const tabG = document.getElementById('tab-gillian');
+      const tabS = document.getElementById('tab-sean');
+      
+      if (appState.activeLocId === 'gillian') {
+        tabG.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 text-slate-950 shadow-md shadow-teal-500/10 transition-all';
+        tabS.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all';
+      } else {
+        tabS.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 text-slate-950 shadow-md shadow-teal-500/10 transition-all';
+        tabG.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all';
+      }
     }
 
     // Toggle Location Search Panel
@@ -765,14 +679,11 @@
       }
     }
 
-    // Set coordinates for the active location's weather
+    // Set coordinates for the active weather
     function setWeatherCoords(lat, lon, name) {
-      const activeLocId = appState.currentView;
-      if (activeLocId === 'home') return;
-
       const weatherObj = { lat, lon, name };
-      appState.locationsData[activeLocId].weatherConfig = weatherObj;
-      localStorage.setItem(`loc_weather_${activeLocId}`, JSON.stringify(weatherObj));
+      appState.weatherConfig = weatherObj;
+      localStorage.setItem(`loc_weather_${appState.activeLocId}`, JSON.stringify(weatherObj));
       
       updateWeatherButtonName();
       showNotification(`Wetter-Standort geändert: ${name}`);
@@ -780,13 +691,9 @@
     }
 
     function updateWeatherButtonName() {
-      const activeLocId = appState.currentView;
-      if (activeLocId === 'home') return;
-
-      const conf = appState.locationsData[activeLocId].weatherConfig;
       const btnName = document.getElementById('current-location-name');
-      if (btnName && conf) {
-        btnName.innerText = conf.name;
+      if (btnName && appState.weatherConfig) {
+        btnName.innerText = appState.weatherConfig.name;
       }
     }
 
@@ -809,33 +716,36 @@
       return (216.74 * e) / (temp + 273.15);
     }
 
-    // Master reload data
+    // Show / Hide Loading Screen
+    function toggleLoadingOverlay(show) {
+      const overlay = document.getElementById('loading-overlay');
+      if (show) {
+        overlay.classList.remove('hidden', 'opacity-0');
+      } else {
+        overlay.classList.add('opacity-0');
+        setTimeout(() => {
+          overlay.classList.add('hidden');
+        }, 300);
+      }
+    }
+
+    // Master reload data (optimized: ONLY active location is loaded!)
     async function reloadData() {
       const reloadIcon = document.getElementById('reload-icon');
       if (reloadIcon) reloadIcon.classList.add('animate-spin');
+      toggleLoadingOverlay(true);
       
       try {
-        if (appState.currentView === 'home') {
-          // Fetch both for overview cards
-          await Promise.all([
-            loadIndoorData('gillian'),
-            loadIndoorData('sean'),
-            loadOutdoorWeather('gillian'),
-            loadOutdoorWeather('sean')
-          ]);
-          renderHomeOverview();
-        } else {
-          // Fetch only current active view details
-          const activeLoc = appState.currentView;
-          await Promise.all([
-            loadIndoorData(activeLoc),
-            loadOutdoorWeather(activeLoc)
-          ]);
-          renderDetailView(activeLoc);
-        }
+        await Promise.all([
+          loadIndoorData(),
+          loadOutdoorWeather()
+        ]);
+        
+        renderActiveView();
       } catch (error) {
         console.error('Error reloading data:', error);
       } finally {
+        toggleLoadingOverlay(false);
         if (reloadIcon) {
           setTimeout(() => {
             reloadIcon.classList.remove('animate-spin');
@@ -850,11 +760,11 @@
       reloadData();
     }
 
-    // Fetch ThingSpeak indoor feeds for a specific location
-    async function loadIndoorData(locId) {
-      const loc = LOCATIONS.find(l => l.id === locId);
+    // Fetch ThingSpeak indoor feeds for the active location
+    async function loadIndoorData() {
+      const activeLoc = LOCATIONS.find(l => l.id === appState.activeLocId);
       try {
-        const response = await fetch(loc.thingspeakUrl);
+        const response = await fetch(activeLoc.thingspeakUrl);
         if (!response.ok) throw new Error('ThingSpeak load failed');
         
         const data = await response.json();
@@ -889,7 +799,8 @@
           });
 
           if (aligned.length > 0) {
-            appState.locationsData[locId].insideData = aligned;
+            appState.insideData = aligned;
+            appState.isDemoMode = false;
             updateStatusText(true);
           } else {
             throw new Error('No valid aligned feeds');
@@ -898,14 +809,14 @@
           throw new Error('Empty feeds array');
         }
       } catch (err) {
-        console.warn(`ThingSpeak load failed for ${locId}, fallback to demo mode.`, err);
-        activateDemoMode(locId);
+        console.warn(`ThingSpeak load failed, fallback to demo mode.`, err);
+        activateDemoMode();
       }
     }
 
-    // Fetch local weather from Open-Meteo per location
-    async function loadOutdoorWeather(locId) {
-      const conf = appState.locationsData[locId].weatherConfig;
+    // Fetch local weather from Open-Meteo for active coordinates
+    async function loadOutdoorWeather() {
+      const conf = appState.weatherConfig;
       if (!conf) return;
 
       try {
@@ -914,15 +825,15 @@
         if (!res.ok) throw new Error('Open-Meteo load failed');
         
         const data = await res.json();
-        appState.locationsData[locId].outsideData = data;
+        appState.outsideData = data;
       } catch (err) {
-        console.error(`Error fetching weather for ${locId}:`, err);
-        appState.locationsData[locId].outsideData = generateMockWeather(locId);
+        console.error(`Error fetching weather:`, err);
+        appState.outsideData = generateMockWeather();
       }
     }
 
-    function generateMockWeather(locId) {
-      const isSean = locId === 'sean';
+    function generateMockWeather() {
+      const isSean = appState.activeLocId === 'sean';
       const baseTemp = isSean ? 14.5 : 18.0;
       
       const hourlyTimes = [];
@@ -953,16 +864,15 @@
       };
     }
 
-    function activateDemoMode(locId) {
+    function activateDemoMode() {
       appState.isDemoMode = true;
       document.getElementById('demo-banner').classList.remove('hidden');
       updateStatusText(false);
 
-      // Generate simulated indoor readings
       const mockFeeds = [];
       const now = new Date();
       const totalFeeds = 1000;
-      const isSean = locId === 'sean';
+      const isSean = appState.activeLocId === 'sean';
       
       let baseTemp = isSean ? 20.2 : 22.1;
       let baseHum = isSean ? 54.0 : 45.0;
@@ -989,7 +899,7 @@
         });
       }
 
-      appState.locationsData[locId].insideData = mockFeeds;
+      appState.insideData = mockFeeds;
     }
 
     function updateStatusText(isLive) {
@@ -1005,7 +915,7 @@
       }
     }
 
-    // Format utility
+    // Format utilities
     function formatTime(date) {
       return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
     }
@@ -1024,115 +934,36 @@
       return 'Heiter';
     }
 
-    // VIEW SWITCHER
-    function showView(viewId) {
-      appState.currentView = viewId;
+    // Switch location selection & reload
+    async function switchLocation(locId) {
+      if (appState.activeLocId === locId) return;
 
-      // DOM Toggles
-      const homeView = document.getElementById('view-home');
-      const detailView = document.getElementById('view-detail');
+      appState.activeLocId = locId;
+      localStorage.setItem('selected_location', locId);
       
-      const navHomeBtn = document.getElementById('nav-home-btn');
-      const navLocTabs = document.getElementById('nav-location-tabs');
-      const navWeather = document.getElementById('nav-weather-picker');
-      const badge = document.getElementById('current-view-badge');
-
-      if (viewId === 'home') {
-        // Show Home, Hide Details
-        homeView.classList.remove('hidden');
-        detailView.classList.add('hidden');
-        
-        navHomeBtn.classList.replace('flex', 'hidden');
-        navLocTabs.classList.add('hidden');
-        navWeather.classList.add('hidden');
-        badge.innerText = 'Zentrale';
-
-        renderHomeOverview();
+      // Reset active weather config to this location's saved weather
+      const savedWeather = localStorage.getItem(`loc_weather_${locId}`);
+      if (savedWeather) {
+        appState.weatherConfig = JSON.parse(savedWeather);
       } else {
-        // Show Details, Hide Home
-        homeView.classList.add('hidden');
-        detailView.classList.remove('hidden');
-        
-        navHomeBtn.classList.replace('hidden', 'flex');
-        navLocTabs.classList.remove('hidden');
-        navWeather.classList.remove('hidden');
-        
-        badge.innerText = 'Detailansicht';
-
-        // Select correct Tab highlight
-        const tabG = document.getElementById('tab-gillian');
-        const tabS = document.getElementById('tab-sean');
-        
-        if (viewId === 'gillian') {
-          tabG.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 text-slate-950 shadow-md shadow-teal-500/10 transition-all';
-          tabS.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all';
-        } else {
-          tabS.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 text-slate-950 shadow-md shadow-teal-500/10 transition-all';
-          tabG.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all';
-        }
-
-        updateWeatherButtonName();
-        renderDetailView(viewId);
+        const loc = LOCATIONS.find(l => l.id === locId);
+        appState.weatherConfig = { ...loc.defaultWeather };
       }
+
+      highlightActiveTab();
+      updateWeatherButtonName();
+      updateTabLabels();
       
-      // Update Lucide icons
-      updateIcons();
-    }
-
-    function switchLocation(locId) {
-      showView(locId);
-      reloadData();
-    }
-
-    // Render Home overview page cards
-    function renderHomeOverview() {
-      LOCATIONS.forEach(loc => {
-        const data = appState.locationsData[loc.id];
-        const feeds = data.insideData;
-        const weather = data.outsideData.current;
-
-        if (feeds && feeds.length > 0) {
-          const latest = feeds[feeds.length - 1];
-          document.getElementById(`card-temp-${loc.id}`).innerText = latest.temp.toFixed(1);
-          document.getElementById(`card-hum-${loc.id}`).innerText = latest.humidity.toFixed(0);
-
-          // Ventilation advice for overview
-          if (weather) {
-            const tempOut = weather.temperature_2m;
-            const humOut = weather.relative_humidity_2m;
-            
-            document.getElementById(`card-out-${loc.id}`).innerText = tempOut.toFixed(1);
-            document.getElementById(`card-weather-desc-${loc.id}`).innerText = 
-              `${getWeatherDescription(weather.weather_code)}, ${humOut.toFixed(0)}% rF`;
-
-            // Calculate absolute humidity
-            const ahIn = getAbsoluteHumidity(latest.temp, latest.humidity);
-            const ahOut = getAbsoluteHumidity(tempOut, humOut);
-            const diff = ahIn - ahOut;
-
-            const badge = document.getElementById(`card-badge-${loc.id}`);
-            if (diff > 0.8) {
-              badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400';
-              badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Lüften';
-            } else if (diff < -0.4) {
-              badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400';
-              badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>Schließen';
-            } else {
-              badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 bg-slate-900 border border-slate-800 text-slate-400';
-              badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>Zufrieden';
-            }
-          }
-        }
-      });
+      // Trigger API requests and repaint
+      await reloadData();
     }
 
     // Render detailed dashboard metrics
-    function renderDetailView(locId) {
-      const data = appState.locationsData[locId];
-      const feeds = data.insideData;
-      const weather = data.outsideData.current;
+    function renderActiveView() {
+      const feeds = appState.insideData;
+      const weather = appState.outsideData.current;
+      const locId = appState.activeLocId;
 
-      // Title
       document.getElementById('detail-loc-title').innerText = getLocationName(locId);
 
       if (!feeds || feeds.length === 0) return;
@@ -1198,7 +1029,7 @@
       compute24hStats(feeds, curTempOut);
 
       // 5. Draw lines
-      drawChart(locId);
+      drawChart();
 
       // 6. Table
       populateTable(feeds);
@@ -1310,7 +1141,7 @@
         verdict.className = 'text-xs font-bold mt-1 text-red-400';
         title.innerText = 'Fenster geschlossen halten';
         desc.innerText = 'Außenluft ist zu feucht.';
-        expl.innerText = `Die Außenluft trägt mehr Feuchte (${ahOut.toFixed(1)} g/m³) als drinnen (${ahIn.toFixed(1)} g/m³). Lüften würde die Raumfeuchtigkeit erhöhen.`;
+        expl.innerText = `Die Außenluft trägt mehr Feuchte (${ahOut.toFixed(1)} g/m³) als drinnen (${ahIn.toFixed(1)} g/m³). Das Öffnen der Fenster würde die Raumfeuchte ansteigen lassen.`;
         tip.innerText = inTemp > 24 ? 'Tipp: Fenster tagsüber geschlossen halten, um sommerliche Schwüle auszusperren.' : 'Tipp: Warte auf trockenere Stunden am Abend/Morgen.';
       } else {
         badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-slate-900 border border-slate-800 text-slate-400';
@@ -1354,18 +1185,17 @@
     }
 
     // Draw Line Chart.js
-    function drawChart(locId) {
+    function drawChart() {
       const ctx = document.getElementById('climateChart').getContext('2d');
       const timeframeHours = appState.currentChartTimeframe;
       
       const now = new Date();
-      let filtered = appState.locationsData[locId].insideData;
+      let filtered = appState.insideData;
       if (timeframeHours > 0) {
         const threshold = new Date(now.getTime() - timeframeHours * 60 * 60 * 1000);
         filtered = filtered.filter(f => f.time >= threshold);
       }
 
-      // Downsample if too many points
       const maxPoints = 400;
       if (filtered.length > maxPoints) {
         const step = Math.ceil(filtered.length / maxPoints);
@@ -1381,7 +1211,7 @@
 
       // Outdoor weather alignment
       const outsideTemp = [];
-      const hourly = appState.locationsData[locId].outsideData.hourly;
+      const hourly = appState.outsideData.hourly;
       if (hourly && hourly.time) {
         filtered.forEach(feed => {
           const feedTimePrefix = feed.time.toISOString().substring(0, 14) + '00';
@@ -1401,7 +1231,6 @@
         filtered.forEach(() => outsideTemp.push(16.5));
       }
 
-      // Canvas Gradients
       const tempGrad = ctx.createLinearGradient(0, 0, 0, 360);
       tempGrad.addColorStop(0, 'rgba(249, 115, 22, 0.15)');
       tempGrad.addColorStop(1, 'rgba(249, 115, 22, 0)');
@@ -1511,7 +1340,7 @@
       const active = document.getElementById(tfIds[hours.toString()]);
       if (active) active.className = 'px-3.5 py-1.5 rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 text-xs font-semibold transition-all';
 
-      drawChart(appState.currentView);
+      drawChart();
     }
 
     function toggleTableCollapse() {
@@ -1545,9 +1374,8 @@
     async function init() {
       updateIcons();
       initConfigs();
-      updateTabLabels();
       
-      // Load initially all locations data
+      // Load initially active location data
       await reloadData();
       
       // Auto-refresh every 5 minutes
