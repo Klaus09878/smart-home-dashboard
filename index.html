@@ -84,18 +84,6 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
 
-  <!-- Loading Overlay -->
-  <div id="loading-overlay" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 transition-all duration-300">
-    <div class="relative w-16 h-16 flex items-center justify-center">
-      <div class="w-16 h-16 rounded-full border-4 border-slate-800 border-t-teal-500 animate-spin absolute"></div>
-      <i data-lucide="wind" class="w-6 h-6 text-teal-400"></i>
-    </div>
-    <div class="text-center">
-      <p class="text-base font-bold text-white tracking-tight" id="loading-text">Klimadaten werden geladen...</p>
-      <p class="text-xs text-slate-500 mt-1">ThingSpeak Abfrage läuft (results=8000)</p>
-    </div>
-  </div>
-
   <!-- Background Ambient Glows -->
   <div class="absolute top-0 left-1/4 w-96 h-96 bg-teal-500/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
   <div class="absolute top-1/3 right-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
@@ -115,7 +103,7 @@
       </button>
     </div>
 
-    <!-- HEADER: Dynamic navigation and location switching -->
+    <!-- HEADER: Navigation and location switching -->
     <header class="relative z-30 glass-panel rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-lg">
       <div class="flex items-center gap-3">
         <!-- Logo Icon -->
@@ -128,14 +116,14 @@
           </div>
           <p class="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
             <span class="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_8px_#14b8a6] animate-pulse" id="status-dot"></span>
-            <span id="status-text">ThingSpeak API live</span>
+            <span id="status-text">ThingSpeak API bereit</span>
           </p>
         </div>
       </div>
 
       <!-- Action & Location Controls -->
       <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
-        <!-- Location Selector Tabs (Persisted in localStorage) -->
+        <!-- Location Selector Tabs -->
         <div id="nav-location-tabs" class="bg-slate-950 p-1 rounded-xl border border-slate-850 flex gap-1">
           <button onclick="switchLocation('gillian')" id="tab-gillian" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">Gillian</button>
           <button onclick="switchLocation('sean')" id="tab-sean" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">Sean</button>
@@ -145,7 +133,7 @@
         <div class="relative w-full sm:w-auto" id="nav-weather-picker">
           <button id="location-btn" onclick="toggleLocationModal()" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-sm font-medium flex items-center justify-between sm:justify-start gap-2.5 transition-all text-slate-200">
             <i data-lucide="map-pin" class="w-4 h-4 text-teal-400"></i>
-            <span id="current-location-name">Standort wird ermittelt...</span>
+            <span id="current-location-name">Standort wählen...</span>
             <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-500"></i>
           </button>
           
@@ -175,7 +163,7 @@
         </div>
 
         <!-- Reload Data Button -->
-        <button onclick="reloadData()" id="reload-btn" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Daten aktualisieren">
+        <button onclick="triggerAllLoad()" id="reload-btn" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Daten aktualisieren">
           <i data-lucide="refresh-cw" class="w-4.5 h-4.5 transition-transform" id="reload-icon"></i>
         </button>
       </div>
@@ -198,7 +186,16 @@
       <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         
         <!-- Inside Temp Card -->
-        <div class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md">
+        <div class="glass-panel rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md">
+          <!-- Button placeholder if not loaded -->
+          <div id="indoor-temp-empty" class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center gap-2 p-4 text-center">
+            <p class="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">Innentemperatur</p>
+            <button onclick="triggerIndoorLoad()" id="btn-load-indoor-1" class="px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/40 text-orange-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5">
+              <i data-lucide="radio" class="w-3.5 h-3.5"></i>
+              <span>Klima laden</span>
+            </button>
+          </div>
+          
           <div class="flex items-start justify-between">
             <div>
               <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Innentemperatur</p>
@@ -223,7 +220,16 @@
         </div>
 
         <!-- Inside Humidity Card -->
-        <div class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md">
+        <div class="glass-panel rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md">
+          <!-- Button placeholder if not loaded -->
+          <div id="indoor-hum-empty" class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center gap-2 p-4 text-center">
+            <p class="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">Innenfeuchte</p>
+            <button onclick="triggerIndoorLoad()" id="btn-load-indoor-2" class="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5">
+              <i data-lucide="radio" class="w-3.5 h-3.5"></i>
+              <span>Klima laden</span>
+            </button>
+          </div>
+
           <div class="flex items-start justify-between">
             <div>
               <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Innenluftfeuchtigkeit</p>
@@ -248,7 +254,16 @@
         </div>
 
         <!-- Outside Weather Card -->
-        <div class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md sm:col-span-2 lg:col-span-1">
+        <div class="glass-panel rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md sm:col-span-2 lg:col-span-1">
+          <!-- Button placeholder if not loaded -->
+          <div id="outdoor-weather-empty" class="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center gap-2 p-4 text-center">
+            <p class="text-[10px] text-slate-400 font-semibold tracking-wider uppercase">Außenklima</p>
+            <button onclick="triggerOutdoorLoad()" id="btn-load-outdoor" class="px-3 py-1.5 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5">
+              <i data-lucide="cloud-sun" class="w-3.5 h-3.5"></i>
+              <span>Wetter laden</span>
+            </button>
+          </div>
+
           <div class="flex items-start justify-between">
             <div>
               <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Außenklima (Wetter)</p>
@@ -278,7 +293,14 @@
       <section class="grid grid-cols-1 lg:grid-cols-5 gap-6">
         
         <!-- Ventilation Advisor Card (Col span 3) -->
-        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col justify-between lg:col-span-3 min-h-[300px]">
+        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col justify-between lg:col-span-3 min-h-[300px] relative">
+          <!-- Blocking placeholder -->
+          <div id="advisor-placeholder" class="absolute inset-0 bg-slate-900/55 backdrop-blur-[2.5px] rounded-2xl z-20 flex flex-col items-center justify-center gap-2 p-6 text-center">
+            <i data-lucide="wind" class="w-10 h-10 text-slate-500 animate-pulse"></i>
+            <p class="text-sm font-semibold text-slate-300">Lüftungsberater inaktiv</p>
+            <p class="text-xs text-slate-500 max-w-[280px]">Bitte lade sowohl die <strong>Klimadaten</strong> als auch das <strong>Wetter</strong>, um Empfehlungen zu erhalten.</p>
+          </div>
+
           <div class="flex items-start justify-between mb-4">
             <div>
               <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -341,7 +363,14 @@
         </div>
 
         <!-- 24h Climate Statistics (Col span 2) -->
-        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col justify-between lg:col-span-2 min-h-[300px]">
+        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col justify-between lg:col-span-2 min-h-[300px] relative">
+          <!-- Blocking placeholder -->
+          <div id="stats-placeholder" class="absolute inset-0 bg-slate-900/55 backdrop-blur-[2.5px] rounded-2xl z-20 flex flex-col items-center justify-center gap-2 p-6 text-center">
+            <i data-lucide="bar-chart-3" class="w-10 h-10 text-slate-500"></i>
+            <p class="text-sm font-semibold text-slate-300">Statistiken inaktiv</p>
+            <p class="text-xs text-slate-500">Daten müssen zuerst geladen werden.</p>
+          </div>
+
           <div>
             <h2 class="text-lg font-bold text-white flex items-center gap-2 mb-1">
               <i data-lucide="bar-chart-3" class="w-5 h-5 text-indigo-400"></i>
@@ -406,7 +435,14 @@
       </section>
 
       <!-- Visualisation: Interactive Chart.js Section -->
-      <section class="glass-panel rounded-2xl p-6 shadow-lg">
+      <section class="glass-panel rounded-2xl p-6 shadow-lg relative">
+        <!-- Blocking placeholder -->
+        <div id="chart-placeholder" class="absolute inset-0 bg-slate-900/55 backdrop-blur-[2.5px] rounded-2xl z-20 flex flex-col items-center justify-center gap-2 p-6 text-center">
+          <i data-lucide="line-chart" class="w-10 h-10 text-slate-500"></i>
+          <p class="text-sm font-semibold text-slate-300">Diagramm inaktiv</p>
+          <p class="text-xs text-slate-500">Bitte lade die Klimadaten, um die Kurven anzuzeigen.</p>
+        </div>
+
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
             <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -445,7 +481,12 @@
       </section>
 
       <!-- Collapsible Historical Feed Data Table -->
-      <section class="glass-panel rounded-2xl shadow-lg transition-all duration-300">
+      <section class="glass-panel rounded-2xl shadow-lg transition-all duration-300 relative">
+        <!-- Blocking placeholder -->
+        <div id="table-placeholder" class="absolute inset-0 bg-slate-900/55 backdrop-blur-[2px] rounded-2xl z-20 flex flex-col items-center justify-center gap-2 p-4 text-center">
+          <p class="text-xs text-slate-500 font-medium">Tabelle wird nach dem Laden der Daten freigeschaltet.</p>
+        </div>
+
         <button onclick="toggleTableCollapse()" class="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none">
           <div class="flex items-center gap-2">
             <i data-lucide="list" class="w-5 h-5 text-indigo-400"></i>
@@ -480,7 +521,7 @@
 
     <!-- Footer -->
     <footer class="mt-8 py-6 border-t border-slate-900/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-      <p>© 2026 ClimateFlow. Entwickelt für optimierte Raumnutzung & Energieeffizienz.</p>
+      <p>© 2026 ClimateFlow. Entwickelt für Raumnutzung & Energieeffizienz.</p>
       <p class="flex items-center gap-4">
         <span>Quelle: <a href="https://thingspeak.com/" target="_blank" class="hover:text-teal-400 underline decoration-teal-500/30 transition-colors">ThingSpeak API</a></span>
         <span>Wetter: <a href="https://open-meteo.com/" target="_blank" class="hover:text-teal-400 underline decoration-teal-500/30 transition-colors">Open-Meteo API</a></span>
@@ -507,10 +548,12 @@
       }
     ];
 
-    // Global State
+    // Global State (Start empty!)
     const appState = {
       activeLocId: localStorage.getItem('selected_location') || 'gillian',
       isDemoMode: false,
+      insideLoaded: false,
+      outsideLoaded: false,
       insideData: [],
       outsideData: {},
       weatherConfig: null,
@@ -520,6 +563,12 @@
 
     // Load custom names and weather configs from localStorage
     function initConfigs() {
+      // Safety check for selected location
+      if (!LOCATIONS.some(l => l.id === appState.activeLocId)) {
+        appState.activeLocId = 'gillian';
+        localStorage.setItem('selected_location', 'gillian');
+      }
+
       // Restore weather configs
       const savedWeather = localStorage.getItem(`loc_weather_${appState.activeLocId}`);
       if (savedWeather) {
@@ -529,11 +578,8 @@
         appState.weatherConfig = { ...activeLoc.defaultWeather };
       }
 
-      // Set titles & tab buttons labels
       updateTabLabels();
       updateWeatherButtonName();
-      
-      // Select correct Tab highlight on UI
       highlightActiveTab();
     }
 
@@ -549,8 +595,6 @@
       
       if (newName !== null && newName.trim() !== '') {
         localStorage.setItem(`loc_name_${locId}`, newName.trim());
-        
-        // Update DOM Elements
         document.getElementById('detail-loc-title').innerText = newName.trim();
         updateTabLabels();
         showNotification('Name erfolgreich geändert!');
@@ -594,7 +638,7 @@
       }
     });
 
-    // Request Geolocation from Browser
+    // Request Geolocation
     function requestGeolocation() {
       const dropdown = document.getElementById('location-dropdown');
       dropdown.classList.add('hidden');
@@ -687,7 +731,11 @@
       
       updateWeatherButtonName();
       showNotification(`Wetter-Standort geändert: ${name}`);
-      reloadData();
+      
+      // If weather was already loaded, reload it. Otherwise let the user trigger it.
+      if (appState.outsideLoaded) {
+        triggerOutdoorLoad();
+      }
     }
 
     function updateWeatherButtonName() {
@@ -716,24 +764,72 @@
       return (216.74 * e) / (temp + 273.15);
     }
 
-    // Show / Hide Loading Screen
-    function toggleLoadingOverlay(show) {
-      const overlay = document.getElementById('loading-overlay');
-      if (show) {
-        overlay.classList.remove('hidden', 'opacity-0');
-      } else {
-        overlay.classList.add('opacity-0');
-        setTimeout(() => {
-          overlay.classList.add('hidden');
-        }, 300);
+    // INDIVIDUAL TRIGGERS FOR DATA LOADING (Prevents infinite blocking on load)
+    async function triggerIndoorLoad() {
+      const btn1 = document.getElementById('btn-load-indoor-1');
+      const btn2 = document.getElementById('btn-load-indoor-2');
+      
+      if (btn1) { btn1.disabled = true; btn1.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5 animate-spin"></i> Lade...'; }
+      if (btn2) { btn2.disabled = true; btn2.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5 animate-spin"></i> Lade...'; }
+      updateIcons();
+
+      try {
+        await loadIndoorData();
+        appState.insideLoaded = true;
+        
+        // Hide inside empty blocker
+        document.getElementById('indoor-temp-empty').classList.add('hidden');
+        document.getElementById('indoor-hum-empty').classList.add('hidden');
+        document.getElementById('chart-placeholder').classList.add('hidden');
+        document.getElementById('table-placeholder').classList.add('hidden');
+        
+        // If weather is also loaded, unlock advisor & stats
+        if (appState.outsideLoaded) {
+          document.getElementById('advisor-placeholder').classList.add('hidden');
+          document.getElementById('stats-placeholder').classList.add('hidden');
+        }
+
+        renderActiveView();
+        showNotification('Klimadaten erfolgreich geladen!');
+      } catch (err) {
+        showNotification('Fehler beim Laden der Klimadaten.', 'error');
+        if (btn1) btn1.innerHTML = 'Radio'; // Reset icon triggers
+      } finally {
+        if (btn1) btn1.disabled = false;
+        if (btn2) btn2.disabled = false;
       }
     }
 
-    // Master reload data (optimized: ONLY active location is loaded!)
-    async function reloadData() {
+    async function triggerOutdoorLoad() {
+      const btn = document.getElementById('btn-load-outdoor');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5 animate-spin"></i> Lade...'; }
+      updateIcons();
+
+      try {
+        await loadOutdoorWeather();
+        appState.outsideLoaded = true;
+
+        // Hide weather empty blocker
+        document.getElementById('outdoor-weather-empty').classList.add('hidden');
+        
+        // If indoor is also loaded, unlock advisor & stats
+        if (appState.insideLoaded) {
+          document.getElementById('advisor-placeholder').classList.add('hidden');
+          document.getElementById('stats-placeholder').classList.add('hidden');
+        }
+
+        renderActiveView();
+        showNotification('Wetter erfolgreich geladen!');
+      } catch (err) {
+        showNotification('Fehler beim Laden des Wetters.', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function triggerAllLoad() {
       const reloadIcon = document.getElementById('reload-icon');
       if (reloadIcon) reloadIcon.classList.add('animate-spin');
-      toggleLoadingOverlay(true);
       
       try {
         await Promise.all([
@@ -741,11 +837,23 @@
           loadOutdoorWeather()
         ]);
         
+        appState.insideLoaded = true;
+        appState.outsideLoaded = true;
+
+        // Hide all blockers
+        document.getElementById('indoor-temp-empty').classList.add('hidden');
+        document.getElementById('indoor-hum-empty').classList.add('hidden');
+        document.getElementById('outdoor-weather-empty').classList.add('hidden');
+        document.getElementById('chart-placeholder').classList.add('hidden');
+        document.getElementById('table-placeholder').classList.add('hidden');
+        document.getElementById('advisor-placeholder').classList.add('hidden');
+        document.getElementById('stats-placeholder').classList.add('hidden');
+
         renderActiveView();
+        showNotification('Alle Daten aktualisiert!');
       } catch (error) {
-        console.error('Error reloading data:', error);
+        showNotification('Laden fehlgeschlagen.', 'error');
       } finally {
-        toggleLoadingOverlay(false);
         if (reloadIcon) {
           setTimeout(() => {
             reloadIcon.classList.remove('animate-spin');
@@ -754,63 +862,51 @@
       }
     }
 
-    function retryLoadingData() {
-      appState.isDemoMode = false;
-      document.getElementById('demo-banner').classList.add('hidden');
-      reloadData();
-    }
-
     // Fetch ThingSpeak indoor feeds for the active location
     async function loadIndoorData() {
       const activeLoc = LOCATIONS.find(l => l.id === appState.activeLocId);
-      try {
-        const response = await fetch(activeLoc.thingspeakUrl);
-        if (!response.ok) throw new Error('ThingSpeak load failed');
-        
-        const data = await response.json();
-        
-        if (data && data.feeds && data.feeds.length > 0) {
-          // Forward-fill temperature and humidity values to align different timestamps
-          let lastTemp = null;
-          let lastHum = null;
-          const aligned = [];
+      const response = await fetch(activeLoc.thingspeakUrl);
+      if (!response.ok) throw new Error('ThingSpeak load failed');
+      
+      const data = await response.json();
+      
+      if (data && data.feeds && data.feeds.length > 0) {
+        let lastTemp = null;
+        let lastHum = null;
+        const aligned = [];
 
-          data.feeds.forEach(feed => {
-            const f1 = feed.field1;
-            const f2 = feed.field2;
+        data.feeds.forEach(feed => {
+          const f1 = feed.field1;
+          const f2 = feed.field2;
 
-            if (f1 !== null && f1 !== undefined && f1.toString().trim() !== '') {
-              const parsedTemp = parseFloat(f1.toString().replace(',', '.'));
-              if (!isNaN(parsedTemp)) lastTemp = parsedTemp;
-            }
-            if (f2 !== null && f2 !== undefined && f2.toString().trim() !== '') {
-              const parsedHum = parseFloat(f2.toString().replace(',', '.'));
-              if (!isNaN(parsedHum)) lastHum = parsedHum;
-            }
-
-            if (lastTemp !== null && lastHum !== null) {
-              aligned.push({
-                time: new Date(feed.created_at),
-                temp: lastTemp,
-                humidity: lastHum,
-                id: feed.entry_id
-              });
-            }
-          });
-
-          if (aligned.length > 0) {
-            appState.insideData = aligned;
-            appState.isDemoMode = false;
-            updateStatusText(true);
-          } else {
-            throw new Error('No valid aligned feeds');
+          if (f1 !== null && f1 !== undefined && f1.toString().trim() !== '') {
+            const parsedTemp = parseFloat(f1.toString().replace(',', '.'));
+            if (!isNaN(parsedTemp)) lastTemp = parsedTemp;
           }
+          if (f2 !== null && f2 !== undefined && f2.toString().trim() !== '') {
+            const parsedHum = parseFloat(f2.toString().replace(',', '.'));
+            if (!isNaN(parsedHum)) lastHum = parsedHum;
+          }
+
+          if (lastTemp !== null && lastHum !== null) {
+            aligned.push({
+              time: new Date(feed.created_at),
+              temp: lastTemp,
+              humidity: lastHum,
+              id: feed.entry_id
+            });
+          }
+        });
+
+        if (aligned.length > 0) {
+          appState.insideData = aligned;
+          appState.isDemoMode = false;
+          updateStatusText(true);
         } else {
-          throw new Error('Empty feeds array');
+          throw new Error('No valid aligned feeds');
         }
-      } catch (err) {
-        console.warn(`ThingSpeak load failed, fallback to demo mode.`, err);
-        activateDemoMode();
+      } else {
+        throw new Error('Empty feeds array');
       }
     }
 
@@ -819,17 +915,12 @@
       const conf = appState.weatherConfig;
       if (!conf) return;
 
-      try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,relative_humidity_2m&timezone=auto`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Open-Meteo load failed');
-        
-        const data = await res.json();
-        appState.outsideData = data;
-      } catch (err) {
-        console.error(`Error fetching weather:`, err);
-        appState.outsideData = generateMockWeather();
-      }
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,relative_humidity_2m&timezone=auto`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Open-Meteo load failed');
+      
+      const data = await res.json();
+      appState.outsideData = data;
     }
 
     function generateMockWeather() {
@@ -915,25 +1006,6 @@
       }
     }
 
-    // Format utilities
-    function formatTime(date) {
-      return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    }
-    function formatDate(date) {
-      return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-    }
-    function getWeatherDescription(code) {
-      if (code === 0) return 'Klar';
-      if (code >= 1 && code <= 3) return 'Leicht bewölkt';
-      if (code === 45 || code === 48) return 'Nebel';
-      if (code >= 51 && code <= 55) return 'Nieselregen';
-      if (code >= 61 && code <= 65) return 'Regen';
-      if (code >= 71 && code <= 75) return 'Schneefall';
-      if (code >= 80 && code <= 82) return 'Schauer';
-      if (code >= 95) return 'Gewitter';
-      return 'Heiter';
-    }
-
     // Switch location selection & reload
     async function switchLocation(locId) {
       if (appState.activeLocId === locId) return;
@@ -941,7 +1013,21 @@
       appState.activeLocId = locId;
       localStorage.setItem('selected_location', locId);
       
-      // Reset active weather config to this location's saved weather
+      // Reset loaded states for clean switches
+      appState.insideLoaded = false;
+      appState.outsideLoaded = false;
+      appState.insideData = [];
+      appState.outsideData = {};
+
+      // Show blockers again
+      document.getElementById('indoor-temp-empty').classList.remove('hidden');
+      document.getElementById('indoor-hum-empty').classList.remove('hidden');
+      document.getElementById('outdoor-weather-empty').classList.remove('hidden');
+      document.getElementById('chart-placeholder').classList.remove('hidden');
+      document.getElementById('table-placeholder').classList.remove('hidden');
+      document.getElementById('advisor-placeholder').classList.remove('hidden');
+      document.getElementById('stats-placeholder').classList.remove('hidden');
+
       const savedWeather = localStorage.getItem(`loc_weather_${locId}`);
       if (savedWeather) {
         appState.weatherConfig = JSON.parse(savedWeather);
@@ -954,8 +1040,10 @@
       updateWeatherButtonName();
       updateTabLabels();
       
-      // Trigger API requests and repaint
-      await reloadData();
+      // Do NOT load automatically - wait for user to click, or let the user click "Refresh"
+      // to keep startup empty as requested!
+      renderActiveView();
+      updateIcons();
     }
 
     // Render detailed dashboard metrics
@@ -966,7 +1054,25 @@
 
       document.getElementById('detail-loc-title').innerText = getLocationName(locId);
 
-      if (!feeds || feeds.length === 0) return;
+      // Even if empty, clear previous text values if not loaded
+      if (!appState.insideLoaded) {
+        document.getElementById('kpi-temp-in').innerText = '--.-';
+        document.getElementById('kpi-humidity-in').innerText = '--.-';
+        document.getElementById('stat-temp-min').innerText = '--.-°C';
+        document.getElementById('stat-temp-max').innerText = '--.-°C';
+        document.getElementById('stat-temp-avg').innerText = '--.-°C';
+        document.getElementById('stat-hum-min').innerText = '--%';
+        document.getElementById('stat-hum-max').innerText = '--%';
+        document.getElementById('stat-hum-avg').innerText = '--%';
+      }
+
+      if (!appState.outsideLoaded) {
+        document.getElementById('kpi-temp-out').innerText = '--.-';
+        document.getElementById('kpi-humidity-out').innerText = '--%';
+        document.getElementById('weather-desc').innerText = 'Laden...';
+      }
+
+      if (!appState.insideLoaded || !appState.outsideLoaded) return;
 
       const latest = feeds[feeds.length - 1];
       const curTempIn = latest.temp;
@@ -1002,7 +1108,7 @@
       }
       const hComfortEl = document.getElementById('kpi-humidity-comfort');
       hComfortEl.innerText = humComfort;
-      hComfortEl.className = `font-semibold ${humComfortClass}`;
+      hComfortEl.className = `font-semibold ${hComfortClass}`;
 
       // Calculate Trends
       calculateTrends(feeds);
@@ -1350,6 +1456,7 @@
       arrow.style.transform = container.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
     }
 
+    // Populate data table
     function populateTable(feeds) {
       const tbody = document.getElementById('feed-table-body');
       tbody.innerHTML = '';
@@ -1371,18 +1478,12 @@
     }
 
     // App Initialization
-    async function init() {
+    function init() {
       updateIcons();
       initConfigs();
       
-      // Load initially active location data
-      await reloadData();
-      
-      // Auto-refresh every 5 minutes
-      setInterval(() => {
-        console.log('[Interval] Auto-refresh data...');
-        reloadData();
-      }, 5 * 60 * 1000);
+      // Render initial empty UI (Zero blocking requests on startup!)
+      renderActiveView();
     }
 
     window.addEventListener('DOMContentLoaded', init);
