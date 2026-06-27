@@ -561,6 +561,13 @@
       currentChartTimeframe: 24 // hours
     };
 
+    // Initialize UI Icons
+    function updateIcons() {
+      if (window.lucide) {
+        window.lucide.createIcons();
+      }
+    }
+
     // Load custom names and weather configs from localStorage
     function initConfigs() {
       // Safety check for selected location
