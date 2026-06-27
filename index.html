@@ -771,63 +771,71 @@
 
     // Fetch ThingSpeak indoor feeds for the active location
     async function loadIndoorData() {
-      const activeLoc = LOCATIONS.find(l => l.id === appState.activeLocId);
-      const response = await fetch(activeLoc.thingspeakUrl);
-      if (!response.ok) throw new Error('ThingSpeak load failed');
-      
-      const data = await response.json();
-      
-      if (data && data.feeds && data.feeds.length > 0) {
-        let lastTemp = null;
-        let lastHum = null;
-        const aligned = [];
+      try {
+        const activeLoc = LOCATIONS.find(l => l.id === appState.activeLocId);
+        const response = await fetch(activeLoc.thingspeakUrl);
+        if (!response.ok) throw new Error(`HTTP-Fehler: ${response.status}`);
+        
+        const data = await response.json();
+        
+        if (data && data.feeds && data.feeds.length > 0) {
+          let lastTemp = null;
+          let lastHum = null;
+          const aligned = [];
 
-        data.feeds.forEach(feed => {
-          const f1 = feed.field1;
-          const f2 = feed.field2;
+          data.feeds.forEach(feed => {
+            const f1 = feed.field1;
+            const f2 = feed.field2;
 
-          if (f1 !== null && f1 !== undefined && f1.toString().trim() !== '') {
-            const parsedTemp = parseFloat(f1.toString().replace(',', '.'));
-            if (!isNaN(parsedTemp)) lastTemp = parsedTemp;
+            if (f1 !== null && f1 !== undefined && f1.toString().trim() !== '') {
+              const parsedTemp = parseFloat(f1.toString().replace(',', '.'));
+              if (!isNaN(parsedTemp)) lastTemp = parsedTemp;
+            }
+            if (f2 !== null && f2 !== undefined && f2.toString().trim() !== '') {
+              const parsedHum = parseFloat(f2.toString().replace(',', '.'));
+              if (!isNaN(parsedHum)) lastHum = parsedHum;
+            }
+
+            if (lastTemp !== null && lastHum !== null) {
+              aligned.push({
+                time: new Date(feed.created_at),
+                temp: lastTemp,
+                humidity: lastHum,
+                id: feed.entry_id
+              });
+            }
+          });
+
+          if (aligned.length > 0) {
+            appState.insideData = aligned;
+            appState.isDemoMode = false;
+            updateStatusText(true);
+            return;
           }
-          if (f2 !== null && f2 !== undefined && f2.toString().trim() !== '') {
-            const parsedHum = parseFloat(f2.toString().replace(',', '.'));
-            if (!isNaN(parsedHum)) lastHum = parsedHum;
-          }
-
-          if (lastTemp !== null && lastHum !== null) {
-            aligned.push({
-              time: new Date(feed.created_at),
-              temp: lastTemp,
-              humidity: lastHum,
-              id: feed.entry_id
-            });
-          }
-        });
-
-        if (aligned.length > 0) {
-          appState.insideData = aligned;
-          appState.isDemoMode = false;
-          updateStatusText(true);
-        } else {
-          throw new Error('No valid aligned feeds');
         }
-      } else {
-        throw new Error('Empty feeds array');
+        throw new Error('Keine gültigen abgeglichenen Daten gefunden');
+      } catch (err) {
+        console.warn('ThingSpeak laden fehlgeschlagen, aktiviere Demo-Modus:', err);
+        activateDemoMode();
       }
     }
 
     // Fetch local weather from Open-Meteo for active coordinates
     async function loadOutdoorWeather() {
-      const conf = appState.weatherConfig;
-      if (!conf) return;
+      try {
+        const conf = appState.weatherConfig;
+        if (!conf) return;
 
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,relative_humidity_2m&timezone=auto`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Open-Meteo load failed');
-      
-      const data = await res.json();
-      appState.outsideData = data;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,relative_humidity_2m&timezone=auto`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
+        
+        const data = await res.json();
+        appState.outsideData = data;
+      } catch (err) {
+        console.warn('Open-Meteo laden fehlgeschlagen, generiere Wetter-Dummy:', err);
+        appState.outsideData = generateMockWeather();
+      }
     }
 
     function generateMockWeather() {
@@ -938,79 +946,110 @@
 
     // Render detailed dashboard metrics
     function renderActiveView() {
-      const feeds = appState.insideData;
-      const weather = appState.outsideData.current;
-      const locId = appState.activeLocId;
+      try {
+        const feeds = appState.insideData;
+        const weather = appState.outsideData.current;
+        const locId = appState.activeLocId;
 
-      document.getElementById('detail-loc-title').innerText = getLocationName(locId);
+        document.getElementById('detail-loc-title').innerText = getLocationName(locId);
 
-      if (!feeds || feeds.length === 0) return;
+        if (!feeds || feeds.length === 0) {
+          console.warn('Keine Feeds zum Zeichnen vorhanden.');
+          return;
+        }
 
-      const latest = feeds[feeds.length - 1];
-      const curTempIn = latest.temp;
-      const curHumIn = latest.humidity;
+        const latest = feeds[feeds.length - 1];
+        const curTempIn = latest.temp;
+        const curHumIn = latest.humidity;
 
-      // 1. Inside metrics
-      document.getElementById('kpi-temp-in').innerText = curTempIn.toFixed(1);
-      document.getElementById('kpi-humidity-in').innerText = curHumIn.toFixed(0);
+        // 1. Inside metrics
+        document.getElementById('kpi-temp-in').innerText = curTempIn.toFixed(1);
+        document.getElementById('kpi-humidity-in').innerText = curHumIn.toFixed(0);
 
-      // Comfort Temp index
-      let tempComfort = 'Behaglich';
-      let tempComfortClass = 'text-teal-400';
-      if (curTempIn < 19) {
-        tempComfort = 'Kühl';
-        tempComfortClass = 'text-blue-400';
-      } else if (curTempIn > 24) {
-        tempComfort = 'Warm';
-        tempComfortClass = 'text-orange-400';
-      }
-      const tComfortEl = document.getElementById('kpi-temp-comfort');
-      tComfortEl.innerText = tempComfort;
-      tComfortEl.className = `font-semibold ${tempComfortClass}`;
+        // Comfort Temp index
+        let tempComfort = 'Behaglich';
+        let tempComfortClass = 'text-teal-400';
+        if (curTempIn < 19) {
+          tempComfort = 'Kühl';
+          tempComfortClass = 'text-blue-400';
+        } else if (curTempIn > 24) {
+          tempComfort = 'Warm';
+          tempComfortClass = 'text-orange-400';
+        }
+        const tComfortEl = document.getElementById('kpi-temp-comfort');
+        if (tComfortEl) {
+          tComfortEl.innerText = tempComfort;
+          tComfortEl.className = `font-semibold ${tempComfortClass}`;
+        }
 
-      // Comfort Hum index
-      let humComfort = 'Optimal';
-      let humComfortClass = 'text-emerald-400';
-      if (curHumIn < 40) {
-        humComfort = 'Trocken';
-        humComfortClass = 'text-amber-500';
-      } else if (curHumIn > 60) {
-        humComfort = 'Feucht';
-        humComfortClass = 'text-red-400';
-      }
-      const hComfortEl = document.getElementById('kpi-humidity-comfort');
-      hComfortEl.innerText = humComfort;
-      hComfortEl.className = `font-semibold ${humComfortClass}`;
+        // Comfort Hum index
+        let humComfort = 'Optimal';
+        let humComfortClass = 'text-emerald-400';
+        if (curHumIn < 40) {
+          humComfort = 'Trocken';
+          humComfortClass = 'text-amber-500';
+        } else if (curHumIn > 60) {
+          humComfort = 'Feucht';
+          humComfortClass = 'text-red-400';
+        }
+        const hComfortEl = document.getElementById('kpi-humidity-comfort');
+        if (hComfortEl) {
+          hComfortEl.innerText = humComfort;
+          hComfortEl.className = `font-semibold ${humComfortClass}`;
+        }
 
-      // Calculate Trends
-      calculateTrends(feeds);
+        // Calculate Trends
+        try {
+          calculateTrends(feeds);
+        } catch (e) {
+          console.error('Fehler bei der Trendberechnung:', e);
+        }
 
-      // 2. Weather metrics
-      let curTempOut = 0;
-      let curHumOut = 0;
-      
-      if (weather) {
-        curTempOut = weather.temperature_2m;
-        curHumOut = weather.relative_humidity_2m;
+        // 2. Weather metrics
+        let curTempOut = 0;
+        let curHumOut = 0;
         
-        document.getElementById('kpi-temp-out').innerText = curTempOut.toFixed(1);
-        document.getElementById('kpi-humidity-out').innerText = curHumOut.toFixed(0) + '%';
-        document.getElementById('weather-desc').innerText = getWeatherDescription(weather.weather_code);
-        
-        updateWeatherIcon(weather.weather_code);
+        if (weather) {
+          curTempOut = weather.temperature_2m;
+          curHumOut = weather.relative_humidity_2m;
+          
+          document.getElementById('kpi-temp-out').innerText = curTempOut.toFixed(1);
+          document.getElementById('kpi-humidity-out').innerText = curHumOut.toFixed(0) + '%';
+          document.getElementById('weather-desc').innerText = getWeatherDescription(weather.weather_code);
+          
+          updateWeatherIcon(weather.weather_code);
+        }
+
+        // 3. Ventilation Advice
+        try {
+          computeVentilationAdvisor(curTempIn, curHumIn, curTempOut, curHumOut);
+        } catch (e) {
+          console.error('Fehler beim Lüftungsberater:', e);
+        }
+
+        // 4. Statistics 24h
+        try {
+          compute24hStats(feeds, curTempOut);
+        } catch (e) {
+          console.error('Fehler bei den 24h Statistiken:', e);
+        }
+
+        // 5. Draw lines
+        try {
+          drawChart();
+        } catch (e) {
+          console.error('Fehler beim Zeichnen des Diagramms:', e);
+        }
+
+        // 6. Table
+        try {
+          populateTable(feeds);
+        } catch (e) {
+          console.error('Fehler beim Befüllen der Tabelle:', e);
+        }
+      } catch (err) {
+        console.error('Fataler Fehler in renderActiveView:', err);
       }
-
-      // 3. Ventilation Advice
-      computeVentilationAdvisor(curTempIn, curHumIn, curTempOut, curHumOut);
-
-      // 4. Statistics 24h
-      compute24hStats(feeds, curTempOut);
-
-      // 5. Draw lines
-      drawChart();
-
-      // 6. Table
-      populateTable(feeds);
     }
 
     // Trend calculator
@@ -1347,6 +1386,52 @@
         `;
         tbody.appendChild(row);
       });
+    }
+
+    // Date & Time formatting helpers
+    function formatTime(date) {
+      if (!(date instanceof Date) || isNaN(date.getTime())) return '--:--';
+      return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatDate(date) {
+      if (!(date instanceof Date) || isNaN(date.getTime())) return '--.--.';
+      return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+    }
+
+    // Open-Meteo Weather Code Parser
+    function getWeatherDescription(code) {
+      const codes = {
+        0: 'Klarer Himmel',
+        1: 'Hauptsächlich klar',
+        2: 'Teilweise bewölkt',
+        3: 'Bedeckt',
+        45: 'Nebel',
+        48: 'Ablagernder Reifnebel',
+        51: 'Leichter Nieselregen',
+        53: 'Mäßiger Nieselregen',
+        55: 'Dichter Nieselregen',
+        56: 'Leichter gefrierender Nieselregen',
+        57: 'Dichter gefrierender Nieselregen',
+        61: 'Leichter Regen',
+        63: 'Mäßiger Regen',
+        65: 'Starker Regen',
+        66: 'Leichter gefrierender Regen',
+        67: 'Starker gefrierender Regen',
+        71: 'Leichter Schneefall',
+        73: 'Mäßiger Schneefall',
+        75: 'Starker Schneefall',
+        77: 'Schneegriesel',
+        80: 'Leichte Regenschauer',
+        81: 'Mäßige Regenschauer',
+        82: 'Starke Regenschauer',
+        85: 'Leichte Schneeschauer',
+        86: 'Starke Schneeschauer',
+        95: 'Gewitter',
+        96: 'Gewitter mit leichtem Hagel',
+        99: 'Gewitter mit schwerem Hagel'
+      };
+      return codes[code] || 'Unbekannt';
     }
 
     // App Initialization
