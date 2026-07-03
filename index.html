@@ -7,7 +7,15 @@
   <!-- SEO & Meta Tags -->
   <meta name="description" content="Visualisiere und analysiere deine Smart-Home-Klimadaten in Echtzeit. Erhalte intelligente Lüftungsempfehlungen basierend auf der absoluten Luftfeuchtigkeit.">
   <meta name="theme-color" content="#0f172a">
-  
+
+  <!-- PWA: Installierbar auf dem Homescreen (crossorigin wegen Basic Auth nötig) -->
+  <link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SmartHub">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -131,6 +139,21 @@
             </div>
             <h3 class="text-lg font-bold text-white mb-1.5">ClimateFlow</h3>
             <p class="text-xs text-slate-400 leading-relaxed">Smart-Home-Klimadashboard: Temperatur, Luftfeuchtigkeit und intelligenter Lüftungsberater für beide Standorte in Echtzeit.</p>
+
+            <!-- Live preview of both locations -->
+            <div class="grid grid-cols-2 gap-2 mt-4">
+              <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
+                <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider truncate" id="hub-prev-gillian-name">Gillian</p>
+                <p class="text-base font-bold text-white mt-0.5"><span id="hub-prev-gillian-temp">--.- °C</span></p>
+                <p class="text-[10px] text-slate-400 mt-0.5"><span id="hub-prev-gillian-hum">-- %</span> · <span id="hub-prev-gillian-time">--</span></p>
+              </div>
+              <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
+                <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider truncate" id="hub-prev-sean-name">Sean</p>
+                <p class="text-base font-bold text-white mt-0.5"><span id="hub-prev-sean-temp">--.- °C</span></p>
+                <p class="text-[10px] text-slate-400 mt-0.5"><span id="hub-prev-sean-hum">-- %</span> · <span id="hub-prev-sean-time">--</span></p>
+              </div>
+            </div>
+
             <div class="flex items-center gap-1.5 mt-5 text-xs font-semibold text-teal-400">
               <span>Dashboard öffnen</span>
               <i data-lucide="arrow-right" class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform"></i>
@@ -196,6 +219,12 @@
       <button onclick="retryLoadingData()" class="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/35 border border-amber-500/40 rounded-lg text-xs font-semibold transition-colors">
         Erneut versuchen
       </button>
+    </div>
+
+    <!-- Sensor Stale Warning Banner -->
+    <div id="sensor-stale-banner" class="hidden mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-sm flex items-center gap-2 animate-fade-in">
+      <i data-lucide="siren" class="w-4 h-4 text-red-400 shrink-0"></i>
+      <span id="sensor-stale-text">Sensor-Ausfall erkannt.</span>
     </div>
 
     <!-- HEADER: Navigation and location switching -->
@@ -504,6 +533,85 @@
 
       </section>
 
+      <!-- Advanced Analytics 2: Mold Risk + Ventilation Forecast -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Dew Point & Mold Risk Card -->
+        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col">
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i data-lucide="droplet" class="w-5 h-5 text-blue-400"></i>
+                Taupunkt &amp; Schimmelrisiko
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">Abschätzung der Kondensationsgefahr an kalten Wandstellen.</p>
+            </div>
+            <div class="px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-slate-900 border border-slate-800" id="mold-badge">
+              <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+              <span>Berechne...</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 text-center mb-4">
+            <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
+              <p class="text-[10px] text-slate-500 uppercase font-semibold">Taupunkt innen</p>
+              <p class="text-sm font-bold text-blue-400 mt-0.5" id="mold-dewpoint">--.-°C</p>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
+              <p class="text-[10px] text-slate-500 uppercase font-semibold">Kälteste Wandstelle*</p>
+              <p class="text-sm font-bold text-white mt-0.5" id="mold-surface-temp">--.-°C</p>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
+              <p class="text-[10px] text-slate-500 uppercase font-semibold">Feuchte an Wand</p>
+              <p class="text-sm font-bold text-amber-400 mt-0.5" id="mold-surface-rh">--%</p>
+            </div>
+          </div>
+
+          <div class="space-y-1 mb-4">
+            <div class="flex justify-between text-xs">
+              <span class="text-slate-300 font-medium">Wandfeuchte (ab 80 % kann Schimmel wachsen)</span>
+              <span class="font-bold text-white" id="mold-bar-label">--%</span>
+            </div>
+            <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800 relative">
+              <div class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-emerald-500 to-emerald-400" id="mold-bar" style="width: 0%"></div>
+              <div class="absolute top-0 bottom-0 w-px bg-red-400/70" style="left: 80%"></div>
+            </div>
+          </div>
+
+          <p class="text-xs text-slate-400 bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/40 mt-auto" id="mold-desc">Lade Klimadaten...</p>
+          <p class="text-[10px] text-slate-500 mt-2">*Näherung: Oberflächentemperatur kritischer Wandstellen über Temperaturfaktor f<sub>Rsi</sub> = 0,7 (DIN 4108-2) aus Innen- und Außentemperatur.</p>
+        </div>
+
+        <!-- Ventilation Window Forecast Card -->
+        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col">
+          <div class="mb-4">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i data-lucide="calendar-clock" class="w-5 h-5 text-teal-400"></i>
+              Lüftungsfenster-Prognose (24h)
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Wann lohnt sich Lüften am meisten? Basierend auf der prognostizierten absoluten Außenfeuchte (Open-Meteo).</p>
+          </div>
+
+          <div class="flex-1 flex flex-col justify-center">
+            <div class="flex gap-0.5 h-10" id="vent-forecast-strip">
+              <div class="flex-1 h-full rounded-sm bg-slate-800 animate-pulse"></div>
+            </div>
+            <div class="flex justify-between text-[10px] text-slate-500 mt-1" id="vent-forecast-labels"></div>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-400 mt-3">
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>Lüften wirksam</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-slate-600"></span>Neutral</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-red-500/80"></span>Ungünstig (Außenluft feuchter)</span>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-slate-800/60 flex items-start gap-2 text-xs text-slate-300">
+            <i data-lucide="clock" class="w-4 h-4 text-teal-400 shrink-0"></i>
+            <span id="vent-forecast-summary">Warte auf Wetterdaten...</span>
+          </div>
+        </div>
+
+      </section>
+
       <!-- Visualisation: Interactive Chart.js Section -->
       <section class="glass-panel rounded-2xl p-6 shadow-lg">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -619,8 +727,14 @@
       currentChartTimeframe: 24, // hours
       climateLoaded: false,
       // Zeitpunkte der letzten ECHTEN Messwerte (nicht forward-filled)
-      lastSensorUpdate: { temp: null, humidity: null }
+      lastSensorUpdate: { temp: null, humidity: null },
+      // Rohdaten-Cache pro Standort für inkrementelles Nachladen (statt jedes Mal 8000 Einträge)
+      feedCache: {},
+      hubPreviewAt: 0
     };
+
+    // Sensor gilt als ausgefallen, wenn länger keine echten Werte kamen als:
+    const SENSOR_STALE_MS = 2 * 60 * 60 * 1000;
 
     // Initialize UI Icons
     function updateIcons() {
@@ -820,12 +934,23 @@
       }
     }
 
+    // Sättigungsdampfdruck in hPa (Magnus-Formel)
+    function satVaporPressure(temp) {
+      return 6.112 * Math.exp((17.67 * temp) / (temp + 243.5));
+    }
+
     // Absolute Humidity (Magnus Formula)
     function getAbsoluteHumidity(temp, rh) {
       if (temp === null || rh === null || isNaN(temp) || isNaN(rh)) return 0;
-      const es = 6.112 * Math.exp((17.67 * temp) / (temp + 243.5));
-      const e = (rh / 100) * es;
+      const e = (rh / 100) * satVaporPressure(temp);
       return (216.74 * e) / (temp + 273.15);
+    }
+
+    // Taupunkt in °C (Umkehrung der Magnus-Formel)
+    function getDewPoint(temp, rh) {
+      if (temp === null || rh === null || isNaN(temp) || isNaN(rh) || rh <= 0) return null;
+      const lnE = Math.log(((rh / 100) * satVaporPressure(temp)) / 6.112);
+      return (243.5 * lnE) / (17.67 - lnE);
     }
 
     // Show / Hide Loading Screen
@@ -841,24 +966,26 @@
       }
     }
 
-    // Master reload data (loads active location automatically)
-    async function reloadData() {
+    // Master reload data (loads active location automatically).
+    // silent = true: Hintergrund-Refresh ohne Lade-Overlay — die bisherigen
+    // Werte bleiben sichtbar und werden still ersetzt.
+    async function reloadData(silent = false) {
       const reloadIcon = document.getElementById('reload-icon');
       if (reloadIcon) reloadIcon.classList.add('animate-spin');
-      toggleLoadingOverlay(true);
-      
+      if (!silent) toggleLoadingOverlay(true);
+
       try {
         await Promise.all([
           loadIndoorData(),
           loadOutdoorWeather()
         ]);
-        
+
         renderActiveView();
       } catch (error) {
         console.error('Error reloading data:', error);
         showNotification('Fehler beim Abrufen der Live-Daten.', 'error');
       } finally {
-        toggleLoadingOverlay(false);
+        if (!silent) toggleLoadingOverlay(false);
         if (reloadIcon) {
           setTimeout(() => {
             reloadIcon.classList.remove('animate-spin');
@@ -873,70 +1000,108 @@
       reloadData();
     }
 
-    // Fetch ThingSpeak indoor feeds for the active location
-    async function loadIndoorData() {
-      try {
-        const activeLoc = LOCATIONS.find(l => l.id === appState.activeLocId);
-        const response = await fetch(activeLoc.thingspeakUrl);
-        if (!response.ok) throw new Error(`HTTP-Fehler: ${response.status}`);
-        
-        const data = await response.json();
-        
-        if (data && data.feeds && data.feeds.length > 0) {
-          let lastTemp = null;
-          let lastHum = null;
-          let lastTempTime = null;
-          let lastHumTime = null;
-          const aligned = [];
+    // Forward-Fill über die Roh-Feeds: bildet lückenlose Temp/Feuchte-Paare
+    // und liefert die Zeitpunkte der letzten ECHTEN Messwerte pro Feld.
+    function processRawFeeds(rawFeeds) {
+      let lastTemp = null;
+      let lastHum = null;
+      let lastTempTime = null;
+      let lastHumTime = null;
+      const aligned = [];
 
-          data.feeds.forEach(feed => {
-            const f1 = feed.field1;
-            const f2 = feed.field2;
-            const feedTime = new Date(feed.created_at);
+      rawFeeds.forEach(feed => {
+        const f1 = feed.field1;
+        const f2 = feed.field2;
+        const feedTime = new Date(feed.created_at);
 
-            if (f1 !== null && f1 !== undefined && f1.toString().trim() !== '') {
-              const parsedTemp = parseFloat(f1.toString().replace(',', '.'));
-              if (!isNaN(parsedTemp)) { lastTemp = parsedTemp; lastTempTime = feedTime; }
-            }
-            if (f2 !== null && f2 !== undefined && f2.toString().trim() !== '') {
-              const parsedHum = parseFloat(f2.toString().replace(',', '.'));
-              if (!isNaN(parsedHum)) { lastHum = parsedHum; lastHumTime = feedTime; }
-            }
-
-            if (lastTemp !== null && lastHum !== null) {
-              aligned.push({
-                time: feedTime,
-                temp: lastTemp,
-                humidity: lastHum,
-                id: feed.entry_id
-              });
-            }
-          });
-
-          // Forward-Fill-Ende abschneiden: Wenn ein Sensor keine neuen Werte mehr
-          // liefert, würden die letzten Einträge nur noch aus mitgezogenen (stale)
-          // Werten bestehen und im Chart eine flache Linie bis "jetzt" erzeugen.
-          // Der Graf soll stattdessen beim letzten ECHTEN Messwert-Paar enden.
-          if (lastTempTime && lastHumTime) {
-            const lastRealMs = Math.min(lastTempTime.getTime(), lastHumTime.getTime());
-            while (aligned.length > 0 && aligned[aligned.length - 1].time.getTime() > lastRealMs) {
-              aligned.pop();
-            }
-          }
-
-          appState.lastSensorUpdate = { temp: lastTempTime, humidity: lastHumTime };
-
-          if (aligned.length > 0) {
-            appState.insideData = aligned;
-            appState.isDemoMode = false;
-            updateStatusText(true);
-            return;
-          }
+        if (f1 !== null && f1 !== undefined && f1.toString().trim() !== '') {
+          const parsedTemp = parseFloat(f1.toString().replace(',', '.'));
+          if (!isNaN(parsedTemp)) { lastTemp = parsedTemp; lastTempTime = feedTime; }
         }
-        throw new Error('Keine gültigen abgeglichenen Daten gefunden');
+        if (f2 !== null && f2 !== undefined && f2.toString().trim() !== '') {
+          const parsedHum = parseFloat(f2.toString().replace(',', '.'));
+          if (!isNaN(parsedHum)) { lastHum = parsedHum; lastHumTime = feedTime; }
+        }
+
+        if (lastTemp !== null && lastHum !== null) {
+          aligned.push({
+            time: feedTime,
+            temp: lastTemp,
+            humidity: lastHum,
+            id: feed.entry_id
+          });
+        }
+      });
+
+      // Forward-Fill-Ende abschneiden: Wenn ein Sensor keine neuen Werte mehr
+      // liefert, würden die letzten Einträge nur noch aus mitgezogenen (stale)
+      // Werten bestehen und im Chart eine flache Linie bis "jetzt" erzeugen.
+      // Der Graf soll stattdessen beim letzten ECHTEN Messwert-Paar enden.
+      if (lastTempTime && lastHumTime) {
+        const lastRealMs = Math.min(lastTempTime.getTime(), lastHumTime.getTime());
+        while (aligned.length > 0 && aligned[aligned.length - 1].time.getTime() > lastRealMs) {
+          aligned.pop();
+        }
+      }
+
+      return { aligned, lastTempTime, lastHumTime };
+    }
+
+    // Fetch ThingSpeak indoor feeds for the active location.
+    // Nutzt einen Rohdaten-Cache pro Standort: Nach dem ersten Voll-Load werden
+    // per ThingSpeak-"start"-Parameter nur noch neue Einträge nachgeladen.
+    async function loadIndoorData() {
+      const activeLoc = LOCATIONS.find(l => l.id === appState.activeLocId);
+      const cache = appState.feedCache[activeLoc.id];
+      const hasCache = !!(cache && cache.rawFeeds && cache.rawFeeds.length > 0);
+
+      let url = activeLoc.thingspeakUrl;
+      if (hasCache) {
+        const lastMs = new Date(cache.rawFeeds[cache.rawFeeds.length - 1].created_at).getTime();
+        // +1s, damit der letzte bekannte Eintrag nicht doppelt kommt (ThingSpeak erwartet UTC)
+        const startStr = new Date(lastMs + 1000).toISOString().replace('T', ' ').substring(0, 19);
+        url += `&start=${encodeURIComponent(startStr)}`;
+      }
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP-Fehler: ${response.status}`);
+
+        const data = await response.json();
+        const newFeeds = (data && Array.isArray(data.feeds)) ? data.feeds : [];
+
+        let rawFeeds;
+        if (hasCache) {
+          const knownIds = new Set(cache.rawFeeds.map(f => f.entry_id));
+          rawFeeds = cache.rawFeeds.concat(newFeeds.filter(f => !knownIds.has(f.entry_id)));
+          if (rawFeeds.length > 8000) rawFeeds = rawFeeds.slice(-8000);
+        } else {
+          rawFeeds = newFeeds;
+        }
+
+        if (rawFeeds.length === 0) throw new Error('Keine Daten empfangen');
+
+        const processed = processRawFeeds(rawFeeds);
+        if (processed.aligned.length === 0) throw new Error('Keine gültigen abgeglichenen Daten gefunden');
+
+        appState.feedCache[activeLoc.id] = { rawFeeds };
+        appState.insideData = processed.aligned;
+        appState.lastSensorUpdate = { temp: processed.lastTempTime, humidity: processed.lastHumTime };
+        appState.isDemoMode = false;
+        document.getElementById('demo-banner').classList.add('hidden');
+        updateStatusText(true);
       } catch (err) {
-        console.warn('ThingSpeak laden fehlgeschlagen, aktiviere Demo-Modus:', err);
-        activateDemoMode();
+        if (hasCache) {
+          // Aktualisierung fehlgeschlagen, aber Daten vorhanden → weiter mit Cache statt Demo-Modus
+          console.warn('ThingSpeak-Refresh fehlgeschlagen, verwende zwischengespeicherte Daten:', err);
+          const processed = processRawFeeds(cache.rawFeeds);
+          appState.insideData = processed.aligned;
+          appState.lastSensorUpdate = { temp: processed.lastTempTime, humidity: processed.lastHumTime };
+          showNotification('Aktualisierung fehlgeschlagen – zeige letzte bekannte Daten.', 'error');
+        } else {
+          console.warn('ThingSpeak laden fehlgeschlagen, aktiviere Demo-Modus:', err);
+          activateDemoMode();
+        }
       }
     }
 
@@ -950,7 +1115,9 @@
         // Zeit-Strings — das macht den Abgleich mit den ThingSpeak-Zeiten
         // zeitzonen-sicher. past_days=7: sonst gäbe es keine Stundenwerte für
         // die 3-Tage-/7-Tage-Chart-Ansicht (API liefert sonst erst ab heute 00:00).
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,relative_humidity_2m&timezone=auto&timeformat=unixtime&past_days=7&forecast_days=1`;
+        // forecast_days=2: nötig, damit die Lüftungsfenster-Prognose immer
+        // volle 24h in die Zukunft schauen kann.
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,relative_humidity_2m&timezone=auto&timeformat=unixtime&past_days=7&forecast_days=2`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
         
@@ -971,7 +1138,8 @@
       const hourlyHum = [];
       const now = new Date();
       
-      for (let i = 168; i >= 0; i--) {
+      // 7 Tage Vergangenheit + 24h "Prognose" für die Lüftungsfenster-Vorschau
+      for (let i = 168; i >= -24; i--) {
         const time = new Date(now.getTime() - i * 60 * 60 * 1000);
         const hour = time.getHours();
         const tempOffset = Math.sin((hour - 8) / 24 * 2 * Math.PI) * 4.5;
@@ -1158,6 +1326,18 @@
           console.error('Fehler beim Lüftungsberater:', e);
         }
 
+        // 3b. Schimmelrisiko & Lüftungsfenster-Prognose
+        try {
+          computeMoldRisk(curTempIn, curHumIn, curTempOut, !!weather);
+        } catch (e) {
+          console.error('Fehler bei der Schimmelrisiko-Berechnung:', e);
+        }
+        try {
+          renderVentilationForecast();
+        } catch (e) {
+          console.error('Fehler bei der Lüftungsfenster-Prognose:', e);
+        }
+
         // 4. Statistics 24h
         try {
           compute24hStats(feeds, curTempOut);
@@ -1303,6 +1483,144 @@
         desc.innerText = 'Nahezu identische Feuchtigkeitswerte.';
         expl.innerText = `Die absolute Feuchtigkeit ist drinnen (${ahIn.toFixed(1)} g/m³) und draußen (${ahOut.toFixed(1)} g/m³) fast gleich. Lüften hat keinen Einfluss auf Feuchte.`;
         tip.innerText = 'Tipp: Lüfte bei Bedarf, um verbrauchte Luft gegen Frischluft auszutauschen.';
+      }
+    }
+
+    // Taupunkt & Schimmelrisiko: schätzt die Oberflächentemperatur der kältesten
+    // Wandstelle über den Temperaturfaktor fRsi (DIN 4108-2: Mindeststandard 0,7)
+    // und berechnet daraus die relative Feuchte direkt an der Wandoberfläche.
+    // Ab ~80 % Oberflächenfeuchte kann Schimmel wachsen, ab 100 % kondensiert Wasser.
+    function computeMoldRisk(inTemp, inRh, outTemp, hasWeather) {
+      const badge = document.getElementById('mold-badge');
+      const desc = document.getElementById('mold-desc');
+      if (!badge || !desc) return;
+
+      if (!hasWeather || [inTemp, inRh, outTemp].some(v => v === null || v === undefined || isNaN(v))) {
+        desc.innerText = 'Keine Wetterdaten verfügbar – Risiko kann nicht berechnet werden.';
+        return;
+      }
+
+      const dewPoint = getDewPoint(inTemp, inRh);
+      const fRsi = 0.7;
+      const surfaceTemp = outTemp + fRsi * (inTemp - outTemp);
+      const vaporPressure = (inRh / 100) * satVaporPressure(inTemp);
+      const surfaceRhRaw = (vaporPressure / satVaporPressure(surfaceTemp)) * 100;
+      const surfaceRh = Math.min(100, surfaceRhRaw);
+
+      document.getElementById('mold-dewpoint').innerText = dewPoint === null ? '--.-°C' : `${dewPoint.toFixed(1)}°C`;
+      document.getElementById('mold-surface-temp').innerText = `${surfaceTemp.toFixed(1)}°C`;
+      document.getElementById('mold-surface-rh').innerText = `${surfaceRh.toFixed(0)}%`;
+      document.getElementById('mold-bar-label').innerText = `${surfaceRh.toFixed(0)}%`;
+
+      const bar = document.getElementById('mold-bar');
+      bar.style.width = `${surfaceRh}%`;
+
+      const badgeBase = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1';
+      const barBase = 'h-full rounded-full transition-all duration-500 bg-gradient-to-r';
+
+      if (surfaceRhRaw >= 100) {
+        badge.className = `${badgeBase} bg-red-500/10 border border-red-500/20 text-red-400`;
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span><span>Kondensat!</span>';
+        bar.className = `${barBase} from-red-500 to-red-400`;
+        desc.innerText = `Achtung: Der Taupunkt der Raumluft (${dewPoint.toFixed(1)} °C) liegt über der geschätzten Temperatur kalter Wandstellen (${surfaceTemp.toFixed(1)} °C) – dort schlägt sich aktuell Wasser nieder. Feuchte dringend senken (siehe Lüftungsberater) und den Raum stärker heizen.`;
+      } else if (surfaceRhRaw >= 80) {
+        badge.className = `${badgeBase} bg-orange-500/10 border border-orange-500/20 text-orange-400`;
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span><span>Erhöht</span>';
+        bar.className = `${barBase} from-orange-500 to-red-400`;
+        desc.innerText = `An kalten Wandstellen liegt die Luftfeuchte bei ca. ${surfaceRh.toFixed(0)} % – ab 80 % kann Schimmel wachsen. Raumfeuchte senken (Lüftungsberater beachten) und Außenwände nicht durch Möbel verdecken.`;
+      } else if (surfaceRhRaw >= 70) {
+        badge.className = `${badgeBase} bg-amber-500/10 border border-amber-500/20 text-amber-400`;
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500"></span><span>Beobachten</span>';
+        bar.className = `${barBase} from-amber-500 to-orange-400`;
+        desc.innerText = `Die Wandfeuchte liegt bei ca. ${surfaceRh.toFixed(0)} % – noch unkritisch, aber nicht weit von der 80-%-Schwelle. Regelmäßiges Stoßlüften hält das Risiko niedrig.`;
+      } else {
+        badge.className = `${badgeBase} bg-emerald-500/10 border border-emerald-500/20 text-emerald-400`;
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>Gering</span>';
+        bar.className = `${barBase} from-emerald-500 to-emerald-400`;
+        desc.innerText = `Alles im grünen Bereich: Selbst an kalten Wandstellen bleibt die Luftfeuchte mit ca. ${surfaceRh.toFixed(0)} % deutlich unter der Schimmelschwelle von 80 %.`;
+      }
+    }
+
+    // Lüftungsfenster-Prognose: bewertet jede Stunde der nächsten 24h danach,
+    // wie viel trockener die Außenluft (absolute Feuchte) als die Raumluft ist.
+    function renderVentilationForecast() {
+      const strip = document.getElementById('vent-forecast-strip');
+      const labels = document.getElementById('vent-forecast-labels');
+      const summary = document.getElementById('vent-forecast-summary');
+      if (!strip || !summary) return;
+
+      const hourly = appState.outsideData ? appState.outsideData.hourly : null;
+      const feeds = appState.insideData;
+      if (!hourly || !hourly.time || !feeds || feeds.length === 0) {
+        summary.innerText = 'Keine Prognosedaten verfügbar.';
+        return;
+      }
+
+      const latest = feeds[feeds.length - 1];
+      const ahIn = getAbsoluteHumidity(latest.temp, latest.humidity);
+
+      const nowMs = Date.now();
+      const horizonMs = nowMs + 24 * 60 * 60 * 1000;
+      const hours = [];
+      for (let i = 0; i < hourly.time.length; i++) {
+        const ms = typeof hourly.time[i] === 'number' ? hourly.time[i] * 1000 : new Date(hourly.time[i]).getTime();
+        if (ms < nowMs - 30 * 60 * 1000 || ms > horizonMs) continue;
+        const t = hourly.temperature_2m[i];
+        const rh = hourly.relative_humidity_2m[i];
+        if (t === null || t === undefined || rh === null || rh === undefined) continue;
+        const ahOut = getAbsoluteHumidity(t, rh);
+        hours.push({ ms, date: new Date(ms), temp: t, ahOut, diff: ahIn - ahOut });
+      }
+
+      if (hours.length === 0) {
+        summary.innerText = 'Keine Prognosedaten für die nächsten 24 Stunden verfügbar.';
+        return;
+      }
+
+      strip.innerHTML = '';
+      hours.forEach(h => {
+        const cell = document.createElement('div');
+        let colorClass = 'bg-slate-600/70';
+        if (h.diff > 0.8) colorClass = 'bg-emerald-500';
+        else if (h.diff < 0) colorClass = 'bg-red-500/80';
+        cell.className = `flex-1 h-full rounded-sm ${colorClass} transition-colors`;
+        cell.title = `${formatTime(h.date)} Uhr · außen ${h.ahOut.toFixed(1)} g/m³ bei ${h.temp.toFixed(0)} °C · ${h.diff >= 0 ? 'trockener' : 'feuchter'} als innen (${Math.abs(h.diff).toFixed(1)} g/m³)`;
+        strip.appendChild(cell);
+      });
+
+      if (labels) {
+        labels.innerHTML = `<span>${formatTime(hours[0].date)}</span><span>${formatTime(hours[Math.floor(hours.length / 2)].date)}</span><span>${formatTime(hours[hours.length - 1].date)}</span>`;
+      }
+
+      // Bestes zusammenhängendes Fenster wirksamer Stunden (niedrigste mittlere Außenfeuchte)
+      let best = null;
+      let run = null;
+      const closeRun = () => {
+        if (run && (!best || run.sum / run.n < best.sum / best.n)) best = run;
+        run = null;
+      };
+      hours.forEach(h => {
+        if (h.diff > 0.8) {
+          if (!run) run = { start: h, end: h, sum: 0, n: 0 };
+          run.end = h;
+          run.sum += h.ahOut;
+          run.n++;
+        } else {
+          closeRun();
+        }
+      });
+      closeRun();
+
+      if (best) {
+        const today = new Date().getDate();
+        const startDay = best.start.date.getDate() === today ? 'heute' : 'morgen';
+        const endDate = new Date(best.end.ms + 60 * 60 * 1000);
+        // Fenster über Mitternacht: Endzeit mit eigenem Tages-Label kennzeichnen
+        const endDay = endDate.getDate() === best.start.date.getDate() ? '' : (endDate.getDate() === today ? 'heute ' : 'morgen ');
+        const windowLabel = `${startDay} ${formatTime(best.start.date)} – ${endDay}${formatTime(endDate)} Uhr`;
+        summary.innerHTML = `Bestes Lüftungsfenster: <strong class="text-teal-300">${windowLabel.charAt(0).toUpperCase()}${windowLabel.slice(1)}</strong> – Außenluft dann im Schnitt ${(best.sum / best.n).toFixed(1)} g/m³ (Raumluft aktuell ${ahIn.toFixed(1)} g/m³).`;
+      } else {
+        summary.innerText = `In den nächsten 24 Stunden bringt Lüften kaum Entfeuchtung – die Außenluft ist durchgehend ähnlich feucht oder feuchter als die Raumluft (aktuell ${ahIn.toFixed(1)} g/m³ innen).`;
       }
     }
 
@@ -1550,10 +1868,13 @@
       if (!(date instanceof Date) || isNaN(date.getTime())) {
         el.innerText = '--';
         el.title = '';
+        el.classList.remove('text-amber-400');
         return;
       }
       el.innerText = `Aktualisiert ${formatRelativeTime(date)}`;
       el.title = `Letzte Aktualisierung: ${formatDate(date)} ${formatTime(date)} Uhr`;
+      // Veraltete Werte optisch hervorheben
+      el.classList.toggle('text-amber-400', Date.now() - date.getTime() > SENSOR_STALE_MS);
     }
 
     // Refresh the "Zuletzt aktualisiert" labels on the three KPI cards
@@ -1568,6 +1889,38 @@
         weatherTime = typeof cur.time === 'number' ? new Date(cur.time * 1000) : new Date(cur.time);
       }
       setUpdatedLabel('kpi-temp-out-updated', weatherTime);
+
+      updateSensorStaleBanner();
+    }
+
+    // Warnbanner, wenn ein Sensor-Kurzbefehl länger als SENSOR_STALE_MS keine echten Werte liefert
+    function updateSensorStaleBanner() {
+      const banner = document.getElementById('sensor-stale-banner');
+      const textEl = document.getElementById('sensor-stale-text');
+      if (!banner || !textEl) return;
+
+      if (appState.isDemoMode) {
+        banner.classList.add('hidden');
+        return;
+      }
+
+      const upd = appState.lastSensorUpdate || {};
+      const problems = [];
+      const checkSensor = (label, date) => {
+        if (date instanceof Date && !isNaN(date.getTime()) && Date.now() - date.getTime() > SENSOR_STALE_MS) {
+          problems.push(`${label} (letzter Wert ${formatRelativeTime(date)})`);
+        }
+      };
+      checkSensor('Temperatur', upd.temp);
+      checkSensor('Luftfeuchtigkeit', upd.humidity);
+
+      if (problems.length > 0) {
+        textEl.innerHTML = `<strong>Sensor-Ausfall bei „${getLocationName(appState.activeLocId)}":</strong> ${problems.join(' · ')} – bitte den iPhone-Kurzbefehl prüfen.`;
+        banner.classList.remove('hidden');
+        updateIcons();
+      } else {
+        banner.classList.add('hidden');
+      }
     }
 
     // Open-Meteo Weather Code Parser
@@ -1648,6 +2001,46 @@
           appState.chartInstance.resize();
         }
       }
+
+      // Live-Werte auf der Hub-Kachel aktualisieren
+      if (view === 'home') {
+        loadHubPreviews();
+      }
+    }
+
+    // Kompakte Live-Vorschau beider Standorte auf der ClimateFlow-Kachel.
+    // Lädt nur die letzten 400 Einträge pro Kanal und ist auf 2 Minuten gedrosselt.
+    async function loadHubPreviews(force = false) {
+      if (!force && Date.now() - appState.hubPreviewAt < 2 * 60 * 1000) return;
+      appState.hubPreviewAt = Date.now();
+
+      await Promise.all(LOCATIONS.map(async loc => {
+        const el = suffix => document.getElementById(`hub-prev-${loc.id}-${suffix}`);
+        const nameEl = el('name');
+        if (nameEl) nameEl.innerText = getLocationName(loc.id).replace('Schlafzimmer ', '');
+
+        try {
+          const url = loc.thingspeakUrl.replace('results=8000', 'results=400');
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
+          const data = await res.json();
+          const processed = processRawFeeds((data && data.feeds) || []);
+
+          if (processed.aligned.length > 0) {
+            const last = processed.aligned[processed.aligned.length - 1];
+            el('temp').innerText = `${last.temp.toFixed(1)} °C`;
+            el('hum').innerText = `${last.humidity.toFixed(0)} %`;
+            el('time').innerText = formatRelativeTime(last.time);
+          } else {
+            el('temp').innerText = '–';
+            el('time').innerText = 'keine Daten';
+          }
+        } catch (err) {
+          console.warn(`Hub-Vorschau für ${loc.id} fehlgeschlagen:`, err);
+          if (el('temp')) el('temp').innerText = '–';
+          if (el('time')) el('time').innerText = 'offline';
+        }
+      }));
     }
 
     // App Initialization
@@ -1658,17 +2051,26 @@
       window.addEventListener('hashchange', handleRoute);
       handleRoute();
 
-      // Auto-refresh every 5 minutes (nur wenn das Klima-Dashboard aktiv ist)
+      // Auto-refresh every 5 minutes: still im Hintergrund (kein Lade-Overlay),
+      // im Klima-Dashboard inkl. Wetter, auf dem Hub nur die Kachel-Vorschau
       setInterval(() => {
         const climateView = document.getElementById('view-climate');
+        const homeView = document.getElementById('view-home');
         if (appState.climateLoaded && climateView && !climateView.classList.contains('hidden')) {
-          console.log('[Interval] Auto-refresh data...');
-          reloadData();
+          console.log('[Interval] Auto-refresh data (silent)...');
+          reloadData(true);
+        } else if (homeView && !homeView.classList.contains('hidden')) {
+          loadHubPreviews(true);
         }
       }, 5 * 60 * 1000);
 
       // "vor X Min."-Labels laufend aktuell halten
       setInterval(updateTimestampLabels, 60 * 1000);
+
+      // PWA: Service Worker registrieren (macht die App installierbar & offlinefähig)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.warn('Service Worker Registrierung fehlgeschlagen:', err));
+      }
     }
 
     window.addEventListener('DOMContentLoaded', init);
