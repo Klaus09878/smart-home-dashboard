@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SmartHome Climate Dashboard | ClimateFlow</title>
+  <title>Smart Home Hub</title>
   <!-- SEO & Meta Tags -->
   <meta name="description" content="Visualisiere und analysiere deine Smart-Home-Klimadaten in Echtzeit. Erhalte intelligente Lüftungsempfehlungen basierend auf der absoluten Luftfeuchtigkeit.">
   <meta name="theme-color" content="#0f172a">
@@ -85,7 +85,7 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
 
   <!-- Loading Overlay (Shown during data load) -->
-  <div id="loading-overlay" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 transition-all duration-300">
+  <div id="loading-overlay" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 transition-all duration-300">
     <div class="relative w-16 h-16 flex items-center justify-center">
       <div class="w-16 h-16 rounded-full border-4 border-slate-800 border-t-teal-500 animate-spin absolute"></div>
       <i data-lucide="wind" class="w-6 h-6 text-teal-400"></i>
@@ -104,6 +104,89 @@
   <!-- Main Container -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col min-h-screen">
     
+    <!-- ============ VIEW: HOME (Navigations-Hub) ============ -->
+    <div id="view-home" class="hidden flex-1 flex-col animate-fade-in">
+      <header class="glass-panel rounded-2xl p-4 mb-8 flex items-center gap-3 shadow-lg">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20">
+          <i data-lucide="layout-grid" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">Smart Home Hub</h1>
+          <p class="text-xs text-slate-400 mt-0.5">Zentrale Übersicht aller Projekte</p>
+        </div>
+      </header>
+
+      <div class="flex-1 flex flex-col justify-center">
+        <h2 class="text-2xl font-bold text-white tracking-tight mb-1">Willkommen zurück 👋</h2>
+        <p class="text-sm text-slate-400 mb-8">Wähle ein Projekt, um loszulegen.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+          <!-- Tile: ClimateFlow -->
+          <button onclick="navigateTo('climate')" class="glass-panel glass-card-hover rounded-2xl p-6 text-left shadow-md group cursor-pointer">
+            <div class="flex items-start justify-between mb-5">
+              <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-teal-500/20 group-hover:scale-105 transition-transform">
+                <i data-lucide="wind" class="w-7 h-7"></i>
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-teal-500/10 border border-teal-500/20 text-teal-400 uppercase">Live</span>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-1.5">ClimateFlow</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">Smart-Home-Klimadashboard: Temperatur, Luftfeuchtigkeit und intelligenter Lüftungsberater für beide Standorte in Echtzeit.</p>
+            <div class="flex items-center gap-1.5 mt-5 text-xs font-semibold text-teal-400">
+              <span>Dashboard öffnen</span>
+              <i data-lucide="arrow-right" class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform"></i>
+            </div>
+          </button>
+
+          <!-- Tile: GPX-Viewer -->
+          <button onclick="navigateTo('gpx')" class="glass-panel glass-card-hover rounded-2xl p-6 text-left shadow-md group cursor-pointer">
+            <div class="flex items-start justify-between mb-5">
+              <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-500 to-rose-600 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform">
+                <i data-lucide="map" class="w-7 h-7"></i>
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-400 uppercase">In Planung</span>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-1.5">GPX-Viewer</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">Rennrad-Touren analysieren: GPX-Dateien hochladen und Routen, Höhenprofile und Statistiken visualisieren.</p>
+            <div class="flex items-center gap-1.5 mt-5 text-xs font-semibold text-orange-400">
+              <span>Vorschau ansehen</span>
+              <i data-lucide="arrow-right" class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform"></i>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ VIEW: GPX-VIEWER (Platzhalter) ============ -->
+    <div id="view-gpx" class="hidden flex-1 flex-col animate-fade-in">
+      <header class="glass-panel rounded-2xl p-4 mb-6 flex items-center gap-3 shadow-lg">
+        <button onclick="navigateTo('home')" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Zurück zum Hub">
+          <i data-lucide="arrow-left" class="w-4.5 h-4.5"></i>
+        </button>
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-500 to-rose-600 flex items-center justify-center text-white shadow-md shadow-orange-500/20">
+          <i data-lucide="map" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-white">GPX-Viewer</h1>
+          <p class="text-xs text-slate-400 mt-0.5">Routen-Visualisierung für Rennrad-Touren</p>
+        </div>
+      </header>
+
+      <div class="flex-1 glass-panel rounded-2xl p-10 flex flex-col items-center justify-center text-center shadow-lg">
+        <div class="w-20 h-20 rounded-3xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-6">
+          <i data-lucide="route" class="w-10 h-10"></i>
+        </div>
+        <h2 class="text-xl font-bold text-white mb-2">Bald verfügbar</h2>
+        <p class="text-sm text-slate-400 max-w-md leading-relaxed">Hier entsteht der GPX-Viewer: GPX-Dateien deiner Rennrad-Touren hochladen und Strecke, Höhenprofil, Geschwindigkeit und mehr grafisch auswerten.</p>
+        <button onclick="navigateTo('home')" class="mt-8 px-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-sm font-medium text-slate-200 transition-colors flex items-center gap-2">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          Zurück zum Hub
+        </button>
+      </div>
+    </div>
+
+    <!-- ============ VIEW: CLIMATEFLOW DASHBOARD ============ -->
+    <div id="view-climate" class="hidden flex-1 flex-col">
+
     <!-- Top Alert Banner (for Demo mode notification) -->
     <div id="demo-banner" class="hidden mb-4 p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-sm flex items-center justify-between animate-fade-in">
       <div class="flex items-center gap-2">
@@ -118,6 +201,10 @@
     <!-- HEADER: Navigation and location switching -->
     <header class="relative z-30 glass-panel rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-lg">
       <div class="flex items-center gap-3">
+        <!-- Back to Hub -->
+        <button onclick="navigateTo('home')" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Zurück zum Hub">
+          <i data-lucide="arrow-left" class="w-4.5 h-4.5"></i>
+        </button>
         <!-- Logo Icon -->
         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20">
           <i data-lucide="home" class="w-5 h-5"></i>
@@ -206,6 +293,10 @@
                 <span class="text-4xl font-bold tracking-tight text-white" id="kpi-temp-in">--.-</span>
                 <span class="text-2xl font-medium text-slate-400">°C</span>
               </div>
+              <p class="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
+                <i data-lucide="clock" class="w-3 h-3"></i>
+                <span class="kpi-updated-label" id="kpi-temp-in-updated" title="">--</span>
+              </p>
             </div>
             <div class="w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400">
               <i data-lucide="thermometer" class="w-6 h-6"></i>
@@ -231,6 +322,10 @@
                 <span class="text-4xl font-bold tracking-tight text-white" id="kpi-humidity-in">--.-</span>
                 <span class="text-2xl font-medium text-slate-400">%</span>
               </div>
+              <p class="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
+                <i data-lucide="clock" class="w-3 h-3"></i>
+                <span class="kpi-updated-label" id="kpi-humidity-in-updated" title="">--</span>
+              </p>
             </div>
             <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
               <i data-lucide="droplets" class="w-6 h-6"></i>
@@ -242,7 +337,7 @@
               Qualität: <span id="kpi-humidity-comfort" class="font-semibold text-emerald-400">Optimal</span>
             </span>
             <span class="flex items-center gap-0.5 font-medium text-blue-400" id="kpi-humidity-in-trend">
-              <i data-lucide="trending-flat" class="w-3.5 h-3.5 inline"></i> <span id="kpi-humidity-in-trend-val">--</span>
+              <i data-lucide="move-right" class="w-3.5 h-3.5 inline"></i> <span id="kpi-humidity-in-trend-val">--</span>
             </span>
           </div>
         </div>
@@ -256,6 +351,10 @@
                 <span class="text-4xl font-bold tracking-tight text-white" id="kpi-temp-out">--.-</span>
                 <span class="text-2xl font-medium text-slate-400">°C</span>
               </div>
+              <p class="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
+                <i data-lucide="clock" class="w-3 h-3"></i>
+                <span class="kpi-updated-label" id="kpi-temp-out-updated" title="">--</span>
+              </p>
             </div>
             <div class="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400" id="weather-icon-container">
               <i data-lucide="cloud-sun" class="w-6 h-6"></i>
@@ -478,6 +577,8 @@
 
     </main>
 
+    </div><!-- /view-climate -->
+
     <!-- Footer -->
     <footer class="mt-8 py-6 border-t border-slate-900/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
       <p>© 2026 ClimateFlow. Entwickelt für Raumnutzung & Energieeffizienz.</p>
@@ -515,7 +616,10 @@
       outsideData: {},
       weatherConfig: null,
       chartInstance: null,
-      currentChartTimeframe: 24 // hours
+      currentChartTimeframe: 24, // hours
+      climateLoaded: false,
+      // Zeitpunkte der letzten ECHTEN Messwerte (nicht forward-filled)
+      lastSensorUpdate: { temp: null, humidity: null }
     };
 
     // Initialize UI Icons
@@ -781,30 +885,46 @@
         if (data && data.feeds && data.feeds.length > 0) {
           let lastTemp = null;
           let lastHum = null;
+          let lastTempTime = null;
+          let lastHumTime = null;
           const aligned = [];
 
           data.feeds.forEach(feed => {
             const f1 = feed.field1;
             const f2 = feed.field2;
+            const feedTime = new Date(feed.created_at);
 
             if (f1 !== null && f1 !== undefined && f1.toString().trim() !== '') {
               const parsedTemp = parseFloat(f1.toString().replace(',', '.'));
-              if (!isNaN(parsedTemp)) lastTemp = parsedTemp;
+              if (!isNaN(parsedTemp)) { lastTemp = parsedTemp; lastTempTime = feedTime; }
             }
             if (f2 !== null && f2 !== undefined && f2.toString().trim() !== '') {
               const parsedHum = parseFloat(f2.toString().replace(',', '.'));
-              if (!isNaN(parsedHum)) lastHum = parsedHum;
+              if (!isNaN(parsedHum)) { lastHum = parsedHum; lastHumTime = feedTime; }
             }
 
             if (lastTemp !== null && lastHum !== null) {
               aligned.push({
-                time: new Date(feed.created_at),
+                time: feedTime,
                 temp: lastTemp,
                 humidity: lastHum,
                 id: feed.entry_id
               });
             }
           });
+
+          // Forward-Fill-Ende abschneiden: Wenn ein Sensor keine neuen Werte mehr
+          // liefert, würden die letzten Einträge nur noch aus mitgezogenen (stale)
+          // Werten bestehen und im Chart eine flache Linie bis "jetzt" erzeugen.
+          // Der Graf soll stattdessen beim letzten ECHTEN Messwert-Paar enden.
+          if (lastTempTime && lastHumTime) {
+            const lastRealMs = Math.min(lastTempTime.getTime(), lastHumTime.getTime());
+            while (aligned.length > 0 && aligned[aligned.length - 1].time.getTime() > lastRealMs) {
+              aligned.pop();
+            }
+          }
+
+          appState.lastSensorUpdate = { temp: lastTempTime, humidity: lastHumTime };
 
           if (aligned.length > 0) {
             appState.insideData = aligned;
@@ -826,7 +946,11 @@
         const conf = appState.weatherConfig;
         if (!conf) return;
 
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,relative_humidity_2m&timezone=auto`;
+        // timeformat=unixtime: liefert absolute Epoch-Zeitstempel statt lokaler
+        // Zeit-Strings — das macht den Abgleich mit den ThingSpeak-Zeiten
+        // zeitzonen-sicher. past_days=7: sonst gäbe es keine Stundenwerte für
+        // die 3-Tage-/7-Tage-Chart-Ansicht (API liefert sonst erst ab heute 00:00).
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,relative_humidity_2m&timezone=auto&timeformat=unixtime&past_days=7&forecast_days=1`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
         
@@ -858,6 +982,7 @@
 
       return {
         current: {
+          time: Math.floor(now.getTime() / 1000),
           temperature_2m: baseTemp + (Math.random() * 2 - 1),
           relative_humidity_2m: 68,
           weather_code: 2
@@ -906,6 +1031,8 @@
       }
 
       appState.insideData = mockFeeds;
+      const lastMockTime = mockFeeds[mockFeeds.length - 1].time;
+      appState.lastSensorUpdate = { temp: lastMockTime, humidity: lastMockTime };
     }
 
     function updateStatusText(isLive) {
@@ -1020,6 +1147,10 @@
           updateWeatherIcon(weather.weather_code);
         }
 
+        // "Zuletzt aktualisiert" labels on the KPI cards
+        updateTimestampLabels();
+        updateIcons();
+
         // 3. Ventilation Advice
         try {
           computeVentilationAdvisor(curTempIn, curHumIn, curTempOut, curHumOut);
@@ -1070,14 +1201,14 @@
 
       // DOM updates
       const tTrend = document.getElementById('kpi-temp-in-trend');
-      let tArrow = 'trending-flat', tColor = 'text-slate-400', tSign = tempDelta > 0.05 ? '+' : '';
+      let tArrow = 'move-right', tColor = 'text-slate-400', tSign = tempDelta > 0.05 ? '+' : '';
       if (tempDelta > 0.08) { tArrow = 'trending-up'; tColor = 'text-orange-400'; }
       else if (tempDelta < -0.08) { tArrow = 'trending-down'; tColor = 'text-blue-400'; }
       tTrend.className = `flex items-center gap-0.5 font-medium ${tColor}`;
       tTrend.innerHTML = `<i data-lucide="${tArrow}" class="w-3.5 h-3.5 inline"></i> ${tSign}${tempDelta.toFixed(1)}°C/h`;
 
       const hTrend = document.getElementById('kpi-humidity-in-trend');
-      let hArrow = 'trending-flat', hColor = 'text-slate-400', hSign = humDelta > 0.5 ? '+' : '';
+      let hArrow = 'move-right', hColor = 'text-slate-400', hSign = humDelta > 0.5 ? '+' : '';
       if (humDelta > 1) { hArrow = 'trending-up'; hColor = 'text-blue-400'; }
       else if (humDelta < -1) { hArrow = 'trending-down'; hColor = 'text-emerald-400'; }
       hTrend.className = `flex items-center gap-0.5 font-medium ${hColor}`;
@@ -1226,26 +1357,28 @@
       const insideTemp = filtered.map(f => f.temp);
       const insideHum = filtered.map(f => f.humidity);
 
-      // Outdoor weather alignment
+      // Outdoor weather alignment (zeitzonen-sicher über absolute Zeitstempel).
+      // Pro Innen-Messpunkt wird die zeitlich nächste Open-Meteo-Stunde gesucht;
+      // liegt keine Stunde nah genug (>45 Min), bleibt der Punkt leer (Lücke im Chart)
+      // statt einen falschen Wert anzuzeigen.
       const outsideTemp = [];
       const hourly = appState.outsideData.hourly;
-      if (hourly && hourly.time) {
+      if (hourly && hourly.time && hourly.time.length > 0) {
+        // Unix-Sekunden (Live-API) oder ISO-Strings (Demo-Modus) → Millisekunden
+        const hourlyMs = hourly.time.map(t => typeof t === 'number' ? t * 1000 : new Date(t).getTime());
+        const maxMatchDistMs = 45 * 60 * 1000;
+
         filtered.forEach(feed => {
-          const feedTimePrefix = feed.time.toISOString().substring(0, 14) + '00';
-          let matchIdx = hourly.time.findIndex(t => t.startsWith(feedTimePrefix));
-          if (matchIdx === -1) {
-            let minDiff = Infinity, closest = 0;
-            const ms = feed.time.getTime();
-            for (let i = 0; i < hourly.time.length; i++) {
-              const diff = Math.abs(ms - new Date(hourly.time[i]).getTime());
-              if (diff < minDiff) { minDiff = diff; closest = i; }
-            }
-            matchIdx = closest;
+          const ms = feed.time.getTime();
+          let minDiff = Infinity, closest = -1;
+          for (let i = 0; i < hourlyMs.length; i++) {
+            const diff = Math.abs(ms - hourlyMs[i]);
+            if (diff < minDiff) { minDiff = diff; closest = i; }
           }
-          outsideTemp.push(hourly.temperature_2m[matchIdx]);
+          outsideTemp.push(closest !== -1 && minDiff <= maxMatchDistMs ? hourly.temperature_2m[closest] : null);
         });
       } else {
-        filtered.forEach(() => outsideTemp.push(16.5));
+        filtered.forEach(() => outsideTemp.push(null));
       }
 
       const tempGrad = ctx.createLinearGradient(0, 0, 0, 360);
@@ -1315,7 +1448,9 @@
               padding: 10,
               usePointStyle: true,
               callbacks: {
-                label: context => `${context.dataset.label.split(' ')[0]}: ${context.parsed.y.toFixed(1)}`
+                label: context => context.parsed.y === null || context.parsed.y === undefined
+                  ? `${context.dataset.label.split(' ')[0]}: –`
+                  : `${context.dataset.label.split(' ')[0]}: ${context.parsed.y.toFixed(1)}`
               }
             }
           },
@@ -1399,6 +1534,42 @@
       return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
     }
 
+    // Relative time label ("vor 5 Min.") for the KPI update indicators
+    function formatRelativeTime(date) {
+      const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
+      if (diffMin < 1) return 'gerade eben';
+      if (diffMin < 60) return `vor ${diffMin} Min.`;
+      const diffH = Math.floor(diffMin / 60);
+      if (diffH < 24) return `vor ${diffH} Std.`;
+      return `am ${formatDate(date)} um ${formatTime(date)}`;
+    }
+
+    function setUpdatedLabel(elementId, date) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      if (!(date instanceof Date) || isNaN(date.getTime())) {
+        el.innerText = '--';
+        el.title = '';
+        return;
+      }
+      el.innerText = `Aktualisiert ${formatRelativeTime(date)}`;
+      el.title = `Letzte Aktualisierung: ${formatDate(date)} ${formatTime(date)} Uhr`;
+    }
+
+    // Refresh the "Zuletzt aktualisiert" labels on the three KPI cards
+    function updateTimestampLabels() {
+      const upd = appState.lastSensorUpdate || {};
+      setUpdatedLabel('kpi-temp-in-updated', upd.temp);
+      setUpdatedLabel('kpi-humidity-in-updated', upd.humidity);
+
+      const cur = appState.outsideData ? appState.outsideData.current : null;
+      let weatherTime = null;
+      if (cur && cur.time !== undefined && cur.time !== null) {
+        weatherTime = typeof cur.time === 'number' ? new Date(cur.time * 1000) : new Date(cur.time);
+      }
+      setUpdatedLabel('kpi-temp-out-updated', weatherTime);
+    }
+
     // Open-Meteo Weather Code Parser
     function getWeatherDescription(code) {
       const codes = {
@@ -1434,19 +1605,70 @@
       return codes[code] || 'Unbekannt';
     }
 
+    // ============ HUB NAVIGATION (Hash-Routing) ============
+    const HUB_VIEWS = ['home', 'climate', 'gpx'];
+
+    function navigateTo(view) {
+      if (location.hash === `#${view}`) {
+        handleRoute();
+      } else {
+        location.hash = view;
+      }
+    }
+
+    function handleRoute() {
+      let view = (location.hash || '').replace('#', '');
+      if (!HUB_VIEWS.includes(view)) view = 'home';
+
+      HUB_VIEWS.forEach(id => {
+        const el = document.getElementById(`view-${id}`);
+        if (!el) return;
+        if (id === view) {
+          el.classList.remove('hidden');
+          el.classList.add('flex');
+        } else {
+          el.classList.add('hidden');
+          el.classList.remove('flex');
+        }
+      });
+
+      document.title = view === 'climate'
+        ? 'ClimateFlow | Smart Home Hub'
+        : view === 'gpx' ? 'GPX-Viewer | Smart Home Hub' : 'Smart Home Hub';
+
+      updateIcons();
+
+      // Klimadaten erst beim ersten Öffnen des Dashboards laden (Performance)
+      if (view === 'climate') {
+        if (!appState.climateLoaded) {
+          appState.climateLoaded = true;
+          reloadData();
+        } else if (appState.chartInstance) {
+          // Chart neu dimensionieren, falls die View zwischenzeitlich versteckt war
+          appState.chartInstance.resize();
+        }
+      }
+    }
+
     // App Initialization
-    async function init() {
+    function init() {
       updateIcons();
       initConfigs();
-      
-      // Auto-load active location data immediately on startup (with loading spinner overlay!)
-      await reloadData();
-      
-      // Auto-refresh every 5 minutes
+
+      window.addEventListener('hashchange', handleRoute);
+      handleRoute();
+
+      // Auto-refresh every 5 minutes (nur wenn das Klima-Dashboard aktiv ist)
       setInterval(() => {
-        console.log('[Interval] Auto-refresh data...');
-        reloadData();
+        const climateView = document.getElementById('view-climate');
+        if (appState.climateLoaded && climateView && !climateView.classList.contains('hidden')) {
+          console.log('[Interval] Auto-refresh data...');
+          reloadData();
+        }
       }, 5 * 60 * 1000);
+
+      // "vor X Min."-Labels laufend aktuell halten
+      setInterval(updateTimestampLabels, 60 * 1000);
     }
 
     window.addEventListener('DOMContentLoaded', init);
