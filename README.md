@@ -7,11 +7,16 @@ Multi-Projekt-Plattform auf Cloudflare Pages: Homescreen-Hub mit Klimadashboard
 
 | Datei | Zweck |
 |---|---|
-| `index.html` | Gesamte SPA: Hub-Homescreen, ClimateFlow-Dashboard, GPX-Platzhalter (Hash-Routing `#home` / `#climate` / `#gpx`) |
+| `index.html` | Hub-Homescreen (Uhr/Datum/Wetter-Widget, Projekt-Kacheln) + ClimateFlow-Dashboard (Hash-Routing `#home` / `#climate`) |
+| `gpx.html` | GPX-Viewer: eigenständige Seite (Leaflet-Karte, Höhenprofil, Statistiken, IndexedDB-Speicher) |
 | `functions/_middleware.js` | Cloudflare Pages Middleware: HTTP Basic Auth (`AUTH_USER` / `AUTH_PASS`) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | PWA: installierbar auf dem iPhone-/Android-Homescreen, Offline-Fallback |
 
-Datenquellen: ThingSpeak (Innenklima, 2 Kanäle) und Open-Meteo (Außenwetter, `timeformat=unixtime`, `past_days=7`, `forecast_days=2`).
+**Grundprinzip für neue Projekte:** Jedes weitere Unterprojekt bekommt seine eigene
+HTML-Seite (wie `gpx.html`) und eine Kachel auf dem Hub — so bleibt `index.html`
+schlank und Projekte laden nur ihre eigenen Abhängigkeiten.
+
+Datenquellen: ThingSpeak (Innenklima, 2 Kanäle), Open-Meteo (Außenwetter, `timeformat=unixtime`, `past_days=7`, `forecast_days=2`), OpenStreetMap (Kartenkacheln GPX-Viewer).
 
 ## ⚠️ Wichtig: iPhone-Kurzbefehl auf kombinierten Upload umstellen
 
@@ -49,6 +54,26 @@ Der Forward-Fill im Dashboard bleibt als Fallback aktiv, alte Daten funktioniere
 - **Inkrementelles Laden**: nach dem ersten Voll-Load werden per ThingSpeak-`start`-Parameter nur neue Einträge geholt; Auto-Refresh alle 5 min läuft still im Hintergrund
 - **Hub-Homescreen** mit Live-Werten beider Standorte auf der ClimateFlow-Kachel
 
+## GPX-Viewer
+
+- Upload per Drag & Drop oder Dateiauswahl (mehrere `.gpx` gleichzeitig)
+- Speicherung **lokal im Browser (IndexedDB)** — kein Server, keine Uploads ins Netz, funktioniert pro Gerät
+- Karte (Leaflet + OpenStreetMap, dunkler Look), Start-/Ziel-Marker
+- Statistiken: Distanz, Dauer (Bewegungszeit, Pausen > 10 min ausgenommen), Ø/Max-Tempo (GPS-Ausreißer gefiltert), Anstieg (geglättet), Höhe min/max
+- Höhenprofil über Distanz (Chart.js)
+- Aktivitätstyp wird über das Ø-Tempo geraten (Spazieren < 6,5 / Laufen < 13 / Rad < 42 / Motorrad) und ist manuell änderbar; Umbenennen & Löschen möglich
+
+## Roadmap / Basis-Ausbau
+
+1. **Tailwind-Build statt CDN** (Performance, keine Runtime-Kompilierung)
+2. **Gemeinsame Assets extrahieren** (`shared.css`, `shared.js`: Glass-Styles, Formatierer, Icons-Init), sobald ein drittes Projekt dazukommt
+3. **Cloudflare Functions als API-Schicht** (`/api/...`): ThingSpeak-Keys verstecken, serverseitiges Caching, später Langzeit-Archiv in D1
+4. **Langzeit-Archiv Klimadaten** (ThingSpeak-Limit 8000 Einträge): tägliche Aggregate in Cloudflare D1/KV
+5. **Push-Benachrichtigungen** bei Sensor-Ausfall/Schimmelrisiko (z. B. ntfy.sh)
+6. **GPX-Ausbau**: Gesamt-Statistik über alle Aktivitäten (km/Woche, Jahresziele), Tempo-Färbung der Route, Vergleich zweier Touren
+7. **Hub-Ausbau**: frei anordenbare Widgets, Schnellzugriffe, Kalender-/To-do-Integration
+
 ## Deployment
 
 Push auf `main` → Cloudflare Pages deployt automatisch.
+Bei Service-Worker-Änderungen `CACHE_NAME` in `sw.js` hochzählen (aktuell `smarthub-v2`).

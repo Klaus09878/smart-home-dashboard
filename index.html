@@ -125,8 +125,23 @@
       </header>
 
       <div class="flex-1 flex flex-col justify-center">
-        <h2 class="text-2xl font-bold text-white tracking-tight mb-1">Willkommen zurück 👋</h2>
-        <p class="text-sm text-slate-400 mb-8">Wähle ein Projekt, um loszulegen.</p>
+
+        <!-- Personal Widget Bar: Uhr, Datum, Begrüßung, Wetter -->
+        <div class="glass-panel rounded-2xl p-6 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
+          <div class="text-center sm:text-left">
+            <h2 class="text-2xl font-bold text-white tracking-tight" id="hub-greeting">Willkommen 👋</h2>
+            <p class="text-sm text-slate-400 mt-1" id="hub-date">–</p>
+          </div>
+          <div class="text-center sm:text-right">
+            <p class="text-5xl font-bold tracking-tight bg-gradient-to-r from-teal-300 to-indigo-400 bg-clip-text text-transparent tabular-nums" id="hub-clock">--:--</p>
+            <p class="text-xs text-slate-400 mt-1.5 flex items-center gap-1.5 justify-center sm:justify-end">
+              <i data-lucide="cloud-sun" class="w-3.5 h-3.5 text-teal-400"></i>
+              <span id="hub-weather-text">Wetter wird geladen...</span>
+            </p>
+          </div>
+        </div>
+
+        <p class="text-sm text-slate-400 mb-4">Wähle ein Projekt, um loszulegen.</p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
           <!-- Tile: ClimateFlow -->
@@ -161,49 +176,21 @@
           </button>
 
           <!-- Tile: GPX-Viewer -->
-          <button onclick="navigateTo('gpx')" class="glass-panel glass-card-hover rounded-2xl p-6 text-left shadow-md group cursor-pointer">
+          <button onclick="location.href='gpx.html'" class="glass-panel glass-card-hover rounded-2xl p-6 text-left shadow-md group cursor-pointer">
             <div class="flex items-start justify-between mb-5">
               <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-500 to-rose-600 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 group-hover:scale-105 transition-transform">
                 <i data-lucide="map" class="w-7 h-7"></i>
               </div>
-              <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-400 uppercase">In Planung</span>
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wider bg-teal-500/10 border border-teal-500/20 text-teal-400 uppercase">Live</span>
             </div>
             <h3 class="text-lg font-bold text-white mb-1.5">GPX-Viewer</h3>
-            <p class="text-xs text-slate-400 leading-relaxed">Rennrad-Touren analysieren: GPX-Dateien hochladen und Routen, Höhenprofile und Statistiken visualisieren.</p>
+            <p class="text-xs text-slate-400 leading-relaxed">Trainings analysieren: GPX-Dateien hochladen (Rad, Motorrad, Laufen, Spazieren) und Route, Höhenprofil, Tempo &amp; Statistiken auswerten.</p>
             <div class="flex items-center gap-1.5 mt-5 text-xs font-semibold text-orange-400">
-              <span>Vorschau ansehen</span>
+              <span>Viewer öffnen</span>
               <i data-lucide="arrow-right" class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform"></i>
             </div>
           </button>
         </div>
-      </div>
-    </div>
-
-    <!-- ============ VIEW: GPX-VIEWER (Platzhalter) ============ -->
-    <div id="view-gpx" class="hidden flex-1 flex-col animate-fade-in">
-      <header class="glass-panel rounded-2xl p-4 mb-6 flex items-center gap-3 shadow-lg">
-        <button onclick="navigateTo('home')" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Zurück zum Hub">
-          <i data-lucide="arrow-left" class="w-4.5 h-4.5"></i>
-        </button>
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-500 to-rose-600 flex items-center justify-center text-white shadow-md shadow-orange-500/20">
-          <i data-lucide="map" class="w-5 h-5"></i>
-        </div>
-        <div>
-          <h1 class="text-xl font-bold tracking-tight text-white">GPX-Viewer</h1>
-          <p class="text-xs text-slate-400 mt-0.5">Routen-Visualisierung für Rennrad-Touren</p>
-        </div>
-      </header>
-
-      <div class="flex-1 glass-panel rounded-2xl p-10 flex flex-col items-center justify-center text-center shadow-lg">
-        <div class="w-20 h-20 rounded-3xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-6">
-          <i data-lucide="route" class="w-10 h-10"></i>
-        </div>
-        <h2 class="text-xl font-bold text-white mb-2">Bald verfügbar</h2>
-        <p class="text-sm text-slate-400 max-w-md leading-relaxed">Hier entsteht der GPX-Viewer: GPX-Dateien deiner Rennrad-Touren hochladen und Strecke, Höhenprofil, Geschwindigkeit und mehr grafisch auswerten.</p>
-        <button onclick="navigateTo('home')" class="mt-8 px-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-sm font-medium text-slate-200 transition-colors flex items-center gap-2">
-          <i data-lucide="arrow-left" class="w-4 h-4"></i>
-          Zurück zum Hub
-        </button>
       </div>
     </div>
 
@@ -689,7 +676,7 @@
 
     <!-- Footer -->
     <footer class="mt-8 py-6 border-t border-slate-900/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-      <p>© 2026 ClimateFlow. Entwickelt für Raumnutzung & Energieeffizienz.</p>
+      <p>© 2026 Smart Home Hub. Persönliches Dashboard für Klima, Training & mehr.</p>
       <p class="flex items-center gap-4">
         <span>Quelle: <a href="https://thingspeak.com/" target="_blank" class="hover:text-teal-400 underline decoration-teal-500/30 transition-colors">ThingSpeak API</a></span>
         <span>Wetter: <a href="https://open-meteo.com/" target="_blank" class="hover:text-teal-400 underline decoration-teal-500/30 transition-colors">Open-Meteo API</a></span>
@@ -1959,7 +1946,7 @@
     }
 
     // ============ HUB NAVIGATION (Hash-Routing) ============
-    const HUB_VIEWS = ['home', 'climate', 'gpx'];
+    const HUB_VIEWS = ['home', 'climate'];
 
     function navigateTo(view) {
       if (location.hash === `#${view}`) {
@@ -1971,6 +1958,13 @@
 
     function handleRoute() {
       let view = (location.hash || '').replace('#', '');
+
+      // Der GPX-Viewer ist eine eigenständige Seite (alte #gpx-Links umleiten)
+      if (view === 'gpx') {
+        location.replace('gpx.html');
+        return;
+      }
+
       if (!HUB_VIEWS.includes(view)) view = 'home';
 
       HUB_VIEWS.forEach(id => {
@@ -1985,9 +1979,7 @@
         }
       });
 
-      document.title = view === 'climate'
-        ? 'ClimateFlow | Smart Home Hub'
-        : view === 'gpx' ? 'GPX-Viewer | Smart Home Hub' : 'Smart Home Hub';
+      document.title = view === 'climate' ? 'ClimateFlow | Smart Home Hub' : 'Smart Home Hub';
 
       updateIcons();
 
@@ -2008,11 +2000,48 @@
       }
     }
 
+    // Uhr, Datum & Begrüßung auf dem Hub-Homescreen
+    function updateHubClock() {
+      const clockEl = document.getElementById('hub-clock');
+      const dateEl = document.getElementById('hub-date');
+      const greetEl = document.getElementById('hub-greeting');
+      if (!clockEl) return;
+
+      const now = new Date();
+      clockEl.innerText = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      if (dateEl) dateEl.innerText = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+      if (greetEl) {
+        const h = now.getHours();
+        const greeting = h < 5 ? 'Gute Nacht' : h < 11 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend';
+        greetEl.innerText = `${greeting} 👋`;
+      }
+    }
+
+    // Aktuelles Außenwetter für die Widget-Leiste auf dem Hub
+    async function loadHubWeather() {
+      const el = document.getElementById('hub-weather-text');
+      if (!el || !appState.weatherConfig) return;
+      try {
+        const conf = appState.weatherConfig;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,weather_code&timezone=auto`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
+        const data = await res.json();
+        el.innerText = `${data.current.temperature_2m.toFixed(1)} °C · ${getWeatherDescription(data.current.weather_code)} · ${conf.name}`;
+      } catch (err) {
+        console.warn('Hub-Wetter fehlgeschlagen:', err);
+        el.innerText = 'Wetter nicht verfügbar';
+      }
+    }
+
     // Kompakte Live-Vorschau beider Standorte auf der ClimateFlow-Kachel.
     // Lädt nur die letzten 400 Einträge pro Kanal und ist auf 2 Minuten gedrosselt.
     async function loadHubPreviews(force = false) {
       if (!force && Date.now() - appState.hubPreviewAt < 2 * 60 * 1000) return;
       appState.hubPreviewAt = Date.now();
+
+      loadHubWeather();
 
       await Promise.all(LOCATIONS.map(async loc => {
         const el = suffix => document.getElementById(`hub-prev-${loc.id}-${suffix}`);
@@ -2066,6 +2095,10 @@
 
       // "vor X Min."-Labels laufend aktuell halten
       setInterval(updateTimestampLabels, 60 * 1000);
+
+      // Hub-Uhr im Sekundentakt (günstig, nur DOM-Text)
+      updateHubClock();
+      setInterval(updateHubClock, 1000);
 
       // PWA: Service Worker registrieren (macht die App installierbar & offlinefähig)
       if ('serviceWorker' in navigator) {

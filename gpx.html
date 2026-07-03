@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPX-Viewer | Smart Home Hub</title>
+  <meta name="description" content="GPX-Dateien von Touren hochladen und Route, Höhenprofil und Statistiken visualisieren.">
+  <meta name="theme-color" content="#0f172a">
+
+  <link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Outfit', 'sans-serif'] },
+          animation: { 'fade-in': 'fadeIn 0.4s ease-out forwards' },
+          keyframes: { fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } } }
+        }
+      }
+    }
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Leaflet (Karten) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* OSM-Kacheln in dunklen Look einfärben */
+    .leaflet-tile { filter: brightness(0.6) invert(1) contrast(3.2) hue-rotate(200deg) saturate(0.35) brightness(0.65); }
+    .leaflet-container { background: #0b1220; font-family: 'Outfit', sans-serif; }
+    .leaflet-control-attribution { background: rgba(15,23,42,0.8) !important; color: #64748b !important; }
+    .leaflet-control-attribution a { color: #94a3b8 !important; }
+
+    #dropzone.dragover { border-color: #14b8a6; background: rgba(20, 184, 166, 0.08); }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
+
+  <!-- Background Glows -->
+  <div class="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+  <div class="absolute top-1/3 right-1/4 w-96 h-96 bg-rose-500/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col min-h-screen gap-6">
+
+    <!-- Header -->
+    <header class="glass-panel rounded-2xl p-4 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-lg">
+      <div class="flex items-center gap-3">
+        <a href="index.html#home" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Zurück zum Hub">
+          <i data-lucide="arrow-left" class="w-4.5 h-4.5"></i>
+        </a>
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-500 to-rose-600 flex items-center justify-center text-white shadow-md shadow-orange-500/20">
+          <i data-lucide="map" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-white">GPX-Viewer</h1>
+          <p class="text-xs text-slate-400 mt-0.5"><span id="activity-count">0</span> Aktivitäten · lokal auf diesem Gerät gespeichert</p>
+        </div>
+      </div>
+
+      <button onclick="document.getElementById('file-input').click()" class="px-4 py-2.5 rounded-xl bg-gradient-to-tr from-orange-500 to-rose-600 hover:opacity-90 text-sm font-semibold text-white flex items-center gap-2 transition-all shadow-md shadow-orange-500/20">
+        <i data-lucide="upload" class="w-4 h-4"></i>
+        GPX hochladen
+      </button>
+      <input type="file" id="file-input" accept=".gpx,application/gpx+xml" multiple class="hidden" onchange="handleFileInput(event)">
+    </header>
+
+    <!-- Dropzone (auch Empty State) -->
+    <div id="dropzone" class="glass-panel rounded-2xl p-8 border-2 border-dashed border-slate-700/80 flex flex-col items-center justify-center text-center transition-all cursor-pointer" onclick="document.getElementById('file-input').click()">
+      <div class="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-3">
+        <i data-lucide="route" class="w-7 h-7"></i>
+      </div>
+      <p class="text-sm font-semibold text-white">GPX-Dateien hierher ziehen oder klicken</p>
+      <p class="text-xs text-slate-400 mt-1">Mehrere Dateien gleichzeitig möglich · Rennrad, Motorrad, Laufen, Spazieren</p>
+      <p class="text-xs text-teal-400 mt-2 hidden" id="upload-status"></p>
+    </div>
+
+    <!-- Hauptbereich: Liste + Detail -->
+    <main id="main-area" class="hidden flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+
+      <!-- Aktivitäten-Liste -->
+      <section class="glass-panel rounded-2xl p-4 shadow-lg lg:col-span-1 flex flex-col max-h-[700px]">
+        <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider text-[11px] px-2 py-2 flex items-center gap-2">
+          <i data-lucide="list" class="w-4 h-4 text-orange-400"></i>
+          Aktivitäten
+        </h2>
+        <div id="activity-list" class="flex flex-col gap-1.5 overflow-y-auto pr-1"></div>
+      </section>
+
+      <!-- Detail-Ansicht -->
+      <section class="lg:col-span-2 flex flex-col gap-6">
+
+        <!-- Titel + Aktionen -->
+        <div class="glass-panel rounded-2xl p-5 shadow-lg flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 shrink-0" id="detail-icon">
+              <i data-lucide="bike" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <h2 class="text-lg font-bold text-white truncate" id="detail-name">–</h2>
+              <p class="text-xs text-slate-400" id="detail-date">–</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="detail-type" onchange="changeActivityType(this.value)" class="px-3 py-2 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-teal-500">
+              <option value="walk">🚶 Spazieren/Wandern</option>
+              <option value="run">🏃 Laufen</option>
+              <option value="ride">🚴 Fahrrad</option>
+              <option value="moto">🏍️ Motorrad</option>
+            </select>
+            <button onclick="renameActivity()" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Umbenennen">
+              <i data-lucide="edit-2" class="w-4 h-4"></i>
+            </button>
+            <button onclick="deleteActivity()" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-all" title="Löschen">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Karte -->
+        <div class="glass-panel rounded-2xl p-2 shadow-lg overflow-hidden">
+          <div id="map" class="w-full h-[320px] md:h-[380px] rounded-xl z-0"></div>
+        </div>
+
+        <!-- Statistiken -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div class="glass-panel rounded-2xl p-3 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-semibold">Distanz</p>
+            <p class="text-base font-bold text-white mt-0.5" id="stat-dist">–</p>
+          </div>
+          <div class="glass-panel rounded-2xl p-3 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-semibold">Dauer</p>
+            <p class="text-base font-bold text-white mt-0.5" id="stat-duration">–</p>
+          </div>
+          <div class="glass-panel rounded-2xl p-3 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-semibold">Ø Tempo</p>
+            <p class="text-base font-bold text-teal-400 mt-0.5" id="stat-avg">–</p>
+          </div>
+          <div class="glass-panel rounded-2xl p-3 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-semibold">Max Tempo</p>
+            <p class="text-base font-bold text-orange-400 mt-0.5" id="stat-max">–</p>
+          </div>
+          <div class="glass-panel rounded-2xl p-3 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-semibold">Anstieg</p>
+            <p class="text-base font-bold text-emerald-400 mt-0.5" id="stat-gain">–</p>
+          </div>
+          <div class="glass-panel rounded-2xl p-3 text-center">
+            <p class="text-[10px] text-slate-500 uppercase font-semibold">Höhe min/max</p>
+            <p class="text-base font-bold text-indigo-400 mt-0.5" id="stat-ele">–</p>
+          </div>
+        </div>
+
+        <!-- Höhenprofil -->
+        <div class="glass-panel rounded-2xl p-5 shadow-lg" id="elevation-card">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+            <i data-lucide="mountain" class="w-4 h-4 text-indigo-400"></i>
+            Höhenprofil
+          </h3>
+          <div class="w-full relative h-[180px]">
+            <canvas id="elevationChart"></canvas>
+          </div>
+          <p class="text-xs text-slate-500 mt-2 hidden" id="no-elevation-hint">Diese GPX-Datei enthält keine Höhendaten.</p>
+        </div>
+
+      </section>
+    </main>
+
+    <footer class="mt-auto py-6 border-t border-slate-900/60 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
+      <p>© 2026 Smart Home Hub · GPX-Viewer</p>
+      <p>Karte: <a href="https://www.openstreetmap.org/" target="_blank" class="hover:text-teal-400 underline decoration-teal-500/30">OpenStreetMap</a> · Alle Daten bleiben lokal im Browser (IndexedDB)</p>
+    </footer>
+  </div>
+
+  <script>
+    // ============ Aktivitätstypen ============
+    const ACTIVITY_TYPES = {
+      walk: { label: 'Spazieren/Wandern', icon: 'footprints', emoji: '🚶' },
+      run:  { label: 'Laufen',            icon: 'flame',      emoji: '🏃' },
+      ride: { label: 'Fahrrad',           icon: 'bike',       emoji: '🚴' },
+      moto: { label: 'Motorrad',          icon: 'gauge',      emoji: '🏍️' }
+    };
+
+    const state = { activities: [], selectedId: null, map: null, trackLayer: null, chart: null };
+
+    function updateIcons() { if (window.lucide) window.lucide.createIcons(); }
+
+    // ============ IndexedDB (lokale, dauerhafte Speicherung) ============
+    const DB_NAME = 'smarthub';
+    const STORE = 'gpx-activities';
+
+    function openDb() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains(STORE)) {
+            req.result.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbRequest(mode, fn) {
+      const db = await openDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, mode);
+        const req = fn(tx.objectStore(STORE));
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    const dbGetAll = () => dbRequest('readonly', store => store.getAll());
+    const dbPut = activity => dbRequest('readwrite', store => store.put(activity));
+    const dbDelete = id => dbRequest('readwrite', store => store.delete(id));
+
+    // ============ GPX-Parsing ============
+    function parseGpx(xmlText, fileName) {
+      const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+      if (doc.getElementsByTagName('parsererror').length > 0) {
+        throw new Error('Ungültige GPX/XML-Datei');
+      }
+
+      // Track-Punkte (Fallback: Routen-Punkte)
+      let ptNodes = Array.from(doc.getElementsByTagName('trkpt'));
+      if (ptNodes.length === 0) ptNodes = Array.from(doc.getElementsByTagName('rtept'));
+      if (ptNodes.length < 2) throw new Error('Keine Track-Punkte gefunden');
+
+      // Kompakt speichern: [lat, lon, ele|null, timestampMs|null]
+      const points = ptNodes.map(node => {
+        const eleNode = node.getElementsByTagName('ele')[0];
+        const timeNode = node.getElementsByTagName('time')[0];
+        const ele = eleNode ? parseFloat(eleNode.textContent) : null;
+        const t = timeNode ? new Date(timeNode.textContent).getTime() : null;
+        return [
+          parseFloat(node.getAttribute('lat')),
+          parseFloat(node.getAttribute('lon')),
+          isNaN(ele) ? null : ele,
+          isNaN(t) ? null : t
+        ];
+      }).filter(p => !isNaN(p[0]) && !isNaN(p[1]));
+
+      const nameNode = doc.getElementsByTagName('name')[0];
+      const name = (nameNode ? nameNode.textContent.trim() : '') || fileName.replace(/\.gpx$/i, '');
+
+      return { name, points };
+    }
+
+    // ============ Statistik-Berechnung ============
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    function computeStats(points) {
+      let distM = 0, movingSec = 0, maxSpeed = 0;
+      const cumDist = [0];
+
+      for (let i = 1; i < points.length; i++) {
+        const d = haversine(points[i - 1][0], points[i - 1][1], points[i][0], points[i][1]);
+        distM += d;
+        cumDist.push(distM);
+
+        const t0 = points[i - 1][3], t1 = points[i][3];
+        if (t0 !== null && t1 !== null) {
+          const dt = (t1 - t0) / 1000;
+          // Pausen (>10 min Lücke) nicht als Bewegungszeit zählen
+          if (dt > 0 && dt < 600) {
+            const v = (d / dt) * 3.6;
+            if (v > 1.5) movingSec += dt;
+            // GPS-Ausreißer filtern: nur Segmente >= 3s und plausible Tempi
+            if (dt >= 3 && v < 250 && v > maxSpeed) maxSpeed = v;
+          }
+        }
+      }
+
+      // Höhenmeter: geglättete Serie (gleitendes Mittel), nur Anstiege > Rauschschwelle
+      const eles = points.map(p => p[2]).filter(e => e !== null);
+      let elevGain = null, eleMin = null, eleMax = null;
+      if (eles.length > points.length * 0.5) {
+        const smooth = [];
+        const win = 5;
+        const rawEles = points.map(p => p[2]);
+        for (let i = 0; i < rawEles.length; i++) {
+          let sum = 0, n = 0;
+          for (let j = Math.max(0, i - win); j <= Math.min(rawEles.length - 1, i + win); j++) {
+            if (rawEles[j] !== null) { sum += rawEles[j]; n++; }
+          }
+          smooth.push(n > 0 ? sum / n : null);
+        }
+        elevGain = 0;
+        let ref = null;
+        smooth.forEach(e => {
+          if (e === null) return;
+          if (ref === null) { ref = e; return; }
+          const delta = e - ref;
+          if (delta > 2) { elevGain += delta; ref = e; }
+          else if (delta < -2) { ref = e; }
+        });
+        eleMin = Math.min(...eles);
+        eleMax = Math.max(...eles);
+      }
+
+      const tStart = points[0][3], tEnd = points[points.length - 1][3];
+      const totalSec = (tStart !== null && tEnd !== null && tEnd > tStart) ? (tEnd - tStart) / 1000 : null;
+      const effMovingSec = movingSec > 0 ? movingSec : totalSec;
+      const avgSpeed = (effMovingSec && effMovingSec > 0) ? (distM / effMovingSec) * 3.6 : null;
+
+      return {
+        distM,
+        totalSec,
+        movingSec: movingSec > 0 ? movingSec : null,
+        avgSpeed,
+        maxSpeed: maxSpeed > 0 ? maxSpeed : null,
+        elevGain: elevGain !== null ? Math.round(elevGain) : null,
+        eleMin, eleMax,
+        cumDist,
+        startTime: tStart
+      };
+    }
+
+    function guessType(avgSpeed) {
+      if (avgSpeed === null || avgSpeed === undefined) return 'ride';
+      if (avgSpeed < 6.5) return 'walk';
+      if (avgSpeed < 13) return 'run';
+      if (avgSpeed < 42) return 'ride';
+      return 'moto';
+    }
+
+    // ============ Formatierung ============
+    const fmtDist = m => m >= 1000 ? `${(m / 1000).toFixed(m >= 100000 ? 0 : 1)} km` : `${Math.round(m)} m`;
+    const fmtSpeed = v => v === null ? '–' : `${v.toFixed(1)} km/h`;
+
+    function fmtDuration(sec) {
+      if (sec === null || sec === undefined) return '–';
+      const totalMin = Math.round(sec / 60);
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      return h > 0 ? `${h}:${m.toString().padStart(2, '0')} h` : `${m} min`;
+    }
+
+    function fmtDateTime(ms) {
+      if (!ms) return 'Datum unbekannt';
+      const d = new Date(ms);
+      return d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }) +
+        ' · ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+    }
+
+    // ============ Upload-Handling ============
+    async function handleFileInput(event) {
+      await importFiles(Array.from(event.target.files));
+      event.target.value = '';
+    }
+
+    async function importFiles(files) {
+      const gpxFiles = files.filter(f => /\.gpx$/i.test(f.name));
+      if (gpxFiles.length === 0) {
+        setUploadStatus('Keine .gpx-Dateien erkannt.', true);
+        return;
+      }
+
+      let imported = 0, failed = 0, lastId = null;
+      for (const file of gpxFiles) {
+        try {
+          const text = await file.text();
+          lastId = await importGpxText(text, file.name);
+          imported++;
+        } catch (err) {
+          console.error(`Import von ${file.name} fehlgeschlagen:`, err);
+          failed++;
+        }
+      }
+
+      await refreshActivities();
+      if (lastId !== null) selectActivity(lastId);
+      setUploadStatus(`${imported} Aktivität(en) importiert${failed ? `, ${failed} fehlgeschlagen` : ''}.`, failed > 0);
+    }
+
+    // Kernimport (auch direkt aufrufbar, z. B. für Tests)
+    async function importGpxText(xmlText, fileName) {
+      const { name, points } = parseGpx(xmlText, fileName);
+      const stats = computeStats(points);
+      const activity = {
+        name,
+        type: guessType(stats.avgSpeed),
+        points,
+        distM: stats.distM,
+        totalSec: stats.totalSec,
+        movingSec: stats.movingSec,
+        avgSpeed: stats.avgSpeed,
+        maxSpeed: stats.maxSpeed,
+        elevGain: stats.elevGain,
+        eleMin: stats.eleMin,
+        eleMax: stats.eleMax,
+        startTime: stats.startTime,
+        addedAt: Date.now()
+      };
+      return dbPut(activity);
+    }
+
+    function setUploadStatus(msg, isError = false) {
+      const el = document.getElementById('upload-status');
+      el.innerText = msg;
+      el.className = `text-xs mt-2 ${isError ? 'text-amber-400' : 'text-teal-400'}`;
+      setTimeout(() => el.classList.add('hidden'), 6000);
+      el.classList.remove('hidden');
+    }
+
+    // Drag & Drop
+    const dropzone = document.getElementById('dropzone');
+    ['dragenter', 'dragover'].forEach(ev => dropzone.addEventListener(ev, e => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    }));
+    ['dragleave', 'drop'].forEach(ev => dropzone.addEventListener(ev, e => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+    }));
+    dropzone.addEventListener('drop', e => importFiles(Array.from(e.dataTransfer.files)));
+
+    // ============ Liste & Auswahl ============
+    async function refreshActivities() {
+      state.activities = (await dbGetAll()).sort((a, b) => (b.startTime || b.addedAt) - (a.startTime || a.addedAt));
+      document.getElementById('activity-count').innerText = state.activities.length;
+      document.getElementById('main-area').classList.toggle('hidden', state.activities.length === 0);
+      renderActivityList();
+    }
+
+    function renderActivityList() {
+      const list = document.getElementById('activity-list');
+      list.innerHTML = '';
+
+      state.activities.forEach(act => {
+        const type = ACTIVITY_TYPES[act.type] || ACTIVITY_TYPES.ride;
+        const isActive = act.id === state.selectedId;
+        const btn = document.createElement('button');
+        btn.className = `w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${
+          isActive ? 'bg-orange-500/10 border-orange-500/30' : 'bg-slate-900/40 border-slate-800/60 hover:border-slate-700'
+        }`;
+        btn.innerHTML = `
+          <div class="w-9 h-9 rounded-lg ${isActive ? 'bg-orange-500/20 text-orange-300' : 'bg-slate-800/80 text-slate-400'} flex items-center justify-center shrink-0">
+            <i data-lucide="${type.icon}" class="w-4.5 h-4.5"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold ${isActive ? 'text-white' : 'text-slate-200'} truncate">${escapeHtml(act.name)}</p>
+            <p class="text-[11px] text-slate-500">${act.startTime ? new Date(act.startTime).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '–'} · ${fmtDist(act.distM)} · ${fmtDuration(act.movingSec || act.totalSec)}</p>
+          </div>
+        `;
+        btn.onclick = () => selectActivity(act.id);
+        list.appendChild(btn);
+      });
+      updateIcons();
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.innerText = str;
+      return div.innerHTML;
+    }
+
+    function selectActivity(id) {
+      state.selectedId = id;
+      renderActivityList();
+      const act = state.activities.find(a => a.id === id);
+      if (act) renderDetail(act);
+    }
+
+    // ============ Detail: Karte, Stats, Höhenprofil ============
+    function renderDetail(act) {
+      const type = ACTIVITY_TYPES[act.type] || ACTIVITY_TYPES.ride;
+
+      document.getElementById('detail-name').innerText = act.name;
+      document.getElementById('detail-date').innerText = fmtDateTime(act.startTime);
+      document.getElementById('detail-type').value = act.type;
+      document.getElementById('detail-icon').innerHTML = `<i data-lucide="${type.icon}" class="w-5 h-5"></i>`;
+
+      document.getElementById('stat-dist').innerText = fmtDist(act.distM);
+      document.getElementById('stat-duration').innerText = fmtDuration(act.movingSec || act.totalSec);
+      document.getElementById('stat-avg').innerText = fmtSpeed(act.avgSpeed);
+      document.getElementById('stat-max').innerText = fmtSpeed(act.maxSpeed);
+      document.getElementById('stat-gain').innerText = act.elevGain !== null ? `${act.elevGain} m` : '–';
+      document.getElementById('stat-ele').innerText = act.eleMin !== null ? `${Math.round(act.eleMin)}–${Math.round(act.eleMax)} m` : '–';
+
+      drawMap(act);
+      drawElevationChart(act);
+      updateIcons();
+    }
+
+    function drawMap(act) {
+      if (!state.map) {
+        state.map = L.map('map', { zoomControl: true, attributionControl: true });
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(state.map);
+      }
+      if (state.trackLayer) state.map.removeLayer(state.trackLayer);
+
+      const latlngs = act.points.map(p => [p[0], p[1]]);
+      const line = L.polyline(latlngs, { color: '#f97316', weight: 3.5, opacity: 0.9 });
+      const start = L.circleMarker(latlngs[0], { radius: 6, color: '#10b981', fillColor: '#10b981', fillOpacity: 1 }).bindTooltip('Start');
+      const end = L.circleMarker(latlngs[latlngs.length - 1], { radius: 6, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }).bindTooltip('Ziel');
+
+      state.trackLayer = L.layerGroup([line, start, end]).addTo(state.map);
+      state.map.fitBounds(line.getBounds(), { padding: [24, 24] });
+    }
+
+    function drawElevationChart(act) {
+      const hasEle = act.eleMin !== null;
+      document.getElementById('no-elevation-hint').classList.toggle('hidden', hasEle);
+      document.getElementById('elevationChart').style.display = hasEle ? '' : 'none';
+      if (!hasEle) { if (state.chart) { state.chart.destroy(); state.chart = null; } return; }
+
+      // Auf max. 300 Punkte ausdünnen
+      const step = Math.max(1, Math.ceil(act.points.length / 300));
+      const cum = [];
+      let dist = 0;
+      const data = [];
+      for (let i = 0; i < act.points.length; i++) {
+        if (i > 0) dist += haversine(act.points[i - 1][0], act.points[i - 1][1], act.points[i][0], act.points[i][1]);
+        if (i % step !== 0) continue;
+        if (act.points[i][2] === null) continue;
+        data.push({ x: dist / 1000, y: act.points[i][2] });
+      }
+
+      const ctx = document.getElementById('elevationChart').getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 180);
+      grad.addColorStop(0, 'rgba(99, 102, 241, 0.25)');
+      grad.addColorStop(1, 'rgba(99, 102, 241, 0)');
+
+      if (state.chart) state.chart.destroy();
+      state.chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          datasets: [{
+            label: 'Höhe (m)',
+            data,
+            borderColor: '#6366f1',
+            borderWidth: 2,
+            backgroundColor: grad,
+            fill: true,
+            tension: 0.3,
+            pointRadius: 0,
+            pointHoverRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'nearest', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              callbacks: {
+                title: items => `km ${items[0].parsed.x.toFixed(1)}`,
+                label: item => `${Math.round(item.parsed.y)} m ü. M.`
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              grid: { color: 'rgba(255,255,255,0.03)' },
+              ticks: { color: '#64748b', font: { size: 10 }, callback: v => `${v.toFixed(0)} km` }
+            },
+            y: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { color: '#94a3b8', font: { size: 10 }, callback: v => `${v} m` }
+            }
+          }
+        }
+      });
+    }
+
+    // ============ Aktionen ============
+    async function changeActivityType(newType) {
+      const act = state.activities.find(a => a.id === state.selectedId);
+      if (!act) return;
+      act.type = newType;
+      await dbPut(act);
+      renderActivityList();
+      renderDetail(act);
+    }
+
+    async function renameActivity() {
+      const act = state.activities.find(a => a.id === state.selectedId);
+      if (!act) return;
+      const newName = prompt('Neuer Name für diese Aktivität:', act.name);
+      if (newName !== null && newName.trim() !== '') {
+        act.name = newName.trim();
+        await dbPut(act);
+        renderActivityList();
+        renderDetail(act);
+      }
+    }
+
+    async function deleteActivity() {
+      const act = state.activities.find(a => a.id === state.selectedId);
+      if (!act) return;
+      if (!confirm(`„${act.name}" wirklich löschen?`)) return;
+      await dbDelete(act.id);
+      state.selectedId = null;
+      await refreshActivities();
+      if (state.activities.length > 0) selectActivity(state.activities[0].id);
+    }
+
+    // ============ Init ============
+    async function init() {
+      updateIcons();
+      await refreshActivities();
+      if (state.activities.length > 0) selectActivity(state.activities[0].id);
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
