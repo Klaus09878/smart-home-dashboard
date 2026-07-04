@@ -33,7 +33,10 @@
       lastSensorUpdate: { temp: null, humidity: null },
       // Rohdaten-Cache pro Standort für inkrementelles Nachladen (statt jedes Mal 8000 Einträge)
       feedCache: {},
-      hubPreviewAt: 0
+      hubPreviewAt: 0,
+      // Standort-Vergleichsmodus im Klimaverlauf-Chart
+      compareMode: false,
+      compareData: null
     };
 
     // Sensor gilt als ausgefallen, wenn länger keine echten Werte kamen als:
@@ -99,6 +102,68 @@
         updateTabLabels();
         showNotification('Name erfolgreich geändert!');
       }
+    }
+
+    // ============ Konfigurierbare Ziel-/Schwellwerte pro Standort ============
+    // Bestimmen die Comfort-Bewertungen (KPI-Karten), den Komfort-Score und die
+    // Feuchte-Schwelle des Lüftungsberaters. Gespeichert in localStorage.
+    const THRESHOLD_DEFAULTS = { tempMin: 19, tempMax: 24, humMin: 40, humMax: 60 };
+
+    function getThresholds(locId = appState.activeLocId) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(`loc_thresholds_${locId}`) || 'null');
+        if (saved && typeof saved === 'object') return { ...THRESHOLD_DEFAULTS, ...saved };
+      } catch (e) { /* defekte gespeicherte Daten → Defaults */ }
+      return { ...THRESHOLD_DEFAULTS };
+    }
+
+    function openThresholdSettings() {
+      const th = getThresholds();
+      document.getElementById('th-temp-min').value = th.tempMin;
+      document.getElementById('th-temp-max').value = th.tempMax;
+      document.getElementById('th-hum-min').value = th.humMin;
+      document.getElementById('th-hum-max').value = th.humMax;
+      document.getElementById('threshold-loc-name').innerText = getLocationName(appState.activeLocId);
+      document.getElementById('threshold-modal').classList.remove('hidden');
+      updateIcons();
+    }
+
+    function closeThresholdSettings() {
+      document.getElementById('threshold-modal').classList.add('hidden');
+    }
+
+    function resetThresholdSettings() {
+      localStorage.removeItem(`loc_thresholds_${appState.activeLocId}`);
+      openThresholdSettings(); // Felder mit Defaults neu befüllen
+      showNotification('Schwellwerte auf Standard zurückgesetzt.');
+      renderActiveView();
+    }
+
+    function saveThresholdSettings() {
+      const read = id => parseFloat(document.getElementById(id).value.toString().replace(',', '.'));
+      const th = {
+        tempMin: read('th-temp-min'), tempMax: read('th-temp-max'),
+        humMin: read('th-hum-min'), humMax: read('th-hum-max')
+      };
+      if (Object.values(th).some(v => isNaN(v))) {
+        showNotification('Bitte gültige Zahlen eingeben.', 'error');
+        return;
+      }
+      if (th.tempMin >= th.tempMax || th.humMin >= th.humMax) {
+        showNotification('Minimum muss kleiner als Maximum sein.', 'error');
+        return;
+      }
+      if (th.humMin < 0 || th.humMax > 100) {
+        showNotification('Feuchte-Werte müssen zwischen 0 und 100 % liegen.', 'error');
+        return;
+      }
+      localStorage.setItem(`loc_thresholds_${appState.activeLocId}`, JSON.stringify(th));
+      closeThresholdSettings();
+      showNotification('Schwellwerte gespeichert.');
+      renderActiveView();
+      // Archiv-Komfortkurve mit neuen Schwellwerten neu zeichnen (falls geöffnet)
+      appState.archiveLoadedFor = null;
+      loadArchiveView();
     }
 
     function updateTabLabels() {
@@ -481,7 +546,12 @@
       highlightActiveTab();
       updateWeatherButtonName();
       updateTabLabels();
-      
+
+      // Vergleichsmodus zurücksetzen — der Bezugsstandort hat sich geändert
+      appState.compareMode = false;
+      appState.compareData = null;
+      updateCompareButton();
+
       // Automatically load the new location's datasets!
       await reloadData();
 
@@ -511,13 +581,14 @@
         document.getElementById('kpi-temp-in').innerText = curTempIn.toFixed(1);
         document.getElementById('kpi-humidity-in').innerText = curHumIn.toFixed(0);
 
-        // Comfort Temp index
+        // Comfort Temp index (Schwellwerte konfigurierbar, siehe getThresholds)
+        const th = getThresholds();
         let tempComfort = 'Behaglich';
         let tempComfortClass = 'text-teal-400';
-        if (curTempIn < 19) {
+        if (curTempIn < th.tempMin) {
           tempComfort = 'Kühl';
           tempComfortClass = 'text-blue-400';
-        } else if (curTempIn > 24) {
+        } else if (curTempIn > th.tempMax) {
           tempComfort = 'Warm';
           tempComfortClass = 'text-orange-400';
         }
@@ -530,10 +601,10 @@
         // Comfort Hum index
         let humComfort = 'Optimal';
         let humComfortClass = 'text-emerald-400';
-        if (curHumIn < 40) {
+        if (curHumIn < th.humMin) {
           humComfort = 'Trocken';
           humComfortClass = 'text-amber-500';
-        } else if (curHumIn > 60) {
+        } else if (curHumIn > th.humMax) {
           humComfort = 'Feucht';
           humComfortClass = 'text-red-400';
         }
@@ -542,6 +613,12 @@
           hComfortEl.innerText = humComfort;
           hComfortEl.className = `font-semibold ${humComfortClass}`;
         }
+
+        // „Soll"-Labels der 24h-Statistik folgen den konfigurierten Schwellwerten
+        const tTargetEl = document.getElementById('stat-temp-target');
+        if (tTargetEl) tTargetEl.innerText = `Soll: ${th.tempMin} – ${th.tempMax} °C`;
+        const hTargetEl = document.getElementById('stat-hum-target');
+        if (hTargetEl) hTargetEl.innerText = `Soll: ${th.humMin} – ${th.humMax} %`;
 
         // Calculate Trends
         try {
@@ -586,6 +663,28 @@
           renderVentilationForecast();
         } catch (e) {
           console.error('Fehler bei der Lüftungsfenster-Prognose:', e);
+        }
+
+        // 3c. Komfort-Score, Lüftungs-Erfolgskontrolle, Heizindikator, Wetterwarnungen
+        try {
+          renderComfortScore(curTempIn, curHumIn, curTempOut, !!weather, th);
+        } catch (e) {
+          console.error('Fehler beim Komfort-Score:', e);
+        }
+        try {
+          renderVentilationSuccess(feeds);
+        } catch (e) {
+          console.error('Fehler bei der Lüftungs-Erfolgskontrolle:', e);
+        }
+        try {
+          renderHeatingIndicator(feeds);
+        } catch (e) {
+          console.error('Fehler beim Heizindikator:', e);
+        }
+        try {
+          checkWeatherWarnings();
+        } catch (e) {
+          console.error('Fehler bei den Wetterwarnungen:', e);
         }
 
         // 4. Statistics 24h
@@ -684,7 +783,8 @@
       const tip = document.getElementById('ventilation-tip');
 
       if (diff > 0.8) {
-        if (inRh > 58) {
+        // „Dringend"-Schwelle folgt dem konfigurierten Feuchte-Maximum (knapp darunter)
+        if (inRh > getThresholds().humMax - 2) {
           badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400';
           badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span><span>Wichtig!</span>';
           circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-emerald-500 bg-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.3)] relative transition-all duration-500';
@@ -885,6 +985,171 @@
       }
     }
 
+    // ============ Komfort-Score (0–100) ============
+    // Bewertet das aktuelle Raumklima über die getestete Kernfunktion
+    // comfortScore (lib/core.js) — inkl. Schimmelrisiko-Abzug, falls Wetterdaten da.
+    function renderComfortScore(inTemp, inRh, outTemp, hasWeather, th) {
+      const valEl = document.getElementById('comfort-score-value');
+      const labelEl = document.getElementById('comfort-score-label');
+      const barEl = document.getElementById('comfort-score-bar');
+      if (!valEl) return;
+
+      let sRh = null;
+      if (hasWeather) {
+        const surf = surfaceHumidity(inTemp, inRh, outTemp);
+        if (surf) sRh = surf.surfaceRhRaw;
+      }
+      const score = comfortScore(inTemp, inRh, sRh, th);
+      if (score === null) {
+        valEl.innerText = '--';
+        if (labelEl) labelEl.innerText = 'keine Daten';
+        return;
+      }
+
+      let label = 'Sehr gut', color = 'text-emerald-400', barColor = 'from-emerald-500 to-emerald-400';
+      if (score < 40) { label = 'Schlecht'; color = 'text-red-400'; barColor = 'from-red-500 to-red-400'; }
+      else if (score < 60) { label = 'Mäßig'; color = 'text-orange-400'; barColor = 'from-orange-500 to-orange-400'; }
+      else if (score < 80) { label = 'Okay'; color = 'text-amber-400'; barColor = 'from-amber-500 to-amber-400'; }
+      else if (score < 95) { label = 'Gut'; color = 'text-teal-400'; barColor = 'from-teal-500 to-teal-400'; }
+
+      valEl.innerText = score;
+      valEl.className = `text-sm font-bold mt-0.5 ${color}`;
+      if (labelEl) {
+        labelEl.innerText = label;
+        labelEl.className = `font-semibold ${color}`;
+      }
+      if (barEl) {
+        barEl.style.width = `${score}%`;
+        barEl.className = `h-full rounded-full transition-all duration-500 bg-gradient-to-r ${barColor}`;
+      }
+    }
+
+    // ============ Lüftungs-Erfolgskontrolle ============
+    // Erkennt vergangenes Stoßlüften in den letzten 48 h (getestete Kernfunktion
+    // detectVentilationEvents) und zeigt den Effekt des letzten Ereignisses.
+    function renderVentilationSuccess(feeds) {
+      const el = document.getElementById('vent-success');
+      if (!el) return;
+
+      const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+      const recent = feeds.filter(f => f.time.getTime() >= cutoff);
+      const events = detectVentilationEvents(recent);
+
+      if (events.length === 0) {
+        el.innerHTML = `<span class="text-slate-500">In den letzten 48 h wurde kein Stoßlüften erkannt.</span>`;
+        return;
+      }
+
+      const last = events[events.length - 1];
+      const today = new Date().getDate();
+      const dayLabel = last.start.getDate() === today ? 'heute' : 'gestern';
+      const countNote = events.length > 1 ? ` · ${events.length}× gelüftet in 48 h` : '';
+      el.innerHTML =
+        `<span class="text-emerald-400 font-semibold">Zuletzt gelüftet ${dayLabel} ${formatTime(last.start)} Uhr:</span> ` +
+        `Feuchte <strong class="text-white">−${last.humDrop.toFixed(0)} %</strong> (${last.humBefore.toFixed(0)} → ${last.humAfter.toFixed(0)} %), ` +
+        `Temperatur −${last.tempDrop.toFixed(1)} °C${countNote}.`;
+    }
+
+    // ============ Heizaufwand-Indikator ============
+    // Innen-/Außentemperatur-Paare der letzten 48 h bilden und den relativen
+    // Heizaufwand heute vs. gestern anzeigen (heatingDemandIndex, lib/core.js).
+    function buildInOutPairs(feeds, hourly) {
+      if (!hourly || !hourly.time || hourly.time.length === 0) return [];
+      const hourlyMs = hourly.time.map(t => typeof t === 'number' ? t * 1000 : new Date(t).getTime());
+      const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+      const maxMatchDistMs = 45 * 60 * 1000;
+
+      const pairs = [];
+      feeds.forEach(f => {
+        const ms = f.time.getTime();
+        if (ms < cutoff) return;
+        let minDiff = Infinity, closest = -1;
+        for (let i = 0; i < hourlyMs.length; i++) {
+          const diff = Math.abs(ms - hourlyMs[i]);
+          if (diff < minDiff) { minDiff = diff; closest = i; }
+        }
+        pairs.push({
+          ms,
+          tin: f.temp,
+          tout: closest !== -1 && minDiff <= maxMatchDistMs ? hourly.temperature_2m[closest] : null
+        });
+      });
+      return pairs;
+    }
+
+    function renderHeatingIndicator(feeds) {
+      const el = document.getElementById('stat-heating');
+      if (!el) return;
+
+      const hourly = appState.outsideData ? appState.outsideData.hourly : null;
+      const { today, yesterday, changePct } = heatingDemandIndex(buildInOutPairs(feeds, hourly), Date.now());
+
+      if (today === null) {
+        el.innerHTML = '';
+        return;
+      }
+      if (today < 0.5) {
+        el.innerHTML = `<span class="font-medium text-slate-300">Heizaufwand:</span> aktuell praktisch keiner — draußen ist es ähnlich warm wie drinnen.`;
+        return;
+      }
+
+      let compare = '';
+      if (changePct !== null) {
+        const pct = Math.abs(changePct).toFixed(0);
+        if (changePct > 5) compare = ` — <span class="font-bold text-orange-400">~${pct} % höher</span> als gestern`;
+        else if (changePct < -5) compare = ` — <span class="font-bold text-emerald-400">~${pct} % niedriger</span> als gestern`;
+        else compare = ' — etwa wie gestern';
+      }
+      el.innerHTML = `<span class="font-medium text-slate-300">Heizaufwand (rel.):</span> Ø <span class="font-bold text-white">${today.toFixed(1)} °C</span> Differenz zur Außenluft heute${compare}.`;
+    }
+
+    // ============ Frost-/Hitzewarnung (Open-Meteo-Prognose) ============
+    // Frost: Tiefstwert der nächsten 15 h ≤ 0 °C. Hitze: Höchstwert der
+    // nächsten 36 h ≥ 30 °C. Anzeige in der Wetter-KPI-Karte + ntfy-Push
+    // (gedrosselt auf 1×/18 h pro Warnungstyp und Standort).
+    function checkWeatherWarnings() {
+      const el = document.getElementById('weather-alert');
+      if (!el) return;
+
+      const hourly = appState.outsideData ? appState.outsideData.hourly : null;
+      if (!hourly || !hourly.time) {
+        el.classList.add('hidden');
+        return;
+      }
+
+      const nowMs = Date.now();
+      const night = forecastExtremes(hourly.time, hourly.temperature_2m, nowMs, 15);
+      const heat = forecastExtremes(hourly.time, hourly.temperature_2m, nowMs, 36);
+      const locName = getLocationName(appState.activeLocId);
+
+      if (night && night.min <= 0) {
+        el.innerHTML = `<i data-lucide="snowflake" class="w-3.5 h-3.5 inline"></i> Frost: Tiefstwert ${night.min.toFixed(1)} °C gegen ${formatTime(new Date(night.minAtMs))} Uhr`;
+        el.className = 'mt-2 text-[11px] font-semibold text-sky-300 flex items-center gap-1';
+        sendPush(
+          'ClimateFlow Frost-Warnung',
+          `Frost bei „${locName}": Tiefstwert ${night.min.toFixed(1)} °C gegen ${formatTime(new Date(night.minAtMs))} Uhr. Fenster schließen, empfindliche Pflanzen schützen.`,
+          'snowflake',
+          `frost_${appState.activeLocId}`,
+          18 * 60 * 60 * 1000
+        );
+      } else if (heat && heat.max >= 30) {
+        el.innerHTML = `<i data-lucide="sun" class="w-3.5 h-3.5 inline"></i> Hitze: bis ${heat.max.toFixed(1)} °C ${heat.maxAtMs - nowMs > 20 * 3600 * 1000 ? 'morgen' : 'heute'} ${formatTime(new Date(heat.maxAtMs))} Uhr`;
+        el.className = 'mt-2 text-[11px] font-semibold text-orange-400 flex items-center gap-1';
+        sendPush(
+          'ClimateFlow Hitze-Warnung',
+          `Hitze bei „${locName}": bis ${heat.max.toFixed(1)} °C erwartet (${formatTime(new Date(heat.maxAtMs))} Uhr). Morgens lüften, tagsüber Fenster und Rollos schließen.`,
+          'sun',
+          `heat_${appState.activeLocId}`,
+          18 * 60 * 60 * 1000
+        );
+      } else {
+        el.classList.add('hidden');
+        return;
+      }
+      el.classList.remove('hidden');
+      updateIcons();
+    }
+
     // 24h stats
     function compute24hStats(feeds, curTempOut) {
       const now = new Date();
@@ -911,23 +1176,26 @@
       document.getElementById('stat-temp-diff-desc').innerText = tAvg > curTempOut ? 'höher' : 'tiefer';
     }
 
-    // Draw Line Chart.js
-    function drawChart() {
-      const ctx = document.getElementById('climateChart').getContext('2d');
-      const timeframeHours = appState.currentChartTimeframe;
-      
-      const now = new Date();
-      let filtered = appState.insideData;
+    // Zeitraum-Filter + Ausdünnung für den Klimaverlauf (auch für Vergleichsdaten)
+    function filterForTimeframe(data, timeframeHours) {
+      let filtered = data || [];
       if (timeframeHours > 0) {
-        const threshold = new Date(now.getTime() - timeframeHours * 60 * 60 * 1000);
+        const threshold = new Date(Date.now() - timeframeHours * 60 * 60 * 1000);
         filtered = filtered.filter(f => f.time >= threshold);
       }
-
       const maxPoints = 400;
       if (filtered.length > maxPoints) {
         const step = Math.ceil(filtered.length / maxPoints);
         filtered = filtered.filter((_, idx) => idx % step === 0);
       }
+      return filtered;
+    }
+
+    // Draw Line Chart.js
+    function drawChart() {
+      const ctx = document.getElementById('climateChart').getContext('2d');
+      const timeframeHours = appState.currentChartTimeframe;
+      const filtered = filterForTimeframe(appState.insideData, timeframeHours);
 
       // Echte Zeitachse: Datenpunkte tragen ms-Zeitstempel als x-Wert, damit
       // zeitliche Lücken proportional dargestellt werden (statt Kategorie-Achse).
@@ -968,55 +1236,75 @@
 
       const outsideTempData = filtered.map((f, i) => ({ x: f.time.getTime(), y: outsideTemp[i] }));
 
+      // Datensätze: Standard (aktiver Standort + Außentemperatur) oder
+      // Vergleichsmodus (beide Standorte übereinander, Außentemp. ausgeblendet)
+      let datasets;
+      if (appState.compareMode && appState.compareData) {
+        const other = LOCATIONS.find(l => l.id !== appState.activeLocId);
+        const activeName = getLocationName(appState.activeLocId).replace('Schlafzimmer ', '');
+        const otherName = getLocationName(other.id).replace('Schlafzimmer ', '');
+        const otherFiltered = filterForTimeframe(appState.compareData, timeframeHours);
+        const otherTemp = otherFiltered.map(f => ({ x: f.time.getTime(), y: f.temp }));
+        const otherHum = otherFiltered.map(f => ({ x: f.time.getTime(), y: f.humidity }));
+        const common = { fill: false, tension: 0.35, pointRadius: 0, pointHoverRadius: 5 };
+        datasets = [
+          { label: `${activeName} · Temperatur (°C)`, data: insideTemp, borderColor: '#f97316', borderWidth: 2.5, backgroundColor: tempGrad, fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 5, yAxisID: 'yTemp' },
+          { label: `${otherName} · Temperatur (°C)`, data: otherTemp, borderColor: '#a78bfa', borderWidth: 2, ...common, yAxisID: 'yTemp' },
+          { label: `${activeName} · Feuchte (%)`, data: insideHum, borderColor: '#6366f1', borderDash: [5, 5], borderWidth: 2, ...common, yAxisID: 'yHum' },
+          { label: `${otherName} · Feuchte (%)`, data: otherHum, borderColor: '#2dd4bf', borderDash: [5, 5], borderWidth: 2, ...common, yAxisID: 'yHum' }
+        ];
+      } else {
+        datasets = [
+          {
+            label: 'Innentemperatur (°C)',
+            data: insideTemp,
+            borderColor: '#f97316',
+            borderWidth: 2.5,
+            backgroundColor: tempGrad,
+            fill: true,
+            tension: 0.35,
+            pointRadius: filtered.length > 50 ? 0 : 2.5,
+            pointHoverRadius: 5,
+            yAxisID: 'yTemp'
+          },
+          {
+            label: 'Außentemperatur (°C)',
+            data: outsideTempData,
+            borderColor: '#14b8a6',
+            borderWidth: 2,
+            backgroundColor: 'transparent',
+            fill: false,
+            tension: 0.35,
+            pointRadius: filtered.length > 50 ? 0 : 2,
+            pointHoverRadius: 5,
+            yAxisID: 'yTemp'
+          },
+          {
+            label: 'Innenfeuchtigkeit (%)',
+            data: insideHum,
+            borderColor: '#6366f1',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            backgroundColor: humGrad,
+            fill: true,
+            tension: 0.35,
+            pointRadius: filtered.length > 50 ? 0 : 2.5,
+            pointHoverRadius: 5,
+            yAxisID: 'yHum'
+          }
+        ];
+      }
+
       const config = {
         type: 'line',
-        data: {
-          datasets: [
-            {
-              label: 'Innentemperatur (°C)',
-              data: insideTemp,
-              borderColor: '#f97316',
-              borderWidth: 2.5,
-              backgroundColor: tempGrad,
-              fill: true,
-              tension: 0.35,
-              pointRadius: filtered.length > 50 ? 0 : 2.5,
-              pointHoverRadius: 5,
-              yAxisID: 'yTemp'
-            },
-            {
-              label: 'Außentemperatur (°C)',
-              data: outsideTempData,
-              borderColor: '#14b8a6',
-              borderWidth: 2,
-              backgroundColor: 'transparent',
-              fill: false,
-              tension: 0.35,
-              pointRadius: filtered.length > 50 ? 0 : 2,
-              pointHoverRadius: 5,
-              yAxisID: 'yTemp'
-            },
-            {
-              label: 'Innenfeuchtigkeit (%)',
-              data: insideHum,
-              borderColor: '#6366f1',
-              borderWidth: 2,
-              borderDash: [5, 5],
-              backgroundColor: humGrad,
-              fill: true,
-              tension: 0.35,
-              pointRadius: filtered.length > 50 ? 0 : 2.5,
-              pointHoverRadius: 5,
-              yAxisID: 'yHum'
-            }
-          ]
-        },
+        data: { datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { display: false },
+            // Im Vergleichsmodus zeigt Chart.js die Legende (4 Serien, 2 Standorte)
+            legend: { display: appState.compareMode, labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12 } },
             tooltip: {
               backgroundColor: 'rgba(15, 23, 42, 0.95)',
               titleColor: '#f8fafc',
@@ -1031,9 +1319,12 @@
                   const d = new Date(items[0].parsed.x);
                   return `${formatDate(d)} ${formatTime(d)} Uhr`;
                 },
-                label: context => context.parsed.y === null || context.parsed.y === undefined
-                  ? `${context.dataset.label.split(' ')[0]}: –`
-                  : `${context.dataset.label.split(' ')[0]}: ${context.parsed.y.toFixed(1)}`
+                label: context => {
+                  const name = context.dataset.label.replace(/ \([^)]*\)$/, '');
+                  return context.parsed.y === null || context.parsed.y === undefined
+                    ? `${name}: –`
+                    : `${name}: ${context.parsed.y.toFixed(1)}`;
+                }
               }
             }
           },
@@ -1090,6 +1381,50 @@
       const active = document.getElementById(tfIds[hours.toString()]);
       if (active) active.className = 'px-3.5 py-1.5 rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 text-xs font-semibold transition-all';
 
+      drawChart();
+    }
+
+    // ============ Standort-Vergleichsmodus im Klimaverlauf ============
+    // Legt die Messreihe des jeweils anderen Standorts als Overlay über den
+    // Chart. Nutzt den Rohdaten-Cache; lädt sonst einmalig per fetchFeeds.
+    async function loadCompareData() {
+      const other = LOCATIONS.find(l => l.id !== appState.activeLocId);
+      const cache = appState.feedCache[other.id];
+      let rawFeeds = cache && cache.rawFeeds;
+      if (!rawFeeds || rawFeeds.length === 0) {
+        const data = await fetchFeeds(other, { results: 8000 });
+        rawFeeds = (data && Array.isArray(data.feeds)) ? data.feeds : [];
+        appState.feedCache[other.id] = { rawFeeds };
+      }
+      return processRawFeeds(rawFeeds).aligned;
+    }
+
+    function updateCompareButton() {
+      const btn = document.getElementById('btn-compare');
+      if (!btn) return;
+      btn.className = appState.compareMode
+        ? 'px-3.5 py-1.5 rounded-xl border border-violet-500/30 bg-violet-500/10 text-violet-300 text-xs font-semibold transition-all'
+        : 'px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all';
+      const staticLegend = document.getElementById('chart-legend-static');
+      if (staticLegend) staticLegend.classList.toggle('hidden', appState.compareMode);
+    }
+
+    async function toggleCompareMode() {
+      if (!appState.compareMode) {
+        try {
+          const data = await loadCompareData();
+          if (!data || data.length === 0) throw new Error('keine Daten');
+          appState.compareData = data;
+        } catch (err) {
+          console.warn('Vergleichsdaten laden fehlgeschlagen:', err);
+          showNotification('Vergleichsdaten konnten nicht geladen werden.', 'error');
+          return;
+        }
+        appState.compareMode = true;
+      } else {
+        appState.compareMode = false;
+      }
+      updateCompareButton();
       drawChart();
     }
 
@@ -1325,7 +1660,9 @@
             { label: 'Max (°C)', data: rows.map(r => r.t_max), borderColor: 'rgba(249,115,22,0.7)', backgroundColor: 'rgba(249,115,22,0.12)', borderWidth: 1, pointRadius: 0, tension: 0.3, fill: '+1', yAxisID: 'yT' },
             { label: 'Min (°C)', data: rows.map(r => r.t_min), borderColor: 'rgba(59,130,246,0.7)', borderWidth: 1, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yT' },
             { label: 'Mittel (°C)', data: rows.map(r => r.t_avg), borderColor: '#f8fafc', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yT' },
-            { label: 'Feuchte Ø (%)', data: rows.map(r => r.h_avg), borderColor: '#6366f1', borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yH' }
+            { label: 'Feuchte Ø (%)', data: rows.map(r => r.h_avg), borderColor: '#6366f1', borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yH' },
+            // Komfort-Score pro Tag (0–100, rechte Achse) aus den Tages-Mitteln
+            { label: 'Komfort-Score', data: rows.map(r => comfortScore(r.t_avg, r.h_avg, null, getThresholds())), borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yH' }
           ]
         },
         options: {

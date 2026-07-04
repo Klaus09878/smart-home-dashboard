@@ -67,6 +67,93 @@ test('surfaceHumidity: null bei ungültigen Werten', () => {
   assert.strictEqual(core.surfaceHumidity(20, 50, undefined), null);
 });
 
+test('comfortScore: 100 im Wohlfühlband, Abzüge außerhalb', () => {
+  assert.strictEqual(core.comfortScore(21, 50), 100);
+  // 2 °C zu warm → −16
+  assert.strictEqual(core.comfortScore(26, 50), 84);
+  // 10 % zu feucht → −15
+  assert.strictEqual(core.comfortScore(21, 70), 85);
+  // Extremwerte: Abzüge sind gedeckelt (max. −40 Temp, −30 Feuchte)
+  assert.strictEqual(core.comfortScore(40, 100), 100 - 40 - 30);
+  assert.strictEqual(core.comfortScore(null, 50), null);
+});
+
+test('comfortScore: Schimmelrisiko senkt den Score, eigene Schwellwerte greifen', () => {
+  assert.strictEqual(core.comfortScore(21, 50, 85), 70);       // >=80 % Wand → −30
+  assert.strictEqual(core.comfortScore(21, 50, 75), 85);       // 75 % → −15
+  assert.strictEqual(core.comfortScore(21, 50, 60), 100);      // unkritisch
+  // Eigenes Band 20–22 °C: 23 °C ist jetzt 1 °C drüber → −8
+  assert.strictEqual(core.comfortScore(23, 50, null, { tempMin: 20, tempMax: 22 }), 92);
+});
+
+test('detectVentilationEvents: erkennt Stoßlüften (Feuchte+Temp fallen schnell)', () => {
+  const t0 = Date.UTC(2026, 6, 1, 8, 0, 0);
+  const mk = (min, temp, hum) => ({ time: new Date(t0 + min * 60000), temp, humidity: hum });
+  const aligned = [
+    mk(0, 22.0, 58), mk(10, 22.1, 58),
+    mk(20, 21.0, 52), mk(30, 20.2, 49),  // Lüftungssturz: −1,9 °C / −9 %
+    mk(40, 20.8, 50), mk(50, 21.5, 52)
+  ];
+  const events = core.detectVentilationEvents(aligned);
+  assert.strictEqual(events.length, 1);
+  assert.ok(events[0].humDrop >= 9, `humDrop=${events[0].humDrop}`);
+  assert.ok(events[0].tempDrop >= 1.8, `tempDrop=${events[0].tempDrop}`);
+  assert.strictEqual(events[0].humBefore, 58);
+});
+
+test('detectVentilationEvents: Heizen (Feuchte sinkt, Temp steigt) ist KEIN Lüften', () => {
+  const t0 = Date.UTC(2026, 6, 1, 8, 0, 0);
+  const mk = (min, temp, hum) => ({ time: new Date(t0 + min * 60000), temp, humidity: hum });
+  const aligned = [mk(0, 20.0, 60), mk(15, 21.0, 55), mk(30, 22.0, 50)];
+  assert.strictEqual(core.detectVentilationEvents(aligned).length, 0);
+});
+
+test('detectVentilationEvents: langsamer Abfall über Stunden ist KEIN Lüften', () => {
+  const t0 = Date.UTC(2026, 6, 1, 8, 0, 0);
+  const aligned = [];
+  for (let i = 0; i < 12; i++) {
+    aligned.push({ time: new Date(t0 + i * 60 * 60000), temp: 22 - i * 0.3, humidity: 60 - i });
+  }
+  assert.strictEqual(core.detectVentilationEvents(aligned).length, 0);
+});
+
+test('heatingDemandIndex: heute vs. gestern inkl. Prozent-Änderung', () => {
+  const now = Date.UTC(2026, 6, 2, 12, 0, 0);
+  const h = 60 * 60 * 1000;
+  const pairs = [];
+  // Gestern: Differenz konstant 10 °C, heute: konstant 12 °C → +20 %
+  // (Samples zur halben Stunde, damit keiner auf eine Fenstergrenze fällt)
+  for (let i = 1; i <= 24; i++) pairs.push({ ms: now - 24 * h - i * h + h / 2, tin: 21, tout: 11 });
+  for (let i = 1; i <= 24; i++) pairs.push({ ms: now - i * h + h / 2, tin: 21, tout: 9 });
+  const r = core.heatingDemandIndex(pairs, now);
+  assert.ok(Math.abs(r.today - 12) < 0.01, `today=${r.today}`);
+  assert.ok(Math.abs(r.yesterday - 10) < 0.01, `yesterday=${r.yesterday}`);
+  assert.ok(Math.abs(r.changePct - 20) < 0.5, `changePct=${r.changePct}`);
+});
+
+test('heatingDemandIndex: ohne Daten null, Sommer (innen kälter) → Index 0', () => {
+  const now = Date.UTC(2026, 6, 2, 12, 0, 0);
+  assert.strictEqual(core.heatingDemandIndex([], now).today, null);
+  const pairs = [{ ms: now - 1000, tin: 22, tout: 30 }];
+  assert.strictEqual(core.heatingDemandIndex(pairs, now).today, 0);
+  assert.strictEqual(core.heatingDemandIndex(pairs, now).changePct, null);
+});
+
+test('forecastExtremes: Min/Max im Fenster, außerhalb wird ignoriert', () => {
+  const now = Date.UTC(2026, 6, 1, 20, 0, 0);
+  const times = [], temps = [];
+  for (let i = 0; i < 24; i++) {
+    times.push((now + i * 3600 * 1000) / 1000); // Unix-Sekunden
+    temps.push(10 - i);                          // fällt stündlich um 1 °C
+  }
+  const r = core.forecastExtremes(times, temps, now, 12);
+  assert.strictEqual(r.max, 10);
+  assert.strictEqual(r.min, 10 - 12);
+  assert.strictEqual(r.minAtMs, now + 12 * 3600 * 1000);
+  // Fenster ohne Stunden → null
+  assert.strictEqual(core.forecastExtremes(times, temps, now - 100 * 3600 * 1000, 1), null);
+});
+
 test('processRawFeeds: Forward-Fill bildet Paare, Komma-Dezimal wird geparst', () => {
   const feeds = [
     { created_at: '2026-07-01T10:00:00Z', field1: '21,5', field2: null, entry_id: 1 },

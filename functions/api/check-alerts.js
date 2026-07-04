@@ -3,10 +3,11 @@
 // externen Cron-Dienst (z. B. cron-job.org), der regelmäßig aufruft:
 //   GET https://<deine-domain>/api/check-alerts
 //
-// Zwei Warnungen:
+// Drei Warnungen:
 //   1. Sensor-Ausfall  — ein Feld liefert seit > 2 h keine echten Werte (max. 1×/6h)
 //   2. Schimmelrisiko  — Wandoberflächen-Feuchte >= 80 % (bzw. >= 100 % Kondensat),
 //      berechnet aus frischen Innenwerten + Open-Meteo-Außentemperatur (max. 1×/12h)
+//   3. Frost           — Tages-Tiefstwert der nächsten 2 Tage <= 0 °C (max. 1×/18h)
 //
 // Einrichtung (Pages → Settings → Environment variables):
 //   NTFY_TOPIC     = <dein geheimer ntfy-Topic-Name, z. B. smarthub-sean-x7k2>
@@ -27,6 +28,7 @@ const CHANNELS = {
 const STALE_MS = 2 * 60 * 60 * 1000;
 const DEDUPE_MS = 6 * 60 * 60 * 1000;
 const MOLD_DEDUPE_MS = 12 * 60 * 60 * 1000;
+const FROST_DEDUPE_MS = 18 * 60 * 60 * 1000;
 // Wert gilt als zu alt für die Schimmelprüfung, wenn älter als:
 const FRESH_MS = 2 * 60 * 60 * 1000;
 
@@ -71,20 +73,36 @@ async function shouldSend(db, key, dedupeMs = DEDUPE_MS) {
   return true;
 }
 
-// Serverseitige Schimmelrisiko-Prüfung: holt das Außenwetter (Open-Meteo) und
-// vergleicht mit den letzten echten Innen-Messwerten. Pusht bei Kondensat (>=100 %)
-// bzw. erhöhtem Risiko (>=80 %) an kalten Wandstellen. Best effort — Fehler hier
-// dürfen die Sensor-Ausfall-Prüfung nicht beeinträchtigen.
-async function checkMoldRisk(env, loc, feeds, report, locId) {
+// Serverseitige Wetter-Prüfungen (ein Open-Meteo-Fetch pro Standort):
+//   Frost — Tages-Tiefstwert der nächsten 2 Tage <= 0 °C (unabhängig von Innenwerten)
+//   Schimmelrisiko — nur mit frischen Innen-Messwerten: Wandoberflächen-Feuchte
+//   >= 80 % (Warnung) bzw. >= 100 % (Kondensat).
+// Best effort — Fehler hier dürfen die Sensor-Ausfall-Prüfung nicht beeinträchtigen.
+async function checkWeatherRisks(env, loc, feeds, report, locId) {
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m&daily=temperature_2m_min&forecast_days=2&timezone=auto&timeformat=unixtime`);
+  if (!res.ok) return;
+  const data = await res.json();
+
+  // ---- Frost-Warnung (auch ohne Innenwerte sinnvoll) ----
+  const mins = (data && data.daily && data.daily.temperature_2m_min) || [];
+  const validMins = mins.filter(v => v !== null && v !== undefined && !isNaN(v));
+  const frostMin = validMins.length ? Math.min(...validMins) : null;
+  report.locations[locId].frostMin = frostMin;
+  if (frostMin !== null && frostMin <= 0 && await shouldSend(env.DB, `frost_${locId}`, FROST_DEDUPE_MS)) {
+    await fetch(`https://ntfy.sh/${encodeURIComponent(env.NTFY_TOPIC)}`, {
+      method: 'POST',
+      body: `Frost bei ${loc.label}: Tiefstwert ${frostMin.toFixed(1)} °C in den nächsten 2 Tagen. Fenster schließen, empfindliche Pflanzen schützen.`,
+      headers: { 'Title': 'ClimateFlow Frost-Warnung', 'Tags': 'snowflake', 'Priority': 'high' }
+    });
+    report.notified.push(`${locId}:frost`);
+  }
+
+  // ---- Schimmelrisiko: nur mit frischen, vollständigen Innenwerten ----
   const temp = lastRealValue(feeds, 'field1');
   const hum = lastRealValue(feeds, 'field2');
   const now = Date.now();
-  // Nur mit frischen, vollständigen Innenwerten rechnen
   if (!temp || !hum || now - temp.ms > FRESH_MS || now - hum.ms > FRESH_MS) return;
 
-  const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m&timeformat=unixtime`);
-  if (!res.ok) return;
-  const data = await res.json();
   const outTemp = data && data.current ? data.current.temperature_2m : null;
   if (outTemp === null || outTemp === undefined || isNaN(outTemp)) return;
 
@@ -153,11 +171,11 @@ export async function onRequestGet(context) {
         report.notified.push(locId);
       }
 
-      // Schimmelrisiko zusätzlich prüfen (nur bei frischen Innenwerten wirksam)
+      // Wetter-Risiken zusätzlich prüfen (Frost immer; Schimmel bei frischen Innenwerten)
       try {
-        await checkMoldRisk(env, loc, feeds, report, locId);
-      } catch (moldErr) {
-        report.locations[locId].moldError = moldErr.message;
+        await checkWeatherRisks(env, loc, feeds, report, locId);
+      } catch (weatherErr) {
+        report.locations[locId].weatherError = weatherErr.message;
       }
     } catch (err) {
       report.locations[locId] = { error: err.message };

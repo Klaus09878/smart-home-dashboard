@@ -18,7 +18,8 @@ Multi-Projekt-Plattform auf Cloudflare Pages: Homescreen-Hub mit Klimadashboard
 | `functions/api/feeds/[locId].js` | ThingSpeak-Proxy (versteckt Keys, 60 s Edge-Cache) |
 | `functions/api/gpx.js` | GPX-Aktivitäten in Cloudflare D1 (CRUD, Sync-Backend) |
 | `functions/api/climate.js` | Langzeit-Archiv: tägliche Klima-Aggregate in D1 |
-| `functions/api/check-alerts.js` | Serverseitiger Sensor- **und Schimmelrisiko**-Check + ntfy-Push (für externen Cron) |
+| `functions/api/check-alerts.js` | Serverseitiger Sensor-, Schimmelrisiko- **und Frost**-Check + ntfy-Push (für externen Cron) |
+| `functions/api/weekly-report.js` | Wöchentlicher Klima-Report per ntfy (D1-Archiv + Vorwochen-Trend, für wöchentlichen Cron) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | PWA: installierbar auf dem iPhone-/Android-Homescreen, Offline-Fallback |
 
 ## 🔧 Einrichtung Cloud-Funktionen (To-do)
@@ -37,7 +38,8 @@ Nach der Einrichtung schalten sie sich automatisch scharf:
 3. **Push-Benachrichtigungen (ntfy.sh)**:
    - Handy: kostenlose **ntfy**-App installieren, ein geheimes Topic abonnieren (z. B. `smarthub-abc123`).
    - Dashboard: Glocken-Symbol im ClimateFlow-Header → dasselbe Topic eintragen (Warnungen bei Sensor-Ausfall, Schimmelrisiko).
-   - Serverseitig (auch bei geschlossenem Browser): Env-Var `NTFY_TOPIC` = Topic setzen und einen kostenlosen Cron-Dienst (z. B. cron-job.org) alle 1–6 h `GET https://<domain>/api/check-alerts` aufrufen lassen. Dieser Endpunkt warnt sowohl bei **Sensor-Ausfall** (>2 h keine Werte, max. 1×/6 h) als auch bei **Schimmel-/Kondensatrisiko** an kalten Wandstellen (Außentemperatur via Open-Meteo, max. 1×/12 h). Die 12-h-Entprellung braucht das D1-Binding `DB` (Schritt 1).
+   - Serverseitig (auch bei geschlossenem Browser): Env-Var `NTFY_TOPIC` = Topic setzen und einen kostenlosen Cron-Dienst (z. B. cron-job.org) alle 1–6 h `GET https://<domain>/api/check-alerts` aufrufen lassen. Dieser Endpunkt warnt bei **Sensor-Ausfall** (>2 h keine Werte, max. 1×/6 h), **Schimmel-/Kondensatrisiko** an kalten Wandstellen (Außentemperatur via Open-Meteo, max. 1×/12 h) und **Frost** (Tiefstwert der nächsten 2 Tage ≤ 0 °C, max. 1×/18 h). Die Entprellung braucht das D1-Binding `DB` (Schritt 1).
+   - **Wochenbericht**: zusätzlich einen zweiten Cron-Job anlegen, der 1×/Woche (z. B. sonntags 19:00) `GET https://<domain>/api/weekly-report` aufruft — verschickt eine Wochen-Zusammenfassung (Ø/Min/Max, Komfort-Score, Vorwochen-Trend) als Push. Beide Jobs brauchen die Basic-Auth-Zugangsdaten (bei cron-job.org unter „Authentication" hinterlegen).
 4. **Build automatisieren (empfohlen):** Pages → *Settings → Builds & deployments*:
    Build command = `npm run build` (führt Tests aus und baut das CSS), Build output directory = `/`.
    Damit kann das committete `tailwind.css` nie mehr veralten und fehlerhafte Kernlogik bricht den Deploy ab.
@@ -88,6 +90,12 @@ Der Forward-Fill im Dashboard bleibt als Fallback aktiv, alte Daten funktioniere
 - **Inkrementelles Laden**: nach dem ersten Voll-Load werden per ThingSpeak-`start`-Parameter nur neue Einträge geholt; Auto-Refresh alle 5 min läuft still im Hintergrund
 - **Hub-Homescreen** mit Live-Werten beider Standorte auf der ClimateFlow-Kachel
 - **CSV-Export** der aktuellen Messreihe (Download-Symbol im Header): Zeit, Temperatur, Feuchte, absolute Feuchte, Taupunkt — Excel-freundlich (Semikolon/Komma, UTF-8-BOM)
+- **Komfort-Score (0–100)** aus Temperatur, Feuchte und Schimmelrisiko — live in der 24h-Statistik und als Tages-Kurve im Langzeit-Archiv
+- **Lüftungs-Erfolgskontrolle**: erkennt Stoßlüften der letzten 48 h automatisch (gleichzeitiger Feuchte-+Temperatursturz) und zeigt den Effekt („Feuchte −9 %")
+- **Heizaufwand-Indikator**: mittlere Innen-Außen-Differenz heute vs. gestern (relativer Heizbedarf ohne Verbrauchsdaten)
+- **Frost-/Hitzewarnung** aus der Prognose (Hinweis in der Wetter-Karte + Push): Frost ≤ 0 °C in den nächsten 15 h, Hitze ≥ 30 °C in den nächsten 36 h
+- **Standort-Vergleich**: Button „Vergleich" legt beide Schlafzimmer in denselben Chart (Temperatur + Feuchte, 4 Serien)
+- **Konfigurierbare Ziel-/Schwellwerte** pro Standort (Regler-Symbol neben dem Namen): Wohlfühlband für Temperatur/Feuchte steuert Comfort-Bewertungen, Komfort-Score und Lüftungsberater-Warnschwelle
 
 ## GPX-Viewer
 

@@ -259,6 +259,9 @@
           <button onclick="renameActiveLocation()" class="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Standort umbenennen">
             <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
           </button>
+          <button onclick="openThresholdSettings()" class="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Ziel- und Schwellwerte einstellen">
+            <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+          </button>
         </div>
       </div>
 
@@ -350,6 +353,8 @@
               Feuchte: <span class="font-semibold text-slate-300" id="kpi-humidity-out">--%</span>
             </span>
           </div>
+          <!-- Frost-/Hitzewarnung aus der Prognose (checkWeatherWarnings) -->
+          <div id="weather-alert" class="hidden mt-2 text-[11px] font-semibold text-sky-300 flex items-center gap-1"></div>
         </div>
 
       </section>
@@ -418,6 +423,11 @@
             <i data-lucide="info" class="w-4 h-4 text-teal-400 shrink-0"></i>
             <span id="ventilation-tip">Warte auf Berechnungen...</span>
           </div>
+          <!-- Lüftungs-Erfolgskontrolle: letztes erkanntes Stoßlüften (48 h) -->
+          <div class="mt-2 pt-2 border-t border-slate-800/40 flex items-start gap-2 text-xs text-slate-400">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+            <span id="vent-success">Analysiere Messreihe...</span>
+          </div>
         </div>
 
         <!-- 24h Climate Statistics (Col span 2) -->
@@ -436,7 +446,7 @@
             <div class="space-y-2">
               <div class="flex justify-between items-center text-xs">
                 <span class="text-slate-300 font-medium">Innentemperatur</span>
-                <span class="text-slate-400">Soll: 19 - 22 °C</span>
+                <span class="text-slate-400" id="stat-temp-target">Soll: 19 – 24 °C</span>
               </div>
               <div class="grid grid-cols-3 gap-2 text-center">
                 <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2">
@@ -458,7 +468,7 @@
             <div class="space-y-2">
               <div class="flex justify-between items-center text-xs">
                 <span class="text-slate-300 font-medium">Luftfeuchtigkeit</span>
-                <span class="text-slate-400">Soll: 40 - 60 %</span>
+                <span class="text-slate-400" id="stat-hum-target">Soll: 40 – 60 %</span>
               </div>
               <div class="grid grid-cols-3 gap-2 text-center">
                 <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2">
@@ -476,10 +486,26 @@
               </div>
             </div>
 
+            <!-- Komfort-Score (0-100) aus Temperatur, Feuchte & Schimmelrisiko -->
+            <div class="space-y-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-slate-300 font-medium">Komfort-Score (jetzt)</span>
+                <span class="text-slate-400">Bewertung: <span id="comfort-score-label" class="font-semibold text-slate-400">--</span></span>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="flex-1 bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
+                  <div class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-emerald-500 to-emerald-400" id="comfort-score-bar" style="width: 0%"></div>
+                </div>
+                <p class="text-sm font-bold text-white mt-0.5 w-8 text-right" id="comfort-score-value">--</p>
+              </div>
+            </div>
+
           </div>
 
-          <div class="text-[11px] text-slate-400 bg-slate-900/50 p-2.5 border border-slate-850 rounded-xl">
-            <span class="font-medium text-slate-300">Temperaturvergleich:</span> Die durchschnittliche Innentemperatur lag in den letzten 24 Stunden um <span id="stat-temp-diff-out" class="font-bold text-white">--.-°C</span> <span id="stat-temp-diff-desc">höher</span> als die Außentemperatur.
+          <div class="text-[11px] text-slate-400 bg-slate-900/50 p-2.5 border border-slate-850 rounded-xl space-y-1.5">
+            <p><span class="font-medium text-slate-300">Temperaturvergleich:</span> Die durchschnittliche Innentemperatur lag in den letzten 24 Stunden um <span id="stat-temp-diff-out" class="font-bold text-white">--.-°C</span> <span id="stat-temp-diff-desc">höher</span> als die Außentemperatur.</p>
+            <!-- Relativer Heizaufwand heute vs. gestern (renderHeatingIndicator) -->
+            <p id="stat-heating"></p>
           </div>
         </div>
 
@@ -580,6 +606,8 @@
             <button onclick="setChartTimeframe(72)" id="btn-tf-72" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all">3 Tage</button>
             <button onclick="setChartTimeframe(168)" id="btn-tf-168" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all">7 Tage</button>
             <button onclick="setChartTimeframe(-1)" id="btn-tf-all" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all">Alle</button>
+            <span class="w-px h-5 bg-slate-800 mx-0.5 hidden sm:block"></span>
+            <button onclick="toggleCompareMode()" id="btn-compare" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all" title="Beide Standorte im selben Chart vergleichen">Vergleich</button>
           </div>
         </div>
 
@@ -587,7 +615,7 @@
           <canvas id="climateChart"></canvas>
         </div>
 
-        <div class="mt-4 pt-4 border-t border-slate-800/60 flex flex-wrap justify-center gap-6 text-xs text-slate-400">
+        <div id="chart-legend-static" class="mt-4 pt-4 border-t border-slate-800/60 flex flex-wrap justify-center gap-6 text-xs text-slate-400">
           <div class="flex items-center gap-2">
             <span class="w-3 h-0.5 bg-gradient-to-r from-orange-400 to-orange-500 rounded"></span>
             <span>Innentemperatur (°C)</span>
@@ -654,6 +682,55 @@
       </section>
 
     </main>
+
+    <!-- Modal: Ziel-/Schwellwerte pro Standort (öffnet über das Regler-Symbol) -->
+    <div id="threshold-modal" class="hidden fixed inset-0 z-[1500] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4" onclick="if (event.target === this) closeThresholdSettings()">
+      <div class="glass-panel rounded-2xl p-6 shadow-2xl w-full max-w-md border border-slate-800">
+        <div class="flex items-start justify-between mb-1">
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="sliders-horizontal" class="w-5 h-5 text-teal-400"></i>
+            Ziel- &amp; Schwellwerte
+          </h2>
+          <button onclick="closeThresholdSettings()" class="p-1.5 rounded-lg text-slate-400 hover:text-white transition-colors" title="Schließen">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <p class="text-xs text-slate-400 mb-5">Für <strong class="text-slate-200" id="threshold-loc-name">Standort</strong>. Bestimmen die Comfort-Bewertungen, den Komfort-Score und die Warnschwelle des Lüftungsberaters.</p>
+
+        <div class="space-y-4">
+          <div>
+            <p class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Wohlfühl-Temperatur (°C)</p>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="text-xs text-slate-400">Min
+                <input type="number" step="0.5" id="th-temp-min" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50 focus:outline-none">
+              </label>
+              <label class="text-xs text-slate-400">Max
+                <input type="number" step="0.5" id="th-temp-max" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50 focus:outline-none">
+              </label>
+            </div>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Wohlfühl-Luftfeuchte (%)</p>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="text-xs text-slate-400">Min
+                <input type="number" step="1" id="th-hum-min" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50 focus:outline-none">
+              </label>
+              <label class="text-xs text-slate-400">Max
+                <input type="number" step="1" id="th-hum-max" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50 focus:outline-none">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-3 mt-6">
+          <button onclick="resetThresholdSettings()" class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-all">Standard</button>
+          <div class="flex gap-2">
+            <button onclick="closeThresholdSettings()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 border border-slate-800 hover:border-slate-700 transition-all">Abbrechen</button>
+            <button onclick="saveThresholdSettings()" class="px-4 py-2 rounded-xl text-xs font-bold bg-teal-500 text-slate-950 hover:bg-teal-400 transition-all">Speichern</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     </div><!-- /view-climate -->
 
