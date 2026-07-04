@@ -1,0 +1,7 @@
+{
+  "name": "smart-home-dashboard",
+  "private": true,
+  "scripts": {
+    "build:css": "npx -y tailwindcss@3.4.17 -c tailwind.config.js -i tailwind.input.css -o tailwind.css --minify"
+  }
+}

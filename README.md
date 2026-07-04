@@ -7,10 +7,35 @@ Multi-Projekt-Plattform auf Cloudflare Pages: Homescreen-Hub mit Klimadashboard
 
 | Datei | Zweck |
 |---|---|
-| `index.html` | Hub-Homescreen (Uhr/Datum/Wetter-Widget, Projekt-Kacheln) + ClimateFlow-Dashboard (Hash-Routing `#home` / `#climate`) |
-| `gpx.html` | GPX-Viewer: eigenständige Seite (Leaflet-Karte, Höhenprofil, Statistiken, IndexedDB-Speicher) |
+| `index.html` | Hub-Homescreen (Uhr/Datum/Wetter/GPX-Widgets, Projekt-Kacheln) + ClimateFlow-Dashboard (Hash-Routing `#home` / `#climate`) |
+| `gpx.html` | GPX-Viewer: eigenständige Seite (Leaflet-Karte, Höhenprofil, Statistiken, IndexedDB + Cloud-Sync) |
+| `shared.js` | Gemeinsame Helfer: Formatierer, Icons, API-Schicht (`apiFetch`), ntfy-Push (`sendPush`) |
+| `tailwind.css` | Statisch gebautes Tailwind-CSS (`npm run build:css` nach Klassen-Änderungen!) |
 | `functions/_middleware.js` | Cloudflare Pages Middleware: HTTP Basic Auth (`AUTH_USER` / `AUTH_PASS`) |
+| `functions/api/feeds/[locId].js` | ThingSpeak-Proxy (versteckt Keys, 60 s Edge-Cache) |
+| `functions/api/gpx.js` | GPX-Aktivitäten in Cloudflare D1 (CRUD, Sync-Backend) |
+| `functions/api/climate.js` | Langzeit-Archiv: tägliche Klima-Aggregate in D1 |
+| `functions/api/check-alerts.js` | Serverseitiger Sensor-Check + ntfy-Push (für externen Cron) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | PWA: installierbar auf dem iPhone-/Android-Homescreen, Offline-Fallback |
+
+## 🔧 Einrichtung Cloud-Funktionen (To-do)
+
+Alle Features laufen ohne diese Schritte weiter (Fallback auf Direktzugriff/lokal).
+Nach der Einrichtung schalten sie sich automatisch scharf:
+
+1. **D1-Datenbank** (GPX-Cloud-Sync + Klima-Archiv):
+   Cloudflare Dashboard → Workers & Pages → D1 → *Create database* (Name z. B. `smarthub`).
+   Dann im Pages-Projekt → *Settings → Functions → D1 database bindings*:
+   Variable name **`DB`** → Datenbank auswählen → neu deployen.
+   (Tabellen legt der Code beim ersten Zugriff selbst an.)
+2. **ThingSpeak-Proxy** (Keys aus dem Frontend verstecken):
+   Pages → *Settings → Environment variables*:
+   `TS_KEY_GILLIAN` = Read-Key Kanal 3417815, `TS_KEY_SEAN` = Read-Key Kanal 3417935.
+3. **Push-Benachrichtigungen (ntfy.sh)**:
+   - Handy: kostenlose **ntfy**-App installieren, ein geheimes Topic abonnieren (z. B. `smarthub-abc123`).
+   - Dashboard: Glocken-Symbol im ClimateFlow-Header → dasselbe Topic eintragen (Warnungen bei Sensor-Ausfall, Schimmelrisiko).
+   - Serverseitig (auch bei geschlossenem Browser): Env-Var `NTFY_TOPIC` = Topic setzen und einen kostenlosen Cron-Dienst (z. B. cron-job.org) alle 1–6 h `GET https://<domain>/api/check-alerts` aufrufen lassen.
+4. **CSS neu bauen** nach HTML/Klassen-Änderungen: `npm run build:css` (Node nötig), dann committen.
 
 **Grundprinzip für neue Projekte:** Jedes weitere Unterprojekt bekommt seine eigene
 HTML-Seite (wie `gpx.html`) und eine Kachel auf dem Hub — so bleibt `index.html`
@@ -57,23 +82,22 @@ Der Forward-Fill im Dashboard bleibt als Fallback aktiv, alte Daten funktioniere
 ## GPX-Viewer
 
 - Upload per Drag & Drop oder Dateiauswahl (mehrere `.gpx` gleichzeitig)
-- Speicherung **lokal im Browser (IndexedDB)** — kein Server, keine Uploads ins Netz, funktioniert pro Gerät
-- Karte (Leaflet + OpenStreetMap, dunkler Look), Start-/Ziel-Marker
-- Statistiken: Distanz, Dauer (Bewegungszeit, Pausen > 10 min ausgenommen), Ø/Max-Tempo (GPS-Ausreißer gefiltert), Anstieg (geglättet), Höhe min/max
-- Höhenprofil über Distanz (Chart.js)
+- Speicherung **lokal (IndexedDB)** + automatischer **Cloud-Sync in D1** (sobald eingerichtet; Status im Header)
+- **Backup**: alle Aktivitäten + Einstellungen als JSON herunterladen / wiederherstellen (Buttons im Header)
+- Karte (Leaflet + OpenStreetMap, dunkler Look), Start-/Ziel-Marker, **Tempo-Färbung** (blau = langsam → rot = schnell)
+- **Tour-Vergleich**: zweite Tour als Overlay auf Karte + Höhenprofil
+- Gesamt-Statistik: km gesamt / diese Woche / dieses Jahr
+- Statistiken pro Tour: Distanz, Dauer (Bewegungszeit, Pausen > 10 min ausgenommen), Ø/Max-Tempo (GPS-Ausreißer gefiltert), Anstieg (geglättet), Höhe min/max, Höhenprofil
 - Aktivitätstyp wird über das Ø-Tempo geraten (Spazieren < 6,5 / Laufen < 13 / Rad < 42 / Motorrad) und ist manuell änderbar; Umbenennen & Löschen möglich
 
-## Roadmap / Basis-Ausbau
+## Roadmap / weitere Ideen
 
-1. **Tailwind-Build statt CDN** (Performance, keine Runtime-Kompilierung)
-2. **Gemeinsame Assets extrahieren** (`shared.css`, `shared.js`: Glass-Styles, Formatierer, Icons-Init), sobald ein drittes Projekt dazukommt
-3. **Cloudflare Functions als API-Schicht** (`/api/...`): ThingSpeak-Keys verstecken, serverseitiges Caching, später Langzeit-Archiv in D1
-4. **Langzeit-Archiv Klimadaten** (ThingSpeak-Limit 8000 Einträge): tägliche Aggregate in Cloudflare D1/KV
-5. **Push-Benachrichtigungen** bei Sensor-Ausfall/Schimmelrisiko (z. B. ntfy.sh)
-6. **GPX-Ausbau**: Gesamt-Statistik über alle Aktivitäten (km/Woche, Jahresziele), Tempo-Färbung der Route, Vergleich zweier Touren
-7. **Hub-Ausbau**: frei anordenbare Widgets, Schnellzugriffe, Kalender-/To-do-Integration
+1. **Hub-Ausbau**: frei anordenbare Widgets, Schnellzugriffe, Kalender-/To-do-Integration
+2. **Klima-Langzeit-Ansicht**: archivierte D1-Tagesaggregate als Monats-/Jahres-Charts anzeigen
+3. **GPX**: Jahresziele, Heatmap aller Routen, Segmente/Bestzeiten
+4. **Cloudflare Access** statt Basic Auth (Login per E-Mail-Code)
 
 ## Deployment
 
 Push auf `main` → Cloudflare Pages deployt automatisch.
-Bei Service-Worker-Änderungen `CACHE_NAME` in `sw.js` hochzählen (aktuell `smarthub-v2`).
+Bei Service-Worker-Änderungen `CACHE_NAME` in `sw.js` hochzählen (aktuell `smarthub-v3`).

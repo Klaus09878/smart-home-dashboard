@@ -16,35 +16,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SmartHub">
 
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Outfit', 'sans-serif'],
-          },
-          animation: {
-            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            'fade-in': 'fadeIn 0.4s ease-out forwards',
-            'slide-up': 'slideUp 0.5s ease-out forwards',
-          },
-          keyframes: {
-            fadeIn: {
-              '0%': { opacity: '0' },
-              '100%': { opacity: '1' },
-            },
-            slideUp: {
-              '0%': { transform: 'translateY(12px)', opacity: '0' },
-              '100%': { transform: 'translateY(0)', opacity: '1' },
-            }
-          }
-        }
-      }
-    }
-  </script>
+  <!-- Tailwind CSS (statischer Build, siehe tailwind.config.js / npm run build:css) -->
+  <link rel="stylesheet" href="tailwind.css">
 
   <!-- Google Fonts (Outfit) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,39 +29,6 @@
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
-  <style>
-    /* Custom Scrollbar */
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #0f172a;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #334155;
-      border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #475569;
-    }
-
-    /* Glassmorphism utility classes */
-    .glass-panel {
-      background: rgba(15, 23, 42, 0.65);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-    }
-    .glass-card-hover {
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .glass-card-hover:hover {
-      transform: translateY(-2px);
-      border-color: rgba(20, 184, 166, 0.3);
-      box-shadow: 0 10px 25px -5px rgba(20, 184, 166, 0.1), 0 8px 10px -6px rgba(20, 184, 166, 0.1);
-    }
-  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
 
@@ -158,12 +98,12 @@
             <!-- Live preview of both locations -->
             <div class="grid grid-cols-2 gap-2 mt-4">
               <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
-                <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider truncate" id="hub-prev-gillian-name">Gillian</p>
+                <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider truncate flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 inline-block shrink-0" id="hub-prev-gillian-dot"></span><span id="hub-prev-gillian-name">Gillian</span></p>
                 <p class="text-base font-bold text-white mt-0.5"><span id="hub-prev-gillian-temp">--.- °C</span></p>
                 <p class="text-[10px] text-slate-400 mt-0.5"><span id="hub-prev-gillian-hum">-- %</span> · <span id="hub-prev-gillian-time">--</span></p>
               </div>
               <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
-                <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider truncate" id="hub-prev-sean-name">Sean</p>
+                <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider truncate flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 inline-block shrink-0" id="hub-prev-sean-dot"></span><span id="hub-prev-sean-name">Sean</span></p>
                 <p class="text-base font-bold text-white mt-0.5"><span id="hub-prev-sean-temp">--.- °C</span></p>
                 <p class="text-[10px] text-slate-400 mt-0.5"><span id="hub-prev-sean-hum">-- %</span> · <span id="hub-prev-sean-time">--</span></p>
               </div>
@@ -185,6 +125,21 @@
             </div>
             <h3 class="text-lg font-bold text-white mb-1.5">GPX-Viewer</h3>
             <p class="text-xs text-slate-400 leading-relaxed">Trainings analysieren: GPX-Dateien hochladen (Rad, Motorrad, Laufen, Spazieren) und Route, Höhenprofil, Tempo &amp; Statistiken auswerten.</p>
+
+            <!-- Live preview: letzte Tour & Wochenleistung -->
+            <div class="grid grid-cols-2 gap-2 mt-4">
+              <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
+                <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Letzte Tour</p>
+                <p class="text-base font-bold text-white mt-0.5 truncate" id="hub-gpx-last">–</p>
+                <p class="text-[10px] text-slate-400 mt-0.5 truncate" id="hub-gpx-last-info">Noch keine Touren</p>
+              </div>
+              <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
+                <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Diese Woche</p>
+                <p class="text-base font-bold text-white mt-0.5" id="hub-gpx-week">0 km</p>
+                <p class="text-[10px] text-slate-400 mt-0.5 truncate" id="hub-gpx-count">0 Aktivitäten</p>
+              </div>
+            </div>
+
             <div class="flex items-center gap-1.5 mt-5 text-xs font-semibold text-orange-400">
               <span>Viewer öffnen</span>
               <i data-lucide="arrow-right" class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform"></i>
@@ -276,6 +231,11 @@
             </div>
           </div>
         </div>
+
+        <!-- Push Notifications (ntfy.sh) -->
+        <button onclick="configureNtfy()" id="ntfy-btn" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Push-Benachrichtigungen einrichten (ntfy.sh)">
+          <i data-lucide="bell" class="w-4.5 h-4.5"></i>
+        </button>
 
         <!-- Reload Data Button -->
         <button onclick="reloadData()" id="reload-btn" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Daten aktualisieren">
@@ -685,6 +645,9 @@
 
   </div>
 
+  <!-- Gemeinsame Helfer (Formatierer, Icons, API-Schicht, Push) -->
+  <script src="shared.js"></script>
+
   <!-- Core JavaScript Logic -->
   <script>
     // Configuration for both locations
@@ -723,10 +686,21 @@
     // Sensor gilt als ausgefallen, wenn länger keine echten Werte kamen als:
     const SENSOR_STALE_MS = 2 * 60 * 60 * 1000;
 
-    // Initialize UI Icons
-    function updateIcons() {
-      if (window.lucide) {
-        window.lucide.createIcons();
+    // Feeds über die API-Schicht laden (/api/feeds/{loc}, Cloudflare Function
+    // mit verstecktem Key + Edge-Cache). Solange die Env-Keys nicht eingerichtet
+    // sind, fällt der Aufruf automatisch auf den direkten ThingSpeak-Zugriff zurück.
+    async function fetchFeeds(loc, { results = 8000, start = null } = {}) {
+      const q = new URLSearchParams({ results: results.toString() });
+      if (start) q.set('start', start);
+      try {
+        return await apiFetch(`/api/feeds/${loc.id}?${q.toString()}`);
+      } catch (err) {
+        if (!err.unavailable) throw err;
+        let url = loc.thingspeakUrl.replace('results=8000', `results=${results}`);
+        if (start) url += `&start=${encodeURIComponent(start)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
+        return res.json();
       }
     }
 
@@ -1042,19 +1016,15 @@
       const cache = appState.feedCache[activeLoc.id];
       const hasCache = !!(cache && cache.rawFeeds && cache.rawFeeds.length > 0);
 
-      let url = activeLoc.thingspeakUrl;
+      let start = null;
       if (hasCache) {
         const lastMs = new Date(cache.rawFeeds[cache.rawFeeds.length - 1].created_at).getTime();
         // +1s, damit der letzte bekannte Eintrag nicht doppelt kommt (ThingSpeak erwartet UTC)
-        const startStr = new Date(lastMs + 1000).toISOString().replace('T', ' ').substring(0, 19);
-        url += `&start=${encodeURIComponent(startStr)}`;
+        start = new Date(lastMs + 1000).toISOString().replace('T', ' ').substring(0, 19);
       }
 
       try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP-Fehler: ${response.status}`);
-
-        const data = await response.json();
+        const data = await fetchFeeds(activeLoc, { results: 8000, start });
         const newFeeds = (data && Array.isArray(data.feeds)) ? data.feeds : [];
 
         let rawFeeds;
@@ -1077,6 +1047,9 @@
         appState.isDemoMode = false;
         document.getElementById('demo-banner').classList.add('hidden');
         updateStatusText(true);
+
+        // Tages-Aggregate ins D1-Langzeit-Archiv schreiben (asynchron, best effort)
+        archiveClimateDaily();
       } catch (err) {
         if (hasCache) {
           // Aktualisierung fehlgeschlagen, aber Daten vorhanden → weiter mit Cache statt Demo-Modus
@@ -1510,11 +1483,25 @@
         badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span><span>Kondensat!</span>';
         bar.className = `${barBase} from-red-500 to-red-400`;
         desc.innerText = `Achtung: Der Taupunkt der Raumluft (${dewPoint.toFixed(1)} °C) liegt über der geschätzten Temperatur kalter Wandstellen (${surfaceTemp.toFixed(1)} °C) – dort schlägt sich aktuell Wasser nieder. Feuchte dringend senken (siehe Lüftungsberater) und den Raum stärker heizen.`;
+        sendPush(
+          'ClimateFlow Kondensat-Warnung',
+          `Kondensatgefahr bei „${getLocationName(appState.activeLocId)}": Taupunkt ${dewPoint.toFixed(1)} °C über Wandtemperatur ${surfaceTemp.toFixed(1)} °C. Dringend lüften/heizen!`,
+          'rotating_light,droplet',
+          `mold_${appState.activeLocId}`,
+          12 * 60 * 60 * 1000
+        );
       } else if (surfaceRhRaw >= 80) {
         badge.className = `${badgeBase} bg-orange-500/10 border border-orange-500/20 text-orange-400`;
         badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span><span>Erhöht</span>';
         bar.className = `${barBase} from-orange-500 to-red-400`;
         desc.innerText = `An kalten Wandstellen liegt die Luftfeuchte bei ca. ${surfaceRh.toFixed(0)} % – ab 80 % kann Schimmel wachsen. Raumfeuchte senken (Lüftungsberater beachten) und Außenwände nicht durch Möbel verdecken.`;
+        sendPush(
+          'ClimateFlow Schimmel-Warnung',
+          `Erhöhtes Schimmelrisiko bei „${getLocationName(appState.activeLocId)}": ca. ${surfaceRh.toFixed(0)} % Feuchte an kalten Wandstellen. Lüften/heizen empfohlen.`,
+          'warning,droplet',
+          `mold_${appState.activeLocId}`,
+          12 * 60 * 60 * 1000
+        );
       } else if (surfaceRhRaw >= 70) {
         badge.className = `${badgeBase} bg-amber-500/10 border border-amber-500/20 text-amber-400`;
         badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500"></span><span>Beobachten</span>';
@@ -1828,27 +1815,6 @@
       });
     }
 
-    // Date & Time formatting helpers
-    function formatTime(date) {
-      if (!(date instanceof Date) || isNaN(date.getTime())) return '--:--';
-      return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-    }
-
-    function formatDate(date) {
-      if (!(date instanceof Date) || isNaN(date.getTime())) return '--.--.';
-      return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-    }
-
-    // Relative time label ("vor 5 Min.") for the KPI update indicators
-    function formatRelativeTime(date) {
-      const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
-      if (diffMin < 1) return 'gerade eben';
-      if (diffMin < 60) return `vor ${diffMin} Min.`;
-      const diffH = Math.floor(diffMin / 60);
-      if (diffH < 24) return `vor ${diffH} Std.`;
-      return `am ${formatDate(date)} um ${formatTime(date)}`;
-    }
-
     function setUpdatedLabel(elementId, date) {
       const el = document.getElementById(elementId);
       if (!el) return;
@@ -1905,6 +1871,14 @@
         textEl.innerHTML = `<strong>Sensor-Ausfall bei „${getLocationName(appState.activeLocId)}":</strong> ${problems.join(' · ')} – bitte den iPhone-Kurzbefehl prüfen.`;
         banner.classList.remove('hidden');
         updateIcons();
+
+        // Push-Benachrichtigung (falls ntfy-Topic konfiguriert, max. 1×/6h pro Standort)
+        sendPush(
+          'ClimateFlow Sensor-Warnung',
+          `Sensor-Ausfall bei „${getLocationName(appState.activeLocId)}": ${problems.join(' und ')}. Bitte iPhone-Kurzbefehl prüfen.`,
+          'warning,thermometer',
+          `stale_${appState.activeLocId}`
+        );
       } else {
         banner.classList.add('hidden');
       }
@@ -1943,6 +1917,128 @@
         99: 'Gewitter mit schwerem Hagel'
       };
       return codes[code] || 'Unbekannt';
+    }
+
+    // ============ Langzeit-Archiv (Cloudflare D1 über /api/climate) ============
+    // Schreibt tägliche Aggregate abgeschlossener Tage in die Datenbank
+    // (max. 1×/12h pro Standort). Ohne konfigurierte API/D1 passiert nichts.
+    async function archiveClimateDaily() {
+      try {
+        const locId = appState.activeLocId;
+        const throttleKey = `archive_last_${locId}`;
+        const last = parseInt(localStorage.getItem(throttleKey) || '0', 10);
+        if (Date.now() - last < 12 * 60 * 60 * 1000) return;
+
+        const feeds = appState.insideData;
+        if (!feeds || feeds.length === 0) return;
+
+        const todayKey = new Date().toISOString().substring(0, 10);
+        const byDay = {};
+        feeds.forEach(f => {
+          const day = f.time.toISOString().substring(0, 10);
+          if (day >= todayKey) return; // nur abgeschlossene Tage archivieren
+          (byDay[day] = byDay[day] || []).push(f);
+        });
+
+        const days = Object.entries(byDay).map(([day, list]) => {
+          const temps = list.map(f => f.temp);
+          const hums = list.map(f => f.humidity);
+          const avg = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+          return {
+            day,
+            tMin: Math.min(...temps), tMax: Math.max(...temps), tAvg: parseFloat(avg(temps).toFixed(2)),
+            hMin: Math.min(...hums), hMax: Math.max(...hums), hAvg: parseFloat(avg(hums).toFixed(2)),
+            samples: list.length
+          };
+        });
+        if (days.length === 0) return;
+
+        await apiFetch('/api/climate', { method: 'POST', body: JSON.stringify({ loc: locId, days }) });
+        localStorage.setItem(throttleKey, Date.now().toString());
+        console.log(`[Archiv] ${days.length} Tages-Aggregate für ${locId} in D1 gesichert.`);
+      } catch (err) {
+        if (!err.unavailable) console.warn('Klima-Archiv fehlgeschlagen:', err);
+      }
+    }
+
+    // ============ Push-Benachrichtigungen (ntfy.sh) ============
+    function configureNtfy() {
+      const current = getNtfyTopic();
+      const topic = prompt(
+        'ntfy.sh-Topic für Push-Benachrichtigungen (leer lassen = deaktivieren).\n\n' +
+        'Einrichtung: Die kostenlose ntfy-App aufs Handy laden und dort dasselbe Topic abonnieren. ' +
+        'Der Name sollte geheim sein (wie ein Passwort).',
+        current || 'smarthub-' + Math.random().toString(36).substring(2, 8)
+      );
+      if (topic === null) return;
+      if (topic.trim() === '') {
+        localStorage.removeItem('ntfy_topic');
+        showNotification('Push-Benachrichtigungen deaktiviert.');
+      } else {
+        localStorage.setItem('ntfy_topic', topic.trim());
+        showNotification('Push aktiviert – Test-Nachricht gesendet.');
+        sendPush('Smart Home Hub', 'Push-Benachrichtigungen sind eingerichtet ✔', 'tada');
+      }
+      updateNtfyButton();
+    }
+
+    function updateNtfyButton() {
+      const btn = document.getElementById('ntfy-btn');
+      if (btn) btn.classList.toggle('text-teal-400', !!getNtfyTopic());
+    }
+
+    // ============ Hub-Widgets: Uhr, Datum, Begrüßung, Wetter, GPX ============
+    function updateHubClock() {
+      const clockEl = document.getElementById('hub-clock');
+      if (!clockEl) return;
+      const now = new Date();
+      clockEl.innerText = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('hub-date').innerText = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const h = now.getHours();
+      const greeting = h < 5 ? 'Gute Nacht' : h < 11 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend';
+      document.getElementById('hub-greeting').innerText = `${greeting} 👋`;
+    }
+
+    async function loadHubWeather() {
+      try {
+        const conf = appState.weatherConfig;
+        if (!conf) return;
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,weather_code&timezone=auto`);
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('hub-weather-text').innerText =
+          `${data.current.temperature_2m.toFixed(1)} °C · ${getWeatherDescription(data.current.weather_code)} · ${conf.name}`;
+      } catch (e) { /* Widget bleibt leer */ }
+    }
+
+    // GPX-Widget: liest die lokal gespeicherten Aktivitäten des GPX-Viewers (IndexedDB)
+    function loadGpxWidget() {
+      try {
+        const req = indexedDB.open('smarthub');
+        req.onsuccess = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('gpx-activities')) { db.close(); return; }
+          const getAll = db.transaction('gpx-activities', 'readonly').objectStore('gpx-activities').getAll();
+          getAll.onsuccess = () => {
+            const acts = getAll.result || [];
+            db.close();
+            if (acts.length === 0) return;
+            acts.sort((a, b) => (b.startTime || b.addedAt) - (a.startTime || a.addedAt));
+
+            const lastAct = acts[0];
+            document.getElementById('hub-gpx-last').innerText = lastAct.name;
+            document.getElementById('hub-gpx-last-info').innerText =
+              `${(lastAct.distM / 1000).toFixed(1)} km${lastAct.startTime ? ' · ' + formatRelativeTime(new Date(lastAct.startTime)) : ''}`;
+
+            const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            const weekActs = acts.filter(a => (a.startTime || a.addedAt) >= weekStart);
+            const weekKm = weekActs.reduce((sum, a) => sum + (a.distM || 0), 0) / 1000;
+            document.getElementById('hub-gpx-week').innerText = `${weekKm.toFixed(1)} km`;
+            document.getElementById('hub-gpx-count').innerText = `${weekActs.length} diese Woche · ${acts.length} gesamt`;
+          };
+        };
+        req.onerror = () => {};
+      } catch (e) { /* Widget optional */ }
     }
 
     // ============ HUB NAVIGATION (Hash-Routing) ============
@@ -1994,9 +2090,12 @@
         }
       }
 
-      // Live-Werte auf der Hub-Kachel aktualisieren
+      // Hub-Widgets aktualisieren
       if (view === 'home') {
+        updateHubClock();
+        loadHubWeather();
         loadHubPreviews();
+        loadGpxWidget();
       }
     }
 
@@ -2049,11 +2148,17 @@
         if (nameEl) nameEl.innerText = getLocationName(loc.id).replace('Schlafzimmer ', '');
 
         try {
-          const url = loc.thingspeakUrl.replace('results=8000', 'results=400');
-          const res = await fetch(url);
-          if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
-          const data = await res.json();
+          const data = await fetchFeeds(loc, { results: 400 });
           const processed = processRawFeeds((data && data.feeds) || []);
+
+          // Sensor-Status-Punkt: grün wenn beide Felder frisch, sonst rot
+          const dot = el('dot');
+          if (dot) {
+            const fresh = t => t instanceof Date && (Date.now() - t.getTime()) < SENSOR_STALE_MS;
+            const ok = fresh(processed.lastTempTime) && fresh(processed.lastHumTime);
+            dot.className = `w-1.5 h-1.5 rounded-full inline-block ${ok ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`;
+            dot.title = ok ? 'Beide Sensoren liefern Daten' : 'Mindestens ein Sensor liefert keine aktuellen Daten';
+          }
 
           if (processed.aligned.length > 0) {
             const last = processed.aligned[processed.aligned.length - 1];
@@ -2076,6 +2181,9 @@
     function init() {
       updateIcons();
       initConfigs();
+      updateNtfyButton();
+      updateHubClock();
+      setInterval(updateHubClock, 10 * 1000);
 
       window.addEventListener('hashchange', handleRoute);
       handleRoute();
