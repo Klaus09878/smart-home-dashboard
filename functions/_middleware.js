@@ -1,6 +1,18 @@
 export async function onRequest(context) {
   const { request, next, env } = context;
 
+  // Cloudflare Access statt Basic Auth (Login per E-Mail-Code, sauberer für
+  // die iPhone-PWA): In Cloudflare Zero Trust eine Access-Application für die
+  // Domain anlegen, dann Env-Var AUTH_MODE=access setzen. Access authentifiziert
+  // VOR dieser Function und setzt das JWT-Header — Anleitung siehe README.
+  if (env.AUTH_MODE === "access") {
+    if (request.headers.get("Cf-Access-Jwt-Assertion")) {
+      return await next();
+    }
+    // Ohne Access-JWT ist die Anfrage an Access vorbeigelaufen (Fehlkonfiguration)
+    return new Response("Zugriff nur über Cloudflare Access (AUTH_MODE=access gesetzt, aber kein Access-JWT vorhanden — Access-Application prüfen).", { status: 403 });
+  }
+
   // Nutze Umgebungsvariablen von Cloudflare (oder Fallback 'admin'/'admin' für den ersten Start)
   const authUser = env.AUTH_USER || "admin";
   const authPass = env.AUTH_PASS || "admin";

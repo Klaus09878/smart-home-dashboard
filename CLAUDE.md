@@ -5,11 +5,11 @@ Multi-Projekt-SPA auf Cloudflare Pages (statisch + Functions), Basic Auth via `f
 ## Dateien & Zuständigkeiten
 - `index.html` — nur Markup: Hub-Homescreen (`#home`) + ClimateFlow-Dashboard (`#climate`, Hash-Routing)
 - `app.js` — gesamte Hub-/ClimateFlow-Logik (appState, fetchFeeds, Charts inkl. Vergleichsmodus, Lüftungsberater + Erfolgskontrolle, Schimmelrisiko, Komfort-Score, Heizindikator, Frost-/Hitzewarnung, Prognose, Archiv-Ansicht, CSV-Export, Hub-Widgets, ntfy-Client). Schwellwerte pro Standort in localStorage `loc_thresholds_<locId>` (Defaults in `THRESHOLD_DEFAULTS`)
-- `gpx.html` — GPX-Viewer, eigenständige Seite (Markup + Logik inline: IndexedDB `smarthub`/`gpx-activities` v2, Leaflet, Cloud-Sync, Backup, Tempo-Färbung, Vergleich)
+- `gpx.html` + `gpx.js` — GPX-Viewer, eigenständige Seite (Logik in gpx.js: IndexedDB `smarthub`/`gpx-activities` v2, Leaflet, Cloud-Sync, Backup, Tempo-Färbung, Vergleich, Ziele `gpx_goals`, Kalender/Streaks, Heatmap, Bestzeiten via routeCells, Notiz + Start-Wetter, GPX-Export)
 - `lib/core.js` — getestete DOM-freie Kernlogik (UMD): Magnus-Formeln, `processRawFeeds` (Forward-Fill + Stale-Trim), `haversine`, `computeStats`, `guessType`, `downsamplePoints`
 - `shared.js` — `updateIcons`, Formatierer, `showToast`, `apiFetch` (wirft `err.unavailable` bei 404/503 → Aufrufer fallen auf Direktzugriff/lokal zurück), `sendPush` (ntfy)
 - `functions/api/` — `feeds/[locId].js` (ThingSpeak-Proxy, Env `TS_KEY_GILLIAN`/`TS_KEY_SEAN`), `gpx.js` (D1-CRUD mit Tombstones/`updated_at`), `climate.js` (Tages-Aggregate), `check-alerts.js` (ntfy: Sensor/Schimmel/Frost, Env `NTFY_TOPIC`), `weekly-report.js` (ntfy-Wochenbericht aus D1); D1-Binding heißt `DB`, Schema wird zur Laufzeit angelegt. Magnus-/Komfort-Formeln sind dort bewusst inline dupliziert (UMD aus lib/core.js nicht importierbar) — bei Formel-Änderungen beide Stellen anfassen
-- `tests/core.test.js` — `npm test` (muss vor jedem Push grün sein)
+- `tests/core.test.js` + `tests/smoke.test.js` — `npm test` (muss vor jedem Push grün sein); der Smoke-Test prüft ID-/Handler-/Dateiverweise über alle Seiten — neue getElementById/onclick-Bezüge fallen dort auf
 - `tailwind.css` — GEBAUT, nie von Hand editieren
 
 ## Nicht-offensichtliche Regeln

@@ -305,7 +305,14 @@
       const weatherObj = { lat, lon, name };
       appState.weatherConfig = weatherObj;
       localStorage.setItem(`loc_weather_${appState.activeLocId}`, JSON.stringify(weatherObj));
-      
+
+      // Koordinaten auch serverseitig hinterlegen (D1 app_config), damit
+      // check-alerts/weekly-report mit demselben Ort rechnen (best effort)
+      apiFetch('/api/config', {
+        method: 'POST',
+        body: JSON.stringify({ key: `weather_${appState.activeLocId}`, value: weatherObj })
+      }).catch(() => { /* ohne D1 bleibt es bei den Server-Defaults */ });
+
       updateWeatherButtonName();
       showNotification(`Wetter-Standort geändert: ${name}`);
       reloadData();
@@ -1805,21 +1812,39 @@
         ].join(';');
       });
 
-      // BOM voranstellen, damit Excel die UTF-8-Umlaute korrekt erkennt
-      const csv = '﻿' + [header.join(';'), ...rows].join('\r\n');
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
       const safeName = getLocationName(appState.activeLocId).replace(/[^\wäöüÄÖÜß-]+/g, '_');
       const stamp = new Date().toISOString().substring(0, 10);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `climateflow_${safeName}_${stamp}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-
+      downloadCsv(`climateflow_${safeName}_${stamp}.csv`, [header.join(';'), ...rows]);
       showNotification(`${feeds.length} Messwerte als CSV exportiert.`);
+    }
+
+    // CSV-Export der D1-Langzeitdaten (Tages-Aggregate inkl. Komfort-Score)
+    async function exportArchiveCsv() {
+      try {
+        const locId = appState.activeLocId;
+        const rows = await apiFetch(`/api/climate?loc=${encodeURIComponent(locId)}`);
+        if (!rows || rows.length === 0) {
+          showNotification('Noch keine Archivdaten vorhanden.', 'error');
+          return;
+        }
+        const th = getThresholds();
+        const num = (v, d = 1) => (v === null || v === undefined || isNaN(v)) ? '' : v.toFixed(d).replace('.', ',');
+        const header = ['Tag', 'Temp Min (°C)', 'Temp Mittel (°C)', 'Temp Max (°C)', 'Feuchte Min (%)', 'Feuchte Mittel (%)', 'Feuchte Max (%)', 'Komfort-Score', 'Messwerte'];
+        const lines = rows.map(r => [
+          r.day,
+          num(r.t_min), num(r.t_avg), num(r.t_max),
+          num(r.h_min, 0), num(r.h_avg, 0), num(r.h_max, 0),
+          comfortScore(r.t_avg, r.h_avg, null, th) ?? '',
+          r.samples ?? ''
+        ].join(';'));
+        const safeName = getLocationName(locId).replace(/[^\wäöüÄÖÜß-]+/g, '_');
+        downloadCsv(`climateflow_archiv_${safeName}.csv`, [header.join(';'), ...lines]);
+        showNotification(`${rows.length} Archiv-Tage als CSV exportiert.`);
+      } catch (err) {
+        showNotification(err.unavailable
+          ? 'Cloud-Datenbank (D1) noch nicht eingerichtet — kein Archiv vorhanden.'
+          : `Archiv-Export fehlgeschlagen: ${err.message}`, 'error');
+      }
     }
 
     // ============ Hub-Widgets: Uhr, Datum, Begrüßung, Wetter, GPX ============

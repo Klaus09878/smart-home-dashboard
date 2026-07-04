@@ -124,6 +124,47 @@ async function apiFetch(path, options = {}) {
   return res.json();
 }
 
+// ============ CSV-Download-Helfer ============
+// lines: Array bereits fertig getrennter Zeilen (Semikolon-getrennt).
+// Stellt das UTF-8-BOM voran, damit Excel Umlaute korrekt erkennt.
+function downloadCsv(filename, lines) {
+  const csv = '﻿' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ============ Fehler-Reporting (unbehandelte Fehler → ntfy-Push) ============
+// Meldet Laufzeitfehler ans konfigurierte ntfy-Topic (max. 3 pro Sitzung,
+// gleicher Fehlertext höchstens 1×/6 h) — sonst bleiben Fehler auf anderen
+// Geräten (z. B. bei Gillian) unbemerkt. Ohne Topic passiert nichts.
+let _errorPushCount = 0;
+function reportRuntimeError(kind, message) {
+  try {
+    if (_errorPushCount >= 3) return;
+    const msg = (message || '').toString().substring(0, 300);
+    if (!msg || msg === 'Script error.') return; // Cross-Origin-Rauschen ignorieren
+    _errorPushCount++;
+    let hash = 0;
+    for (let i = 0; i < msg.length; i++) hash = (hash * 31 + msg.charCodeAt(i)) | 0;
+    sendPush(
+      'Smart Home Hub – Fehler',
+      `${kind} auf ${location.pathname}${location.hash}: ${msg}`,
+      'rotating_light',
+      `err_${hash}`
+    );
+  } catch (e) { /* Fehler-Reporting darf selbst nie werfen */ }
+}
+window.addEventListener('error', e => reportRuntimeError('Fehler', e.message));
+window.addEventListener('unhandledrejection', e =>
+  reportRuntimeError('Unbehandelte Promise-Ablehnung', e.reason && (e.reason.message || e.reason)));
+
 // ============ ntfy.sh Push-Benachrichtigungen ============
 // Topic wird in localStorage ('ntfy_topic') gespeichert; Konfiguration siehe README.
 function getNtfyTopic() {

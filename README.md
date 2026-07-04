@@ -20,6 +20,10 @@ Multi-Projekt-Plattform auf Cloudflare Pages: Homescreen-Hub mit Klimadashboard
 | `functions/api/climate.js` | Langzeit-Archiv: tägliche Klima-Aggregate in D1 |
 | `functions/api/check-alerts.js` | Serverseitiger Sensor-, Schimmelrisiko- **und Frost**-Check + ntfy-Push (für externen Cron) |
 | `functions/api/weekly-report.js` | Wöchentlicher Klima-Report per ntfy (D1-Archiv + Vorwochen-Trend, für wöchentlichen Cron) |
+| `functions/api/ical.js` | CORS-Proxy für Kalender-Feeds (.ics) — fürs Kalender-Widget auf dem Hub |
+| `functions/api/config.js` | Key-Value-Speicher in D1 (z. B. Wetter-Koordinaten für die Server-Checks) |
+| `gpx.js` | GPX-Viewer-Logik (aus gpx.html ausgelagert) |
+| `tests/smoke.test.js` | Deploy-Schutz: prüft IDs/Handler/Dateiverweise über alle Seiten (`npm test`) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | PWA: installierbar auf dem iPhone-/Android-Homescreen, Offline-Fallback |
 
 ## 🔧 Einrichtung Cloud-Funktionen (To-do)
@@ -99,6 +103,12 @@ Der Forward-Fill im Dashboard bleibt als Fallback aktiv, alte Daten funktioniere
 
 ## GPX-Viewer
 
+- **Jahres-/Wochenziele** (Zielscheiben-Symbol) mit Fortschrittsbalken — auch auf der Hub-Kachel
+- **Kalender & Streaks**: Monatsraster mit Aktivitätstagen, aktuelle/längste Serie
+- **Heatmap** (Flammen-Symbol): alle Routen halbtransparent übereinander — häufige Wege glühen
+- **Strecken-Bestzeiten**: wiederkehrende Strecken werden automatisch erkannt (60-m-Raster-Abgleich), Rangliste nach Bewegungszeit mit 🏆
+- **Notiz & Start-Wetter** pro Tour: Textnotiz (auto-gespeichert, cloud-synct ☁️), Wetter beim Start wird automatisch nachgeschlagen
+- **GPX-Export**: jede Tour wieder als GPX-1.1-Datei herunterladen
 - Upload per Drag & Drop oder Dateiauswahl (mehrere `.gpx` gleichzeitig)
 - Speicherung **lokal (IndexedDB)** + automatischer **Cloud-Sync in D1** (sobald eingerichtet; Status im Header)
 - **Backup**: alle Aktivitäten + Einstellungen als JSON herunterladen / wiederherstellen (Buttons im Header)
@@ -108,11 +118,26 @@ Der Forward-Fill im Dashboard bleibt als Fallback aktiv, alte Daten funktioniere
 - Statistiken pro Tour: Distanz, Dauer (Bewegungszeit, Pausen > 10 min ausgenommen), Ø/Max-Tempo (GPS-Ausreißer gefiltert), Anstieg (geglättet), Höhe min/max, Höhenprofil
 - Aktivitätstyp wird über das Ø-Tempo geraten (Spazieren < 6,5 / Laufen < 13 / Rad < 42 / Motorrad) und ist manuell änderbar; Umbenennen & Löschen möglich
 
+## Hub-Widgets
+
+- **Uhr/Begrüßung/Wetter jetzt**, **3-Tage-Wettervorschau**, **To-do-Liste** (lokal) und **Kalender** (nächste Termine)
+- **Anpassbar**: Reihenfolge per Drag & Drop am Griff-Symbol (erscheint beim Überfahren), Ein-/Ausblenden über „Widgets anpassen" — beides bleibt gespeichert
+- **Kalender verbinden**: Zahnrad im Termine-Widget → .ics-URL eintragen (Google Kalender: Einstellungen → [Kalender] → „Geheime Adresse im iCal-Format"). Braucht den deployten `/api/ical`-Proxy ☁️. Grenze: Serientermine erscheinen nur mit ihrem ersten Datum (↻-Markierung).
+- **Fehler-Reporting**: unbehandelte JS-Fehler auf jedem Gerät werden als ntfy-Push gemeldet (max. 3/Sitzung, Topic muss eingerichtet sein)
+
+## Cloudflare Access statt Basic Auth (optional, vorbereitet)
+
+Login per E-Mail-Code statt Benutzer/Passwort — angenehmer auf dem iPhone (PWA):
+1. [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → Access → Applications → *Add an application* → Self-hosted → Domain der Seite eintragen.
+2. Policy anlegen: *Allow* → Include → Emails → deine E-Mail-Adresse(n).
+3. Im Pages-Projekt die Env-Var **`AUTH_MODE`** = `access` setzen und neu deployen.
+Die Middleware lässt dann nur noch Anfragen mit Access-JWT durch; Basic Auth ist abgeschaltet. Rückweg: `AUTH_MODE` löschen → Basic Auth gilt wieder.
+
 ## Roadmap / weitere Ideen
 
-1. **Hub-Ausbau**: frei anordenbare Widgets, Schnellzugriffe, Kalender-/To-do-Integration
-2. **GPX**: Jahresziele, Heatmap aller Routen, Segmente/Bestzeiten
-3. **Cloudflare Access** statt Basic Auth (Login per E-Mail-Code)
+1. Serientermine (RRULE) im Kalender-Widget expandieren
+2. GPX: Foto-Anhänge pro Tour, Segment-Detailvergleich (Teilstrecken)
+3. To-do-Widget optional in D1 syncen (geräteübergreifend)
 
 ## Deployment
 

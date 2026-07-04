@@ -79,8 +79,25 @@ async function shouldSend(db, key, dedupeMs = DEDUPE_MS) {
 //   Schimmelrisiko — nur mit frischen Innen-Messwerten: Wandoberflächen-Feuchte
 //   >= 80 % (Warnung) bzw. >= 100 % (Kondensat).
 // Best effort — Fehler hier dürfen die Sensor-Ausfall-Prüfung nicht beeinträchtigen.
+// Vom Dashboard gewählte Wetter-Koordinaten aus D1 lesen (app_config,
+// geschrieben über /api/config bei jeder Standort-Änderung im Frontend).
+// Fallback: Default-Koordinaten aus CHANNELS.
+async function getCoordOverride(db, locId) {
+  if (!db) return null;
+  try {
+    await db.exec("CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT, updated_at INTEGER)");
+    const row = await db.prepare('SELECT value FROM app_config WHERE key = ?').bind(`weather_${locId}`).first();
+    const v = row ? JSON.parse(row.value) : null;
+    return (v && typeof v.lat === 'number' && typeof v.lon === 'number') ? v : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function checkWeatherRisks(env, loc, feeds, report, locId) {
-  const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current=temperature_2m&daily=temperature_2m_min&forecast_days=2&timezone=auto&timeformat=unixtime`);
+  const coords = (await getCoordOverride(env.DB, locId)) || loc;
+  report.locations[locId].weatherCoords = { lat: coords.lat, lon: coords.lon, source: coords === loc ? 'default' : 'dashboard' };
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m&daily=temperature_2m_min&forecast_days=2&timezone=auto&timeformat=unixtime`);
   if (!res.ok) return;
   const data = await res.json();
 
