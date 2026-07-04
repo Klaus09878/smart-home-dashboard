@@ -237,6 +237,11 @@
           <i data-lucide="bell" class="w-4.5 h-4.5"></i>
         </button>
 
+        <!-- CSV-Export der aktuellen Messreihe -->
+        <button onclick="exportClimateCsv()" id="export-btn" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Messwerte als CSV exportieren">
+          <i data-lucide="download" class="w-4.5 h-4.5"></i>
+        </button>
+
         <!-- Reload Data Button -->
         <button onclick="reloadData()" id="reload-btn" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Daten aktualisieren">
           <i data-lucide="refresh-cw" class="w-4.5 h-4.5 transition-transform" id="reload-icon"></i>

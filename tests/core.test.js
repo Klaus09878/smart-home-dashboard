@@ -38,6 +38,35 @@ test('getDewPoint: Taupunkt = Temperatur bei 100 % rF', () => {
   assert.ok(Math.abs(core.getDewPoint(15, 100) - 15) < 0.1);
 });
 
+test('surfaceHumidity: warme Wand ≈ Raumfeuchte (kaum Temperaturgefälle)', () => {
+  // Innen 20/50, außen 19 → Oberfläche fast raumwarm, Feuchte ≈ 50 %
+  const r = core.surfaceHumidity(20, 50, 19);
+  assert.ok(Math.abs(r.surfaceTemp - 19.7) < 0.1, `surfaceTemp=${r.surfaceTemp}`);
+  assert.ok(Math.abs(r.surfaceRh - 52) < 2, `surfaceRh=${r.surfaceRh}`);
+});
+
+test('surfaceHumidity: kalte Außenwand → erhöhte Wandfeuchte', () => {
+  // Innen 21/55, außen -5 → kalte Wandstelle, deutlich höhere Oberflächenfeuchte
+  const r = core.surfaceHumidity(21, 55, -5);
+  // -5 + 0,7·(21−(−5)) = 13,2 °C an der Wärmebrücke (deutlich unter Raumtemp.)
+  assert.ok(r.surfaceTemp < 14, `surfaceTemp=${r.surfaceTemp}`);
+  assert.ok(r.surfaceRh > r.surfaceRhRaw - 0.001); // surfaceRh ist Deckelung von Raw
+  assert.ok(r.surfaceRh > 80, `surfaceRh=${r.surfaceRh}`);
+});
+
+test('surfaceHumidity: surfaceRh ist auf 100 % gedeckelt, Raw kann darüber liegen', () => {
+  // Extrem: sehr feucht innen, sehr kalt außen → Kondensat (Raw > 100)
+  const r = core.surfaceHumidity(22, 75, -15);
+  assert.ok(r.surfaceRhRaw > 100, `raw=${r.surfaceRhRaw}`);
+  assert.strictEqual(r.surfaceRh, 100);
+});
+
+test('surfaceHumidity: null bei ungültigen Werten', () => {
+  assert.strictEqual(core.surfaceHumidity(null, 50, 5), null);
+  assert.strictEqual(core.surfaceHumidity(20, NaN, 5), null);
+  assert.strictEqual(core.surfaceHumidity(20, 50, undefined), null);
+});
+
 test('processRawFeeds: Forward-Fill bildet Paare, Komma-Dezimal wird geparst', () => {
   const feeds = [
     { created_at: '2026-07-01T10:00:00Z', field1: '21,5', field2: null, entry_id: 1 },

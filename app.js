@@ -751,11 +751,8 @@
       }
 
       const dewPoint = getDewPoint(inTemp, inRh);
-      const fRsi = 0.7;
-      const surfaceTemp = outTemp + fRsi * (inTemp - outTemp);
-      const vaporPressure = (inRh / 100) * satVaporPressure(inTemp);
-      const surfaceRhRaw = (vaporPressure / satVaporPressure(surfaceTemp)) * 100;
-      const surfaceRh = Math.min(100, surfaceRhRaw);
+      // Wandoberflächen-Feuchte via getestete Kernfunktion (lib/core.js)
+      const { surfaceTemp, surfaceRhRaw, surfaceRh } = surfaceHumidity(inTemp, inRh, outTemp);
 
       document.getElementById('mold-dewpoint').innerText = dewPoint === null ? '--.-°C' : `${dewPoint.toFixed(1)}°C`;
       document.getElementById('mold-surface-temp').innerText = `${surfaceTemp.toFixed(1)}°C`;
@@ -1377,29 +1374,57 @@
       if (btn) btn.classList.toggle('text-teal-400', !!getNtfyTopic());
     }
 
-    // ============ Hub-Widgets: Uhr, Datum, Begrüßung, Wetter, GPX ============
-    function updateHubClock() {
-      const clockEl = document.getElementById('hub-clock');
-      if (!clockEl) return;
-      const now = new Date();
-      clockEl.innerText = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-      document.getElementById('hub-date').innerText = now.toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-      const h = now.getHours();
-      const greeting = h < 5 ? 'Gute Nacht' : h < 11 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend';
-      document.getElementById('hub-greeting').innerText = `${greeting} 👋`;
+    // ============ CSV-Export der aktuellen Messreihe ============
+    // Exportiert die abgeglichenen Innen-Messwerte (appState.insideData) des aktiven
+    // Standorts als CSV. Deutsch-/Excel-freundlich: Semikolon als Trenner,
+    // Komma als Dezimalzeichen. Rechnet absolute Feuchte & Taupunkt gleich mit.
+    function exportClimateCsv() {
+      const feeds = appState.insideData;
+      if (!feeds || feeds.length === 0) {
+        showNotification('Keine Messwerte zum Exportieren vorhanden.', 'error');
+        return;
+      }
+      if (appState.isDemoMode) {
+        showNotification('Demo-Modus aktiv – es liegen keine echten Messwerte vor.', 'error');
+        return;
+      }
+
+      const num = (v, d) => (v === null || v === undefined || isNaN(v)) ? '' : v.toFixed(d).replace('.', ',');
+      const header = ['Zeit (ISO)', 'Datum', 'Uhrzeit', 'Temperatur (°C)', 'Luftfeuchte (%)', 'Absolute Feuchte (g/m³)', 'Taupunkt (°C)', 'Eintrag-ID'];
+      const rows = feeds.map(f => {
+        const ah = getAbsoluteHumidity(f.temp, f.humidity);
+        const dp = getDewPoint(f.temp, f.humidity);
+        return [
+          f.time.toISOString(),
+          formatDate(f.time),
+          formatTime(f.time),
+          num(f.temp, 1),
+          num(f.humidity, 0),
+          num(ah, 2),
+          num(dp, 1),
+          f.id != null ? f.id : ''
+        ].join(';');
+      });
+
+      // BOM voranstellen, damit Excel die UTF-8-Umlaute korrekt erkennt
+      const csv = '﻿' + [header.join(';'), ...rows].join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const safeName = getLocationName(appState.activeLocId).replace(/[^\wäöüÄÖÜß-]+/g, '_');
+      const stamp = new Date().toISOString().substring(0, 10);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `climateflow_${safeName}_${stamp}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      showNotification(`${feeds.length} Messwerte als CSV exportiert.`);
     }
 
-    async function loadHubWeather() {
-      try {
-        const conf = appState.weatherConfig;
-        if (!conf) return;
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,weather_code&timezone=auto`);
-        if (!res.ok) return;
-        const data = await res.json();
-        document.getElementById('hub-weather-text').innerText =
-          `${data.current.temperature_2m.toFixed(1)} °C · ${getWeatherDescription(data.current.weather_code)} · ${conf.name}`;
-      } catch (e) { /* Widget bleibt leer */ }
-    }
+    // ============ Hub-Widgets: Uhr, Datum, Begrüßung, Wetter, GPX ============
+    // (updateHubClock & loadHubWeather sind weiter unten definiert.)
 
     // GPX-Widget: liest die lokal gespeicherten Aktivitäten des GPX-Viewers (IndexedDB)
     function loadGpxWidget() {
@@ -1572,8 +1597,6 @@
       updateIcons();
       initConfigs();
       updateNtfyButton();
-      updateHubClock();
-      setInterval(updateHubClock, 10 * 1000);
 
       window.addEventListener('hashchange', handleRoute);
       handleRoute();
