@@ -10,14 +10,12 @@
       {
         id: 'gillian',
         defaultName: 'Schlafzimmer Gillian',
-        thingspeakUrl: 'https://api.thingspeak.com/channels/3417815/feeds.json?api_key=79KYAS8DHBA01ZO2&results=8000',
         defaultWeather: { lat: 48.7758, lon: 9.1829, name: 'Stuttgart, DE' },
         fields: { temp: 'field1', humidity: 'field2', extra: [] }
       },
       {
         id: 'sean',
         defaultName: 'Schlafzimmer Sean',
-        thingspeakUrl: 'https://api.thingspeak.com/channels/3417935/feeds.json?api_key=CTMDY1UODSQK7OJN&results=8000',
         defaultWeather: { lat: 52.5200, lon: 13.4050, name: 'Berlin, DE' },
         fields: { temp: 'field1', humidity: 'field2', extra: [] }
       }
@@ -55,25 +53,11 @@
     const SENSOR_STALE_MS = 2 * 60 * 60 * 1000;
 
     // Feeds über die API-Schicht laden (/api/feeds/{loc}, Cloudflare Function
-    // mit verstecktem Key + Edge-Cache). Solange die Env-Keys nicht eingerichtet
-    // sind, fällt der Aufruf automatisch auf den direkten ThingSpeak-Zugriff zurück.
+    // mit verstecktem TS_KEY_* aus Env-Vars + Edge-Cache).
     async function fetchFeeds(loc, { results = 8000, start = null } = {}) {
       const q = new URLSearchParams({ results: results.toString() });
       if (start) q.set('start', start);
-      try {
-        return await apiFetch(`/api/feeds/${loc.id}?${q.toString()}`);
-      } catch (err) {
-        if (!err.unavailable) throw err;
-        // HINWEIS: Dieser Direktzugriff (Read-Key im Client) ist nur die
-        // Übergangslösung, bis TS_KEY_* als Env-Vars gesetzt sind. Danach:
-        // Fallback samt thingspeakUrl aus LOCATIONS entfernen (siehe README).
-        console.warn(`[fetchFeeds] API-Proxy nicht verfügbar – Direktzugriff für "${loc.id}".`);
-        let url = loc.thingspeakUrl.replace('results=8000', `results=${results}`);
-        if (start) url += `&start=${encodeURIComponent(start)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
-        return res.json();
-      }
+      return await apiFetch(`/api/feeds/${loc.id}?${q.toString()}`);
     }
 
     // Load custom names and weather configs from localStorage
