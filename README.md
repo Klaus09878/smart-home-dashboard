@@ -18,7 +18,7 @@ Multi-Projekt-Plattform auf Cloudflare Pages: Homescreen-Hub mit Klimadashboard
 | `functions/api/feeds/[locId].js` | ThingSpeak-Proxy (versteckt Keys, 60 s Edge-Cache) |
 | `functions/api/gpx.js` | GPX-Aktivitäten in Cloudflare D1 (CRUD, Sync-Backend) |
 | `functions/api/climate.js` | Langzeit-Archiv: tägliche Klima-Aggregate in D1 |
-| `functions/api/check-alerts.js` | Serverseitiger Sensor-Check + ntfy-Push (für externen Cron) |
+| `functions/api/check-alerts.js` | Serverseitiger Sensor- **und Schimmelrisiko**-Check + ntfy-Push (für externen Cron) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | PWA: installierbar auf dem iPhone-/Android-Homescreen, Offline-Fallback |
 
 ## 🔧 Einrichtung Cloud-Funktionen (To-do)
@@ -37,7 +37,7 @@ Nach der Einrichtung schalten sie sich automatisch scharf:
 3. **Push-Benachrichtigungen (ntfy.sh)**:
    - Handy: kostenlose **ntfy**-App installieren, ein geheimes Topic abonnieren (z. B. `smarthub-abc123`).
    - Dashboard: Glocken-Symbol im ClimateFlow-Header → dasselbe Topic eintragen (Warnungen bei Sensor-Ausfall, Schimmelrisiko).
-   - Serverseitig (auch bei geschlossenem Browser): Env-Var `NTFY_TOPIC` = Topic setzen und einen kostenlosen Cron-Dienst (z. B. cron-job.org) alle 1–6 h `GET https://<domain>/api/check-alerts` aufrufen lassen.
+   - Serverseitig (auch bei geschlossenem Browser): Env-Var `NTFY_TOPIC` = Topic setzen und einen kostenlosen Cron-Dienst (z. B. cron-job.org) alle 1–6 h `GET https://<domain>/api/check-alerts` aufrufen lassen. Dieser Endpunkt warnt sowohl bei **Sensor-Ausfall** (>2 h keine Werte, max. 1×/6 h) als auch bei **Schimmel-/Kondensatrisiko** an kalten Wandstellen (Außentemperatur via Open-Meteo, max. 1×/12 h). Die 12-h-Entprellung braucht das D1-Binding `DB` (Schritt 1).
 4. **Build automatisieren (empfohlen):** Pages → *Settings → Builds & deployments*:
    Build command = `npm run build` (führt Tests aus und baut das CSS), Build output directory = `/`.
    Damit kann das committete `tailwind.css` nie mehr veralten und fehlerhafte Kernlogik bricht den Deploy ab.
@@ -87,6 +87,7 @@ Der Forward-Fill im Dashboard bleibt als Fallback aktiv, alte Daten funktioniere
 - **Klimaverlauf** (24 h / 3 d / 7 d / alles); der Graf endet beim letzten echten Messwert-Paar
 - **Inkrementelles Laden**: nach dem ersten Voll-Load werden per ThingSpeak-`start`-Parameter nur neue Einträge geholt; Auto-Refresh alle 5 min läuft still im Hintergrund
 - **Hub-Homescreen** mit Live-Werten beider Standorte auf der ClimateFlow-Kachel
+- **CSV-Export** der aktuellen Messreihe (Download-Symbol im Header): Zeit, Temperatur, Feuchte, absolute Feuchte, Taupunkt — Excel-freundlich (Semikolon/Komma, UTF-8-BOM)
 
 ## GPX-Viewer
 
