@@ -1849,10 +1849,310 @@
             const weekKm = weekActs.reduce((sum, a) => sum + (a.distM || 0), 0) / 1000;
             document.getElementById('hub-gpx-week').innerText = `${weekKm.toFixed(1)} km`;
             document.getElementById('hub-gpx-count').innerText = `${weekActs.length} diese Woche · ${acts.length} gesamt`;
+
+            // Wochenziel-Fortschritt (gpx_goals aus dem GPX-Viewer)
+            try {
+              const goals = JSON.parse(localStorage.getItem('gpx_goals') || 'null');
+              const wrap = document.getElementById('hub-gpx-goal-wrap');
+              if (wrap && goals && goals.weekKm > 0) {
+                const pct = Math.min(100, (weekKm / goals.weekKm) * 100);
+                document.getElementById('hub-gpx-goal-bar').style.width = `${pct}%`;
+                document.getElementById('hub-gpx-goal-label').innerText = `Wochenziel: ${Math.round(pct)} % von ${goals.weekKm} km`;
+                wrap.classList.remove('hidden');
+              } else if (wrap) {
+                wrap.classList.add('hidden');
+              }
+            } catch (e) { /* Ziel-Anzeige optional */ }
           };
         };
         req.onerror = () => {};
       } catch (e) { /* Widget optional */ }
+    }
+
+    // ============ Hub-Widgets: Layout (Drag & Drop + Ein-/Ausblenden) ============
+    // Reihenfolge in localStorage 'hub_widget_order', ausgeblendete Widgets in
+    // 'hub_widget_hidden'. Gezogen wird am Griff-Symbol (erscheint beim Hover).
+    const HUB_WIDGET_META = {
+      clock: 'Uhr & Wetter jetzt',
+      forecast: 'Wetter (3 Tage)',
+      todo: 'To-do-Liste',
+      calendar: 'Nächste Termine'
+    };
+
+    function getWidgetOrder() {
+      let order = [];
+      try { order = JSON.parse(localStorage.getItem('hub_widget_order') || '[]'); } catch (e) { /* Defaults */ }
+      const known = Object.keys(HUB_WIDGET_META);
+      order = order.filter(id => known.includes(id));
+      known.forEach(id => { if (!order.includes(id)) order.push(id); });
+      return order;
+    }
+
+    function getHiddenWidgets() {
+      try { return JSON.parse(localStorage.getItem('hub_widget_hidden') || '[]'); } catch (e) { return []; }
+    }
+
+    function applyWidgetLayout() {
+      const container = document.getElementById('hub-widgets');
+      if (!container) return;
+      const hidden = new Set(getHiddenWidgets());
+      getWidgetOrder().forEach(id => {
+        const el = container.querySelector(`[data-widget="${id}"]`);
+        if (!el) return;
+        container.appendChild(el); // ans Ende → ergibt die gespeicherte Reihenfolge
+        el.classList.toggle('hidden', hidden.has(id));
+      });
+    }
+
+    function saveWidgetOrder() {
+      const container = document.getElementById('hub-widgets');
+      if (!container) return;
+      const order = [...container.querySelectorAll('[data-widget]')].map(el => el.dataset.widget);
+      localStorage.setItem('hub_widget_order', JSON.stringify(order));
+    }
+
+    function initWidgetDrag() {
+      const container = document.getElementById('hub-widgets');
+      if (!container) return;
+      container.querySelectorAll('[data-widget]').forEach(el => {
+        // Nur der Griff aktiviert das Ziehen — sonst stören Inputs/Textauswahl
+        const grip = el.querySelector('.widget-grip');
+        if (grip) {
+          grip.addEventListener('mousedown', () => { el.draggable = true; });
+          grip.addEventListener('touchstart', () => { el.draggable = true; }, { passive: true });
+        }
+        el.addEventListener('dragstart', e => {
+          e.dataTransfer.setData('text/plain', el.dataset.widget);
+          e.dataTransfer.effectAllowed = 'move';
+          el.classList.add('opacity-50');
+        });
+        el.addEventListener('dragend', () => {
+          el.classList.remove('opacity-50');
+          el.draggable = false;
+        });
+        el.addEventListener('dragover', e => e.preventDefault());
+        el.addEventListener('drop', e => {
+          e.preventDefault();
+          const draggedId = e.dataTransfer.getData('text/plain');
+          if (!draggedId || draggedId === el.dataset.widget) return;
+          const draggedEl = container.querySelector(`[data-widget="${draggedId}"]`);
+          if (!draggedEl) return;
+          // Vor oder hinter dem Ziel einfügen, je nach DOM-Position
+          const kids = [...container.querySelectorAll('[data-widget]')];
+          if (kids.indexOf(draggedEl) < kids.indexOf(el)) {
+            el.after(draggedEl);
+          } else {
+            el.before(draggedEl);
+          }
+          saveWidgetOrder();
+        });
+      });
+    }
+
+    function toggleWidgetSettings() {
+      const panel = document.getElementById('widget-settings');
+      if (!panel) return;
+      if (panel.classList.contains('hidden')) {
+        const hidden = new Set(getHiddenWidgets());
+        const list = document.getElementById('widget-settings-list');
+        list.innerHTML = '';
+        Object.entries(HUB_WIDGET_META).forEach(([id, label]) => {
+          const row = document.createElement('label');
+          row.className = 'flex items-center gap-2 cursor-pointer hover:text-white transition-colors';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = !hidden.has(id);
+          cb.className = 'accent-teal-500';
+          cb.onchange = () => {
+            const h = new Set(getHiddenWidgets());
+            if (cb.checked) h.delete(id); else h.add(id);
+            localStorage.setItem('hub_widget_hidden', JSON.stringify([...h]));
+            applyWidgetLayout();
+          };
+          row.appendChild(cb);
+          row.appendChild(document.createTextNode(label));
+          list.appendChild(row);
+        });
+        panel.classList.remove('hidden');
+      } else {
+        panel.classList.add('hidden');
+      }
+    }
+
+    // ============ Hub-Widget: To-do-Liste (localStorage) ============
+    function getTodos() {
+      try { return JSON.parse(localStorage.getItem('hub_todos') || '[]'); } catch (e) { return []; }
+    }
+    function saveTodos(list) {
+      localStorage.setItem('hub_todos', JSON.stringify(list));
+      renderTodos();
+    }
+
+    function renderTodos() {
+      const listEl = document.getElementById('todo-list');
+      const countEl = document.getElementById('todo-count');
+      if (!listEl) return;
+      const todos = getTodos().sort((a, b) => (a.done === b.done) ? a.createdAt - b.createdAt : (a.done ? 1 : -1));
+      const open = todos.filter(t => !t.done).length;
+      if (countEl) countEl.innerText = todos.length > 0 ? `${open} offen` : '';
+
+      listEl.innerHTML = '';
+      if (todos.length === 0) {
+        listEl.innerHTML = '<p class="text-xs text-slate-500">Nichts zu tun 🎉</p>';
+        return;
+      }
+      todos.forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2 group/todo';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = !!t.done;
+        cb.className = 'accent-teal-500 shrink-0 cursor-pointer';
+        cb.onchange = () => {
+          const list = getTodos();
+          const item = list.find(x => x.id === t.id);
+          if (item) { item.done = cb.checked; saveTodos(list); }
+        };
+        const span = document.createElement('span');
+        span.className = `flex-1 min-w-0 truncate text-xs ${t.done ? 'line-through text-slate-600' : 'text-slate-300'}`;
+        span.innerText = t.text;
+        const del = document.createElement('button');
+        del.className = 'p-0.5 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
+        del.title = 'Löschen';
+        del.innerHTML = '<i data-lucide="x" class="w-3 h-3"></i>';
+        del.onclick = () => saveTodos(getTodos().filter(x => x.id !== t.id));
+        row.appendChild(cb);
+        row.appendChild(span);
+        row.appendChild(del);
+        listEl.appendChild(row);
+      });
+      updateIcons();
+    }
+
+    function addTodo(event) {
+      event.preventDefault();
+      const input = document.getElementById('todo-input');
+      const text = input.value.trim();
+      if (!text) return;
+      const list = getTodos();
+      list.push({ id: Date.now() + Math.random().toString(36).slice(2, 6), text, done: false, createdAt: Date.now() });
+      input.value = '';
+      saveTodos(list);
+    }
+
+    // ============ Hub-Widget: 3-Tage-Wettervorschau ============
+    function weatherIconFor(code) {
+      if (code === 0) return 'sun';
+      if (code >= 1 && code <= 3) return 'cloud-sun';
+      if (code === 45 || code === 48) return 'cloud-fog';
+      if (code >= 71 && code <= 77) return 'snowflake';
+      if (code >= 51 && code <= 82) return 'cloud-rain';
+      if (code >= 85 && code <= 86) return 'snowflake';
+      if (code >= 95) return 'cloud-lightning';
+      return 'cloud-sun';
+    }
+
+    async function loadHubForecast() {
+      const el = document.getElementById('hub-forecast');
+      if (!el || !appState.weatherConfig) return;
+      try {
+        const conf = appState.weatherConfig;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&daily=temperature_2m_max,temperature_2m_min,weather_code&forecast_days=3&timezone=auto`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
+        const daily = (await res.json()).daily;
+        if (!daily || !daily.time) throw new Error('keine Tagesdaten');
+
+        el.innerHTML = '';
+        daily.time.forEach((day, i) => {
+          const label = i === 0 ? 'Heute' : new Date(`${day}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short' });
+          const cell = document.createElement('div');
+          cell.className = 'bg-slate-900/60 border border-slate-800/60 rounded-xl p-2 text-center';
+          cell.title = getWeatherDescription(daily.weather_code[i]);
+          cell.innerHTML = `
+            <p class="text-[10px] text-slate-500 font-semibold">${label}</p>
+            <i data-lucide="${weatherIconFor(daily.weather_code[i])}" class="w-4 h-4 mx-auto my-1 text-teal-400"></i>
+            <p class="text-[11px] text-slate-200 font-semibold">${Math.round(daily.temperature_2m_max[i])}°<span class="text-slate-500 font-normal"> / ${Math.round(daily.temperature_2m_min[i])}°</span></p>
+          `;
+          el.appendChild(cell);
+        });
+        updateIcons();
+      } catch (err) {
+        console.warn('Hub-Vorschau fehlgeschlagen:', err);
+        el.innerHTML = '<p class="text-xs text-slate-500 col-span-3">Vorschau nicht verfügbar.</p>';
+      }
+    }
+
+    // ============ Hub-Widget: Kalender (.ics über /api/ical) ============
+    function configureIcal() {
+      const current = localStorage.getItem('ical_url') || '';
+      const url = prompt(
+        'URL eines Kalender-Feeds (.ics) — z. B. die „geheime Adresse im iCal-Format" ' +
+        'eines Google Kalenders (Einstellungen → Kalender → Kalender integrieren).\n\n' +
+        'Leer lassen = Widget deaktivieren.',
+        current
+      );
+      if (url === null) return;
+      if (url.trim() === '') {
+        localStorage.removeItem('ical_url');
+      } else if (!/^https:\/\//i.test(url.trim())) {
+        showNotification('Bitte eine https://-URL angeben.', 'error');
+        return;
+      } else {
+        localStorage.setItem('ical_url', url.trim());
+      }
+      loadHubCalendar(true);
+    }
+
+    async function loadHubCalendar(force = false) {
+      const el = document.getElementById('hub-cal-list');
+      if (!el) return;
+      const url = localStorage.getItem('ical_url');
+      if (!url) {
+        el.innerHTML = 'Kein Kalender verbunden — über das Zahnrad eine .ics-URL hinterlegen (z. B. Google Kalender „geheime Adresse").';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/ical?url=${encodeURIComponent(url)}`);
+        if (res.status === 404 || res.status === 503 || res.status === 405) {
+          el.innerHTML = 'Kalender-Proxy (/api/ical) noch nicht deployt — erscheint nach dem nächsten Cloudflare-Deploy automatisch.';
+          return;
+        }
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        const events = parseIcsEvents(await res.text());
+
+        const now = Date.now();
+        const horizon = now + 14 * 24 * 60 * 60 * 1000;
+        const upcoming = events.filter(e =>
+          e.startMs >= now - (e.allDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000) && e.startMs <= horizon
+        ).slice(0, 4);
+
+        if (upcoming.length === 0) {
+          el.innerHTML = 'Keine Termine in den nächsten 14 Tagen.' +
+            (events.some(e => e.recurring) ? '<p class="text-[10px] text-slate-600 mt-1">Hinweis: Serientermine werden nur mit ihrem ersten Datum erkannt.</p>' : '');
+          return;
+        }
+
+        el.innerHTML = '';
+        upcoming.forEach(e => {
+          const d = new Date(e.startMs);
+          const dayLabel = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-2';
+          row.innerHTML = `
+            <span class="shrink-0 w-20 text-[10px] font-semibold text-orange-300">${dayLabel}${e.allDay ? '' : ` ${formatTime(d)}`}</span>
+            <span class="flex-1 min-w-0 truncate text-slate-300">${escapeHtml(e.summary || '(ohne Titel)')}${e.recurring ? ' ↻' : ''}</span>
+          `;
+          el.appendChild(row);
+        });
+      } catch (err) {
+        console.warn('Kalender laden fehlgeschlagen:', err);
+        el.innerHTML = `Kalender konnte nicht geladen werden: ${escapeHtml(err.message)}`;
+      }
     }
 
     // ============ HUB NAVIGATION (Hash-Routing) ============
@@ -1910,6 +2210,9 @@
         loadHubWeather();
         loadHubPreviews();
         loadGpxWidget();
+        renderTodos();
+        loadHubForecast();
+        loadHubCalendar();
       }
     }
 
@@ -1996,6 +2299,17 @@
       updateIcons();
       initConfigs();
       updateNtfyButton();
+      applyWidgetLayout();
+      initWidgetDrag();
+
+      // Widget-Einstellungs-Popover bei Klick außerhalb schließen
+      document.addEventListener('click', event => {
+        const panel = document.getElementById('widget-settings');
+        if (panel && !panel.classList.contains('hidden') &&
+            !panel.contains(event.target) && !event.target.closest('button[onclick="toggleWidgetSettings()"]')) {
+          panel.classList.add('hidden');
+        }
+      });
 
       window.addEventListener('hashchange', handleRoute);
       handleRoute();

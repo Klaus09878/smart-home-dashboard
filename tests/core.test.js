@@ -220,6 +220,41 @@ test('processRawFeeds: Extra-Felder (z. B. CO₂) werden forward-gefüllt angeh�
   assert.strictEqual(aligned[2].temp, 22);    // Standard-Felder unverändert
 });
 
+test('parseIcsEvents: UTC-Zeit, Ganztag, gefaltete Zeile, RRULE-Markierung', () => {
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'BEGIN:VEVENT',
+    'DTSTART:20260710T120000Z',
+    'SUMMARY:Zahnarzt\\, Kontrolle',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'DTSTART;VALUE=DATE:20260712',
+    // RFC-5545-Faltung: Fortsetzungszeile beginnt mit Leerzeichen (wird beim
+    // Entfalten entfernt — das Inhalts-Leerzeichen steht vor dem Umbruch)
+    'SUMMARY:Geburtstag mit einem sehr langen Titel der ',
+    ' umgebrochen wurde',
+    'END:VEVENT',
+    'BEGIN:VEVENT',
+    'DTSTART;TZID=Europe/Berlin:20260708T090000',
+    'RRULE:FREQ=WEEKLY',
+    'SUMMARY:Weekly',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+  const events = core.parseIcsEvents(ics);
+  assert.strictEqual(events.length, 3);
+  // sortiert nach Start: Weekly (08.), Zahnarzt (10.), Geburtstag (12.)
+  assert.strictEqual(events[0].summary, 'Weekly');
+  assert.strictEqual(events[0].recurring, true);
+  assert.strictEqual(events[1].summary, 'Zahnarzt, Kontrolle');
+  assert.strictEqual(events[1].startMs, Date.UTC(2026, 6, 10, 12, 0, 0));
+  assert.strictEqual(events[1].allDay, false);
+  assert.strictEqual(events[2].summary, 'Geburtstag mit einem sehr langen Titel der umgebrochen wurde');
+  assert.strictEqual(events[2].allDay, true);
+  // Müll rein → leeres Array
+  assert.deepStrictEqual(core.parseIcsEvents('<html>Fehler</html>'), []);
+});
+
 console.log('lib/core.js – GPX');
 
 test('haversine: 1° Länge am Äquator ≈ 111,2 km', () => {

@@ -66,22 +66,93 @@
 
       <div class="flex-1 flex flex-col justify-center">
 
-        <!-- Personal Widget Bar: Uhr, Datum, Begrüßung, Wetter -->
-        <div class="glass-panel rounded-2xl p-6 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg">
-          <div class="text-center sm:text-left">
-            <h2 class="text-2xl font-bold text-white tracking-tight" id="hub-greeting">Willkommen 👋</h2>
-            <p class="text-sm text-slate-400 mt-1" id="hub-date">–</p>
+        <!-- Widget-Bereich: Reihenfolge per Drag & Drop (Griff-Symbol), Sichtbarkeit
+             über „Widgets anpassen" — beides in localStorage (applyWidgetLayout) -->
+        <div id="hub-widgets" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+
+          <!-- Widget: Uhr, Datum, Begrüßung, Wetter jetzt -->
+          <div data-widget="clock" class="glass-panel rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg md:col-span-3 relative group/widget">
+            <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
+              <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
+            </button>
+            <div class="text-center sm:text-left">
+              <h2 class="text-2xl font-bold text-white tracking-tight" id="hub-greeting">Willkommen 👋</h2>
+              <p class="text-sm text-slate-400 mt-1" id="hub-date">–</p>
+            </div>
+            <div class="text-center sm:text-right">
+              <p class="text-5xl font-bold tracking-tight bg-gradient-to-r from-teal-300 to-indigo-400 bg-clip-text text-transparent tabular-nums" id="hub-clock">--:--</p>
+              <p class="text-xs text-slate-400 mt-1.5 flex items-center gap-1.5 justify-center sm:justify-end">
+                <i data-lucide="cloud-sun" class="w-3.5 h-3.5 text-teal-400"></i>
+                <span id="hub-weather-text">Wetter wird geladen...</span>
+              </p>
+            </div>
           </div>
-          <div class="text-center sm:text-right">
-            <p class="text-5xl font-bold tracking-tight bg-gradient-to-r from-teal-300 to-indigo-400 bg-clip-text text-transparent tabular-nums" id="hub-clock">--:--</p>
-            <p class="text-xs text-slate-400 mt-1.5 flex items-center gap-1.5 justify-center sm:justify-end">
-              <i data-lucide="cloud-sun" class="w-3.5 h-3.5 text-teal-400"></i>
-              <span id="hub-weather-text">Wetter wird geladen...</span>
-            </p>
+
+          <!-- Widget: 3-Tage-Wettervorschau -->
+          <div data-widget="forecast" class="glass-panel rounded-2xl p-5 shadow-lg relative group/widget">
+            <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
+              <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
+            </button>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+              <i data-lucide="calendar-days" class="w-4 h-4 text-teal-400"></i>
+              Wetter (3 Tage)
+            </h3>
+            <div class="grid grid-cols-3 gap-2" id="hub-forecast">
+              <p class="text-xs text-slate-500 col-span-3">Lade Vorschau …</p>
+            </div>
           </div>
+
+          <!-- Widget: To-do-Liste (lokal, localStorage) -->
+          <div data-widget="todo" class="glass-panel rounded-2xl p-5 shadow-lg relative group/widget">
+            <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
+              <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
+            </button>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+              <i data-lucide="check-square" class="w-4 h-4 text-indigo-400"></i>
+              To-do
+              <span class="text-[10px] font-semibold text-slate-500" id="todo-count"></span>
+            </h3>
+            <div id="todo-list" class="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1 mb-2"></div>
+            <form onsubmit="addTodo(event)" class="flex gap-1.5">
+              <input id="todo-input" type="text" maxlength="120" placeholder="Neuer Eintrag …"
+                class="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-indigo-500/50 focus:outline-none">
+              <button type="submit" class="px-2.5 py-1.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 transition-colors" title="Hinzufügen">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              </button>
+            </form>
+          </div>
+
+          <!-- Widget: Kalender (.ics-Feed über /api/ical) -->
+          <div data-widget="calendar" class="glass-panel rounded-2xl p-5 shadow-lg relative group/widget">
+            <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
+              <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
+            </button>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+              <i data-lucide="calendar" class="w-4 h-4 text-orange-400"></i>
+              Nächste Termine
+              <button onclick="configureIcal()" class="ml-auto mr-5 p-1 rounded text-slate-500 hover:text-white transition-colors" title="Kalender-URL (.ics) hinterlegen">
+                <i data-lucide="settings-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </h3>
+            <div id="hub-cal-list" class="flex flex-col gap-1.5 text-xs text-slate-400">Lade Termine …</div>
+          </div>
+
         </div>
 
-        <p class="text-sm text-slate-400 mb-4">Wähle ein Projekt, um loszulegen.</p>
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-sm text-slate-400">Wähle ein Projekt, um loszulegen.</p>
+          <div class="relative">
+            <button onclick="toggleWidgetSettings()" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-all flex items-center gap-1.5">
+              <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+              Widgets anpassen
+            </button>
+            <div id="widget-settings" class="hidden absolute right-0 top-full mt-2 z-[500] glass-panel border border-slate-800 rounded-xl p-3 shadow-2xl w-56">
+              <p class="text-[10px] text-slate-500 uppercase font-semibold mb-2">Widgets ein-/ausblenden</p>
+              <div id="widget-settings-list" class="flex flex-col gap-1.5 text-xs text-slate-300"></div>
+              <p class="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-800/60">Reihenfolge: Widgets am Griff-Symbol ziehen.</p>
+            </div>
+          </div>
+        </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
           <!-- Tile: ClimateFlow -->
@@ -137,6 +208,13 @@
                 <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Diese Woche</p>
                 <p class="text-base font-bold text-white mt-0.5" id="hub-gpx-week">0 km</p>
                 <p class="text-[10px] text-slate-400 mt-0.5 truncate" id="hub-gpx-count">0 Aktivitäten</p>
+                <!-- Wochenziel-Fortschritt (gpx_goals, P10) -->
+                <div id="hub-gpx-goal-wrap" class="hidden mt-1.5">
+                  <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800">
+                    <div class="h-full rounded-full bg-gradient-to-r from-teal-500 to-teal-400 transition-all duration-500" id="hub-gpx-goal-bar" style="width: 0%"></div>
+                  </div>
+                  <p class="text-[9px] text-slate-500 mt-0.5" id="hub-gpx-goal-label"></p>
+                </div>
               </div>
             </div>
 
