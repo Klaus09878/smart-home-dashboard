@@ -7,9 +7,12 @@ Multi-Projekt-Plattform auf Cloudflare Pages: Homescreen-Hub mit Klimadashboard
 
 | Datei | Zweck |
 |---|---|
-| `index.html` | Hub-Homescreen (Uhr/Datum/Wetter/GPX-Widgets, Projekt-Kacheln) + ClimateFlow-Dashboard (Hash-Routing `#home` / `#climate`) |
+| `index.html` | Hub-Homescreen (Uhr/Datum/Wetter/GPX-Widgets, Projekt-Kacheln) + ClimateFlow-Dashboard (nur Markup; Logik in `app.js`) |
+| `app.js` | Hub-Navigation + gesamte ClimateFlow-Logik (aus index.html ausgelagert) |
 | `gpx.html` | GPX-Viewer: eigenständige Seite (Leaflet-Karte, Höhenprofil, Statistiken, IndexedDB + Cloud-Sync) |
-| `shared.js` | Gemeinsame Helfer: Formatierer, Icons, API-Schicht (`apiFetch`), ntfy-Push (`sendPush`) |
+| `lib/core.js` | Getestete Kernlogik ohne DOM (Magnus, Feed-Verarbeitung, GPX-Statistik) — läuft im Browser und in Node |
+| `tests/core.test.js` | Testsuite für lib/core.js (`npm test`) |
+| `shared.js` | Gemeinsame Helfer: Formatierer, Icons, Toasts (`showToast`), API-Schicht (`apiFetch`), ntfy-Push (`sendPush`) |
 | `tailwind.css` | Statisch gebautes Tailwind-CSS (`npm run build:css` nach Klassen-Änderungen!) |
 | `functions/_middleware.js` | Cloudflare Pages Middleware: HTTP Basic Auth (`AUTH_USER` / `AUTH_PASS`) |
 | `functions/api/feeds/[locId].js` | ThingSpeak-Proxy (versteckt Keys, 60 s Edge-Cache) |
@@ -35,7 +38,13 @@ Nach der Einrichtung schalten sie sich automatisch scharf:
    - Handy: kostenlose **ntfy**-App installieren, ein geheimes Topic abonnieren (z. B. `smarthub-abc123`).
    - Dashboard: Glocken-Symbol im ClimateFlow-Header → dasselbe Topic eintragen (Warnungen bei Sensor-Ausfall, Schimmelrisiko).
    - Serverseitig (auch bei geschlossenem Browser): Env-Var `NTFY_TOPIC` = Topic setzen und einen kostenlosen Cron-Dienst (z. B. cron-job.org) alle 1–6 h `GET https://<domain>/api/check-alerts` aufrufen lassen.
-4. **CSS neu bauen** nach HTML/Klassen-Änderungen: `npm run build:css` (Node nötig), dann committen.
+4. **Build automatisieren (empfohlen):** Pages → *Settings → Builds & deployments*:
+   Build command = `npm run build` (führt Tests aus und baut das CSS), Build output directory = `/`.
+   Damit kann das committete `tailwind.css` nie mehr veralten und fehlerhafte Kernlogik bricht den Deploy ab.
+   Bis dahin gilt: nach HTML/Klassen-Änderungen lokal `npm run build:css` ausführen und committen.
+5. **Nach Schritt 2 (Proxy aktiv): Fallback-Keys entfernen.** In `app.js` die `thingspeakUrl`-Einträge
+   aus `LOCATIONS` und den Direktzugriff-Zweig in `fetchFeeds()` löschen — erst dann sind die
+   Read-Keys wirklich aus dem Client verschwunden. (Der Code loggt bis dahin eine Warnung in die Konsole.)
 
 **Grundprinzip für neue Projekte:** Jedes weitere Unterprojekt bekommt seine eigene
 HTML-Seite (wie `gpx.html`) und eine Kachel auf dem Hub — so bleibt `index.html`
@@ -93,9 +102,8 @@ Der Forward-Fill im Dashboard bleibt als Fallback aktiv, alte Daten funktioniere
 ## Roadmap / weitere Ideen
 
 1. **Hub-Ausbau**: frei anordenbare Widgets, Schnellzugriffe, Kalender-/To-do-Integration
-2. **Klima-Langzeit-Ansicht**: archivierte D1-Tagesaggregate als Monats-/Jahres-Charts anzeigen
-3. **GPX**: Jahresziele, Heatmap aller Routen, Segmente/Bestzeiten
-4. **Cloudflare Access** statt Basic Auth (Login per E-Mail-Code)
+2. **GPX**: Jahresziele, Heatmap aller Routen, Segmente/Bestzeiten
+3. **Cloudflare Access** statt Basic Auth (Login per E-Mail-Code)
 
 ## Deployment
 

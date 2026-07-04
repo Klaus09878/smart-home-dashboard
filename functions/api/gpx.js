@@ -11,7 +11,10 @@ const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
 
 async function ensureSchema(db) {
-  await db.exec("CREATE TABLE IF NOT EXISTS gpx_activities (uid TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL, start_time INTEGER, dist_m REAL, total_sec REAL, moving_sec REAL, avg_speed REAL, max_speed REAL, elev_gain REAL, ele_min REAL, ele_max REAL, added_at INTEGER, points TEXT)");
+  await db.exec("CREATE TABLE IF NOT EXISTS gpx_activities (uid TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL, start_time INTEGER, dist_m REAL, total_sec REAL, moving_sec REAL, avg_speed REAL, max_speed REAL, elev_gain REAL, ele_min REAL, ele_max REAL, added_at INTEGER, updated_at INTEGER, deleted INTEGER DEFAULT 0, points TEXT)");
+  // Tabellen aus älteren Versionen nachrüsten (ALTER schlägt fehl, wenn Spalte existiert → ignorieren)
+  try { await db.exec("ALTER TABLE gpx_activities ADD COLUMN updated_at INTEGER"); } catch (e) { /* Spalte existiert */ }
+  try { await db.exec("ALTER TABLE gpx_activities ADD COLUMN deleted INTEGER DEFAULT 0"); } catch (e) { /* Spalte existiert */ }
 }
 
 function rowToActivity(row, withPoints) {
@@ -28,7 +31,9 @@ function rowToActivity(row, withPoints) {
     elevGain: row.elev_gain,
     eleMin: row.ele_min,
     eleMax: row.ele_max,
-    addedAt: row.added_at
+    addedAt: row.added_at,
+    updatedAt: row.updated_at,
+    deleted: !!row.deleted
   };
   if (withPoints && row.points) activity.points = JSON.parse(row.points);
   return activity;
@@ -49,9 +54,9 @@ export async function onRequest(context) {
       if (!row) return json({ error: 'Nicht gefunden' }, 404);
       return json(rowToActivity(row, true));
     }
-    // Liste ohne Punkte (leichtgewichtig für den Sync-Abgleich)
+    // Liste ohne Punkte, inkl. Tombstones (nötig für den Lösch-Abgleich)
     const { results } = await env.DB
-      .prepare('SELECT uid, name, type, start_time, dist_m, total_sec, moving_sec, avg_speed, max_speed, elev_gain, ele_min, ele_max, added_at FROM gpx_activities ORDER BY start_time DESC')
+      .prepare('SELECT uid, name, type, start_time, dist_m, total_sec, moving_sec, avg_speed, max_speed, elev_gain, ele_min, ele_max, added_at, updated_at, deleted FROM gpx_activities ORDER BY start_time DESC')
       .all();
     return json(results.map(r => rowToActivity(r, false)));
   }
@@ -59,8 +64,9 @@ export async function onRequest(context) {
   if (request.method === 'POST') {
     const a = await request.json();
     if (!a.uid || !Array.isArray(a.points)) return json({ error: 'uid und points erforderlich' }, 400);
+    // INSERT OR REPLACE mit deleted = 0: belebt auch Tombstones wieder (Undo)
     await env.DB
-      .prepare('INSERT OR REPLACE INTO gpx_activities (uid, name, type, start_time, dist_m, total_sec, moving_sec, avg_speed, max_speed, elev_gain, ele_min, ele_max, added_at, points) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .prepare('INSERT OR REPLACE INTO gpx_activities (uid, name, type, start_time, dist_m, total_sec, moving_sec, avg_speed, max_speed, elev_gain, ele_min, ele_max, added_at, updated_at, deleted, points) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)')
       .bind(
         a.uid,
         a.name || 'Aktivität',
@@ -75,6 +81,7 @@ export async function onRequest(context) {
         a.eleMin ?? null,
         a.eleMax ?? null,
         a.addedAt ?? Date.now(),
+        a.updatedAt ?? Date.now(),
         JSON.stringify(a.points)
       )
       .run();
@@ -85,8 +92,8 @@ export async function onRequest(context) {
     const a = await request.json();
     if (!a.uid) return json({ error: 'uid erforderlich' }, 400);
     await env.DB
-      .prepare('UPDATE gpx_activities SET name = COALESCE(?, name), type = COALESCE(?, type) WHERE uid = ?')
-      .bind(a.name ?? null, a.type ?? null, a.uid)
+      .prepare('UPDATE gpx_activities SET name = COALESCE(?, name), type = COALESCE(?, type), updated_at = ? WHERE uid = ?')
+      .bind(a.name ?? null, a.type ?? null, a.updatedAt ?? Date.now(), a.uid)
       .run();
     return json({ ok: true });
   }
@@ -94,7 +101,13 @@ export async function onRequest(context) {
   if (request.method === 'DELETE') {
     const uid = url.searchParams.get('uid');
     if (!uid) return json({ error: 'uid erforderlich' }, 400);
-    await env.DB.prepare('DELETE FROM gpx_activities WHERE uid = ?').bind(uid).run();
+    // Tombstone statt hartem Löschen: andere Geräte erfahren so von der
+    // Löschung und synchronisieren die Tour nicht wieder herein.
+    // Punkte werden entfernt, damit der Tombstone kaum Platz belegt.
+    await env.DB
+      .prepare('UPDATE gpx_activities SET deleted = 1, updated_at = ?, points = NULL WHERE uid = ?')
+      .bind(Date.now(), uid)
+      .run();
     return json({ ok: true });
   }
 

@@ -193,7 +193,8 @@
     </footer>
   </div>
 
-  <!-- Gemeinsame Helfer (Formatierer, Icons, API-Schicht, Push) -->
+  <!-- Getestete Kernlogik (Statistik, Geometrie) + gemeinsame Helfer -->
+  <script src="lib/core.js"></script>
   <script src="shared.js"></script>
 
   <script>
@@ -271,89 +272,8 @@
       return { name, points };
     }
 
-    // ============ Statistik-Berechnung ============
-    function haversine(lat1, lon1, lat2, lon2) {
-      const R = 6371000;
-      const toRad = d => d * Math.PI / 180;
-      const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-      return 2 * R * Math.asin(Math.sqrt(a));
-    }
-
-    function computeStats(points) {
-      let distM = 0, movingSec = 0, maxSpeed = 0;
-      const cumDist = [0];
-
-      for (let i = 1; i < points.length; i++) {
-        const d = haversine(points[i - 1][0], points[i - 1][1], points[i][0], points[i][1]);
-        distM += d;
-        cumDist.push(distM);
-
-        const t0 = points[i - 1][3], t1 = points[i][3];
-        if (t0 !== null && t1 !== null) {
-          const dt = (t1 - t0) / 1000;
-          // Pausen (>10 min Lücke) nicht als Bewegungszeit zählen
-          if (dt > 0 && dt < 600) {
-            const v = (d / dt) * 3.6;
-            if (v > 1.5) movingSec += dt;
-            // GPS-Ausreißer filtern: nur Segmente >= 3s und plausible Tempi
-            if (dt >= 3 && v < 250 && v > maxSpeed) maxSpeed = v;
-          }
-        }
-      }
-
-      // Höhenmeter: geglättete Serie (gleitendes Mittel), nur Anstiege > Rauschschwelle
-      const eles = points.map(p => p[2]).filter(e => e !== null);
-      let elevGain = null, eleMin = null, eleMax = null;
-      if (eles.length > points.length * 0.5) {
-        const smooth = [];
-        const win = 5;
-        const rawEles = points.map(p => p[2]);
-        for (let i = 0; i < rawEles.length; i++) {
-          let sum = 0, n = 0;
-          for (let j = Math.max(0, i - win); j <= Math.min(rawEles.length - 1, i + win); j++) {
-            if (rawEles[j] !== null) { sum += rawEles[j]; n++; }
-          }
-          smooth.push(n > 0 ? sum / n : null);
-        }
-        elevGain = 0;
-        let ref = null;
-        smooth.forEach(e => {
-          if (e === null) return;
-          if (ref === null) { ref = e; return; }
-          const delta = e - ref;
-          if (delta > 2) { elevGain += delta; ref = e; }
-          else if (delta < -2) { ref = e; }
-        });
-        eleMin = Math.min(...eles);
-        eleMax = Math.max(...eles);
-      }
-
-      const tStart = points[0][3], tEnd = points[points.length - 1][3];
-      const totalSec = (tStart !== null && tEnd !== null && tEnd > tStart) ? (tEnd - tStart) / 1000 : null;
-      const effMovingSec = movingSec > 0 ? movingSec : totalSec;
-      const avgSpeed = (effMovingSec && effMovingSec > 0) ? (distM / effMovingSec) * 3.6 : null;
-
-      return {
-        distM,
-        totalSec,
-        movingSec: movingSec > 0 ? movingSec : null,
-        avgSpeed,
-        maxSpeed: maxSpeed > 0 ? maxSpeed : null,
-        elevGain: elevGain !== null ? Math.round(elevGain) : null,
-        eleMin, eleMax,
-        cumDist,
-        startTime: tStart
-      };
-    }
-
-    function guessType(avgSpeed) {
-      if (avgSpeed === null || avgSpeed === undefined) return 'ride';
-      if (avgSpeed < 6.5) return 'walk';
-      if (avgSpeed < 13) return 'run';
-      if (avgSpeed < 42) return 'ride';
-      return 'moto';
-    }
+    // Statistik & Geometrie (haversine, computeStats, guessType, downsamplePoints)
+    // kommen aus lib/core.js (getestet via npm test).
 
     // ============ Formatierung ============
     const fmtDist = m => m >= 1000 ? `${(m / 1000).toFixed(m >= 100000 ? 0 : 1)} km` : `${Math.round(m)} m`;
@@ -413,12 +333,15 @@
     // Kernimport (auch direkt aufrufbar, z. B. für Tests)
     async function importGpxText(xmlText, fileName) {
       const { name, points } = parseGpx(xmlText, fileName);
+      // Statistik auf dem vollen Track berechnen, gespeichert wird ausgedünnt
+      // (max. 5000 Punkte), um IndexedDB/D1 vor Riesen-Tracks zu schützen.
       const stats = computeStats(points);
+      const storedPoints = downsamplePoints(points, 5000);
       const activity = {
         uid: genUid(),
         name,
         type: guessType(stats.avgSpeed),
-        points,
+        points: storedPoints,
         distM: stats.distM,
         totalSec: stats.totalSec,
         movingSec: stats.movingSec,
@@ -428,7 +351,8 @@
         eleMin: stats.eleMin,
         eleMax: stats.eleMax,
         startTime: stats.startTime,
-        addedAt: Date.now()
+        addedAt: Date.now(),
+        updatedAt: Date.now()
       };
       const localId = await dbPut(activity);
       // Automatisch in die Cloud-Datenbank schreiben (best effort)
@@ -457,8 +381,27 @@
         uid: a.uid, name: a.name, type: a.type, startTime: a.startTime,
         distM: a.distM, totalSec: a.totalSec, movingSec: a.movingSec,
         avgSpeed: a.avgSpeed, maxSpeed: a.maxSpeed, elevGain: a.elevGain,
-        eleMin: a.eleMin, eleMax: a.eleMax, addedAt: a.addedAt, points: a.points
+        eleMin: a.eleMin, eleMax: a.eleMax, addedAt: a.addedAt,
+        updatedAt: a.updatedAt || a.addedAt || Date.now(),
+        // Sicherheitsnetz für Alt-Bestände, die noch ungedrosselt gespeichert wurden
+        points: downsamplePoints(a.points, 5000)
       };
+    }
+
+    // ============ Lösch-Queue: Tombstones auch offline zuverlässig propagieren ============
+    function getPendingDeletes() {
+      try { return JSON.parse(localStorage.getItem('gpx_pending_deletes') || '[]'); }
+      catch (e) { return []; }
+    }
+    function setPendingDeletes(list) {
+      localStorage.setItem('gpx_pending_deletes', JSON.stringify(list));
+    }
+    function addPendingDelete(uid) {
+      const list = getPendingDeletes();
+      if (!list.includes(uid)) { list.push(uid); setPendingDeletes(list); }
+    }
+    function removePendingDelete(uid) {
+      setPendingDeletes(getPendingDeletes().filter(u => u !== uid));
     }
 
     async function pushActivityToCloud(activity) {
@@ -472,35 +415,70 @@
       }
     }
 
-    // Zwei-Wege-Abgleich: fehlende Touren vom Server holen, lokale hochladen
+    // Zwei-Wege-Abgleich mit Tombstones (Löschungen) und Meta-Reconcile
+    // (Name/Typ: neuerer updatedAt gewinnt, egal auf welchem Gerät geändert).
     async function syncWithCloud() {
       setCloudStatus('sync');
       try {
-        // Alt-Bestände ohne uid nachrüsten
+        // Alt-Bestände ohne uid/updatedAt nachrüsten
         for (const a of state.activities) {
-          if (!a.uid) { a.uid = genUid(); await dbPut(a); }
+          let dirty = false;
+          if (!a.uid) { a.uid = genUid(); dirty = true; }
+          if (!a.updatedAt) { a.updatedAt = a.addedAt || Date.now(); dirty = true; }
+          if (dirty) await dbPut(a);
         }
 
-        const serverList = await apiFetch('/api/gpx');
-        const localUids = new Set(state.activities.map(a => a.uid));
-        const serverUids = new Set(serverList.map(s => s.uid));
+        // 1) Ausstehende Löschungen zuerst propagieren
+        for (const uid of getPendingDeletes()) {
+          await apiFetch(`/api/gpx?uid=${encodeURIComponent(uid)}`, { method: 'DELETE' });
+          removePendingDelete(uid);
+        }
 
-        let pulled = 0;
+        // 2) Abgleich anhand der Server-Liste (enthält auch Tombstones)
+        const serverList = await apiFetch('/api/gpx');
+        const serverByUid = new Map(serverList.map(s => [s.uid, s]));
+        let changed = false;
+
         for (const s of serverList) {
-          if (!localUids.has(s.uid)) {
+          const local = state.activities.find(a => a.uid === s.uid);
+
+          if (s.deleted) {
+            // Tombstone: auf allen Geräten löschen
+            if (local) { await dbDelete(local.id); changed = true; }
+            continue;
+          }
+
+          if (!local) {
             const full = await apiFetch(`/api/gpx?uid=${encodeURIComponent(s.uid)}`);
             delete full.id;
             await dbPut(full);
-            pulled++;
+            changed = true;
+          } else if (s.name !== local.name || s.type !== local.type) {
+            const serverUpd = s.updatedAt || 0;
+            const localUpd = local.updatedAt || local.addedAt || 0;
+            if (serverUpd > localUpd) {
+              local.name = s.name;
+              local.type = s.type;
+              local.updatedAt = serverUpd;
+              await dbPut(local);
+              changed = true;
+            } else {
+              await apiFetch('/api/gpx', {
+                method: 'PUT',
+                body: JSON.stringify({ uid: local.uid, name: local.name, type: local.type, updatedAt: localUpd })
+              });
+            }
           }
         }
+
+        // 3) Lokale Aktivitäten hochladen, die dem Server fehlen
         for (const a of state.activities) {
-          if (!serverUids.has(a.uid)) {
+          if (!serverByUid.has(a.uid)) {
             await apiFetch('/api/gpx', { method: 'POST', body: JSON.stringify(activityToPayload(a)) });
           }
         }
 
-        if (pulled > 0) await refreshActivities();
+        if (changed) await refreshActivities();
         setCloudStatus('ok');
       } catch (err) {
         setCloudStatus(err.unavailable ? 'local' : 'error');
@@ -546,6 +524,8 @@
           if (a.uid && existingUids.has(a.uid)) continue; // Duplikate überspringen
           delete a.id; // neue lokale ID vergeben lassen
           if (!a.uid) a.uid = genUid();
+          if (!a.updatedAt) a.updatedAt = a.addedAt || Date.now();
+          a.points = downsamplePoints(a.points, 5000);
           await dbPut(a);
           restored++;
         }
@@ -863,9 +843,10 @@
       const act = state.activities.find(a => a.id === state.selectedId);
       if (!act) return;
       act.type = newType;
+      act.updatedAt = Date.now();
       await dbPut(act);
       if (act.uid && state.cloud === 'ok') {
-        apiFetch('/api/gpx', { method: 'PUT', body: JSON.stringify({ uid: act.uid, type: newType }) }).catch(() => {});
+        apiFetch('/api/gpx', { method: 'PUT', body: JSON.stringify({ uid: act.uid, type: newType, updatedAt: act.updatedAt }) }).catch(() => {});
       }
       renderActivityList();
       renderDetail(act);
@@ -877,9 +858,10 @@
       const newName = prompt('Neuer Name für diese Aktivität:', act.name);
       if (newName !== null && newName.trim() !== '') {
         act.name = newName.trim();
+        act.updatedAt = Date.now();
         await dbPut(act);
         if (act.uid && state.cloud === 'ok') {
-          apiFetch('/api/gpx', { method: 'PUT', body: JSON.stringify({ uid: act.uid, name: act.name }) }).catch(() => {});
+          apiFetch('/api/gpx', { method: 'PUT', body: JSON.stringify({ uid: act.uid, name: act.name, updatedAt: act.updatedAt }) }).catch(() => {});
         }
         renderActivityList();
         renderDetail(act);
@@ -891,13 +873,36 @@
       if (!act) return;
       if (!confirm(`„${act.name}" wirklich löschen?`)) return;
       await dbDelete(act.id);
-      if (act.uid && state.cloud === 'ok') {
-        apiFetch(`/api/gpx?uid=${encodeURIComponent(act.uid)}`, { method: 'DELETE' }).catch(() => {});
+
+      // Löschung für den Cloud-Sync vormerken (überlebt auch Offline-Phasen)
+      // und sofort zu propagieren versuchen
+      if (act.uid) {
+        addPendingDelete(act.uid);
+        apiFetch(`/api/gpx?uid=${encodeURIComponent(act.uid)}`, { method: 'DELETE' })
+          .then(() => removePendingDelete(act.uid))
+          .catch(() => {});
       }
+
       if (state.compareId === act.id) state.compareId = null;
       state.selectedId = null;
       await refreshActivities();
       if (state.activities.length > 0) selectActivity(state.activities[0].id);
+
+      // Undo anbieten: stellt lokal wieder her und belebt den Server-Eintrag
+      const backup = { ...act };
+      delete backup.id;
+      showToast(`„${act.name}" gelöscht.`, 'info', {
+        label: 'Rückgängig',
+        onClick: async () => {
+          if (backup.uid) removePendingDelete(backup.uid);
+          backup.updatedAt = Date.now();
+          await dbPut(backup);
+          pushActivityToCloud(backup);
+          await refreshActivities();
+          const restored = state.activities.find(a => a.uid === backup.uid);
+          if (restored) selectActivity(restored.id);
+        }
+      });
     }
 
     // ============ Init ============

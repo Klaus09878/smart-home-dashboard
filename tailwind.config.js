@@ -4,7 +4,8 @@
  */
 module.exports = {
   darkMode: 'class',
-  content: ['./index.html', './gpx.html', './shared.js'],
+  // Wichtig: auch JS-Dateien scannen — viele Klassen stehen in Template-Strings
+  content: ['./index.html', './gpx.html', './app.js', './shared.js'],
   theme: {
     extend: {
       fontFamily: {

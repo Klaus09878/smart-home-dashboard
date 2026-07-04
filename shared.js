@@ -31,6 +31,48 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// ============ Toast-Benachrichtigungen ============
+// showToast('Gespeichert!') · showToast('Fehler', 'error')
+// Mit Aktions-Button: showToast('Gelöscht.', 'info', { label: 'Rückgängig', onClick: () => {...} })
+function showToast(message, type = 'success', action = null, durationMs = 4000) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'fixed bottom-4 right-4 z-[2000] flex flex-col gap-2 items-end pointer-events-none';
+    document.body.appendChild(container);
+  }
+
+  const colors = {
+    success: 'border-teal-500/40 text-teal-100',
+    error: 'border-red-500/40 text-red-100',
+    info: 'border-slate-700 text-slate-100'
+  };
+
+  const toast = document.createElement('div');
+  toast.className = `glass-panel rounded-xl px-4 py-3 text-sm shadow-lg border ${colors[type] || colors.info} flex items-center gap-3 animate-fade-in max-w-sm pointer-events-auto`;
+
+  const span = document.createElement('span');
+  span.innerText = message;
+  toast.appendChild(span);
+
+  if (action && typeof action.onClick === 'function') {
+    const btn = document.createElement('button');
+    btn.className = 'px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700 hover:border-slate-500 text-xs font-semibold text-white transition-colors shrink-0';
+    btn.innerText = action.label || 'OK';
+    btn.onclick = () => { toast.remove(); action.onClick(); };
+    toast.appendChild(btn);
+    durationMs = Math.max(durationMs, 7000);
+  }
+
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.transition = 'opacity 0.3s';
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, durationMs);
+}
+
 // ============ API-Schicht (/api/* → Cloudflare Pages Functions) ============
 // Wirft Error mit .unavailable = true, wenn die API (noch) nicht eingerichtet
 // ist (404: Functions fehlen, 503: Env-Var/D1-Binding nicht konfiguriert).
