@@ -20,9 +20,10 @@
 
 // Koordinaten je Standort für den Außenwetter-Abruf (Open-Meteo) — nötig für
 // die serverseitige Schimmelrisiko-Prüfung. Entsprechen den Defaults in app.js.
+// tempField/humField: Feld-Zuordnung des ThingSpeak-Kanals (Schema wie LOCATIONS[].fields).
 const CHANNELS = {
-  gillian: { channel: '3417815', envKey: 'TS_KEY_GILLIAN', label: 'Gillian', lat: 48.7758, lon: 9.1829 },
-  sean:    { channel: '3417935', envKey: 'TS_KEY_SEAN',    label: 'Sean',    lat: 52.5200, lon: 13.4050 }
+  gillian: { channel: '3417815', envKey: 'TS_KEY_GILLIAN', label: 'Gillian', lat: 48.7758, lon: 9.1829, tempField: 'field1', humField: 'field2' },
+  sean:    { channel: '3417935', envKey: 'TS_KEY_SEAN',    label: 'Sean',    lat: 52.5200, lon: 13.4050, tempField: 'field1', humField: 'field2' }
 };
 
 const STALE_MS = 2 * 60 * 60 * 1000;
@@ -98,8 +99,8 @@ async function checkWeatherRisks(env, loc, feeds, report, locId) {
   }
 
   // ---- Schimmelrisiko: nur mit frischen, vollständigen Innenwerten ----
-  const temp = lastRealValue(feeds, 'field1');
-  const hum = lastRealValue(feeds, 'field2');
+  const temp = lastRealValue(feeds, loc.tempField || 'field1');
+  const hum = lastRealValue(feeds, loc.humField || 'field2');
   const now = Date.now();
   if (!temp || !hum || now - temp.ms > FRESH_MS || now - hum.ms > FRESH_MS) return;
 
@@ -152,8 +153,8 @@ export async function onRequestGet(context) {
       const data = await res.json();
       const feeds = (data && data.feeds) || [];
 
-      const lastTemp = lastRealValueTime(feeds, 'field1');
-      const lastHum = lastRealValueTime(feeds, 'field2');
+      const lastTemp = lastRealValueTime(feeds, loc.tempField || 'field1');
+      const lastHum = lastRealValueTime(feeds, loc.humField || 'field2');
       const problems = [];
       const fmt = ms => ms ? `${Math.round((Date.now() - ms) / 3600000)} h` : 'nie';
 

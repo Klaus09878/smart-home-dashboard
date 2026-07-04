@@ -355,6 +355,8 @@
           </div>
           <!-- Frost-/Hitzewarnung aus der Prognose (checkWeatherWarnings) -->
           <div id="weather-alert" class="hidden mt-2 text-[11px] font-semibold text-sky-300 flex items-center gap-1"></div>
+          <!-- Außenluft-Qualität (Open-Meteo Air-Quality, renderAirQuality) -->
+          <div id="air-quality-line" class="hidden mt-2 text-[11px] text-slate-400 flex items-center gap-1" title=""></div>
         </div>
 
       </section>
@@ -663,7 +665,7 @@
           <div class="overflow-x-auto">
             <table class="w-full text-left text-xs border-collapse">
               <thead>
-                <tr class="bg-slate-900/80 text-slate-400 border-b border-slate-800 font-medium">
+                <tr class="bg-slate-900/80 text-slate-400 border-b border-slate-800 font-medium" id="feed-table-head">
                   <th class="p-3">Zeitstempel</th>
                   <th class="p-3">Innentemp. (°C)</th>
                   <th class="p-3">Innenfeuchte (%)</th>

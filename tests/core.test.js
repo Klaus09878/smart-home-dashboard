@@ -196,6 +196,30 @@ test('processRawFeeds: leere/ungültige Felder werden ignoriert', () => {
   assert.strictEqual(aligned[0].temp, 20);
 });
 
+test('processRawFeeds: benutzerdefiniertes Feld-Mapping (n-Kanäle-Schema)', () => {
+  const feeds = [
+    { created_at: '2026-07-01T10:00:00Z', field3: '21,5', field7: '48', entry_id: 1 },
+    { created_at: '2026-07-01T10:05:00Z', field3: '22,0', field7: '50', entry_id: 2 }
+  ];
+  const { aligned } = core.processRawFeeds(feeds, { temp: 'field3', humidity: 'field7' });
+  assert.strictEqual(aligned.length, 2);
+  assert.strictEqual(aligned[0].temp, 21.5);
+  assert.strictEqual(aligned[1].humidity, 50);
+});
+
+test('processRawFeeds: Extra-Felder (z. B. CO₂) werden forward-gefüllt angehängt', () => {
+  const feeds = [
+    { created_at: '2026-07-01T10:00:00Z', field1: '21', field2: '50', entry_id: 1 },
+    { created_at: '2026-07-01T10:05:00Z', field1: '21', field2: '51', field3: '820', entry_id: 2 },
+    { created_at: '2026-07-01T10:10:00Z', field1: '22', field2: '52', entry_id: 3 }
+  ];
+  const { aligned } = core.processRawFeeds(feeds, { extra: [{ key: 'co2', field: 'field3' }] });
+  assert.strictEqual(aligned[0].co2, null);   // noch kein Wert
+  assert.strictEqual(aligned[1].co2, 820);
+  assert.strictEqual(aligned[2].co2, 820);    // forward-gefüllt
+  assert.strictEqual(aligned[2].temp, 22);    // Standard-Felder unverändert
+});
+
 console.log('lib/core.js – GPX');
 
 test('haversine: 1° Länge am Äquator ≈ 111,2 km', () => {

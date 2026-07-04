@@ -1,21 +1,32 @@
 // ClimateFlow Dashboard + Hub-Navigation.
 // Ausgelagert aus index.html; nutzt lib/core.js (getestete Kernlogik) und shared.js.
 
-// Configuration for both locations
+// Configuration for both locations.
+    // fields: generalisiertes Kanal-Schema (siehe processRawFeeds in lib/core.js).
+    // Ein späterer Zusatz-Sensor (z. B. CO₂ auf field3) wird rein per Konfiguration
+    // ergänzt: extra: [{ key: 'co2', field: 'field3', label: 'CO₂', unit: 'ppm', decimals: 0 }]
+    // → Wert erscheint automatisch in aligned-Einträgen, Rohdaten-Tabelle und CSV-Export.
     const LOCATIONS = [
       {
         id: 'gillian',
         defaultName: 'Schlafzimmer Gillian',
         thingspeakUrl: 'https://api.thingspeak.com/channels/3417815/feeds.json?api_key=79KYAS8DHBA01ZO2&results=8000',
-        defaultWeather: { lat: 48.7758, lon: 9.1829, name: 'Stuttgart, DE' }
+        defaultWeather: { lat: 48.7758, lon: 9.1829, name: 'Stuttgart, DE' },
+        fields: { temp: 'field1', humidity: 'field2', extra: [] }
       },
       {
         id: 'sean',
         defaultName: 'Schlafzimmer Sean',
         thingspeakUrl: 'https://api.thingspeak.com/channels/3417935/feeds.json?api_key=CTMDY1UODSQK7OJN&results=8000',
-        defaultWeather: { lat: 52.5200, lon: 13.4050, name: 'Berlin, DE' }
+        defaultWeather: { lat: 52.5200, lon: 13.4050, name: 'Berlin, DE' },
+        fields: { temp: 'field1', humidity: 'field2', extra: [] }
       }
     ];
+
+    function getLocationFields(locId) {
+      const loc = LOCATIONS.find(l => l.id === locId);
+      return (loc && loc.fields) || {};
+    }
 
     // Global State
     const appState = {
@@ -23,6 +34,7 @@
       isDemoMode: false,
       insideData: [],
       outsideData: {},
+      airQuality: null,
       weatherConfig: null,
       chartInstance: null,
       archiveChart: null,
@@ -337,7 +349,8 @@
       try {
         await Promise.all([
           loadIndoorData(),
-          loadOutdoorWeather()
+          loadOutdoorWeather(),
+          loadAirQuality()
         ]);
 
         renderActiveView();
@@ -390,7 +403,7 @@
 
         if (rawFeeds.length === 0) throw new Error('Keine Daten empfangen');
 
-        const processed = processRawFeeds(rawFeeds);
+        const processed = processRawFeeds(rawFeeds, activeLoc.fields);
         if (processed.aligned.length === 0) throw new Error('Keine gültigen abgeglichenen Daten gefunden');
 
         appState.feedCache[activeLoc.id] = { rawFeeds };
@@ -406,7 +419,7 @@
         if (hasCache) {
           // Aktualisierung fehlgeschlagen, aber Daten vorhanden → weiter mit Cache statt Demo-Modus
           console.warn('ThingSpeak-Refresh fehlgeschlagen, verwende zwischengespeicherte Daten:', err);
-          const processed = processRawFeeds(cache.rawFeeds);
+          const processed = processRawFeeds(cache.rawFeeds, activeLoc.fields);
           appState.insideData = processed.aligned;
           appState.lastSensorUpdate = { temp: processed.lastTempTime, humidity: processed.lastHumTime };
           showNotification('Aktualisierung fehlgeschlagen – zeige letzte bekannte Daten.', 'error');
@@ -439,6 +452,51 @@
         console.warn('Open-Meteo laden fehlgeschlagen, generiere Wetter-Dummy:', err);
         appState.outsideData = generateMockWeather();
       }
+    }
+
+    // Außenluft-Qualität (Open-Meteo Air-Quality-API, kostenlos, ohne Key):
+    // Europäischer AQI, Feinstaub, Ozon und Pollen. Best effort — ohne Daten
+    // bleibt die Anzeige leer und der Lüftungsberater arbeitet wie bisher.
+    async function loadAirQuality() {
+      try {
+        const conf = appState.weatherConfig;
+        if (!conf) { appState.airQuality = null; return; }
+        const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${conf.lat}&longitude=${conf.lon}&current=european_aqi,pm2_5,pm10,ozone,birch_pollen,grass_pollen&timezone=auto`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
+        const data = await res.json();
+        appState.airQuality = data && data.current ? data.current : null;
+      } catch (err) {
+        console.warn('Luftqualität laden fehlgeschlagen:', err);
+        appState.airQuality = null;
+      }
+    }
+
+    // Europäische AQI-Skala (https://airindex.eea.europa.eu): 0–20 gut … >100 extrem
+    function classifyAqi(aqi) {
+      if (aqi <= 20) return { label: 'Gut', cls: 'text-emerald-400' };
+      if (aqi <= 40) return { label: 'Okay', cls: 'text-teal-400' };
+      if (aqi <= 60) return { label: 'Mäßig', cls: 'text-amber-400' };
+      if (aqi <= 80) return { label: 'Schlecht', cls: 'text-orange-400' };
+      return { label: 'Sehr schlecht', cls: 'text-red-400' };
+    }
+
+    function renderAirQuality() {
+      const el = document.getElementById('air-quality-line');
+      if (!el) return;
+      const aq = appState.airQuality;
+      if (!aq || aq.european_aqi === null || aq.european_aqi === undefined) {
+        el.classList.add('hidden');
+        return;
+      }
+
+      const cls = classifyAqi(aq.european_aqi);
+      const pollenMax = Math.max(aq.birch_pollen || 0, aq.grass_pollen || 0);
+      const pollen = pollenMax >= 50 ? ' · Pollen: hoch' : pollenMax >= 20 ? ' · Pollen: mittel' : pollenMax > 0 ? ' · Pollen: niedrig' : '';
+      el.innerHTML = `<i data-lucide="leaf" class="w-3.5 h-3.5 inline"></i> Luftqualität: <span class="font-semibold ${cls.cls}">${cls.label}</span> (AQI ${Math.round(aq.european_aqi)})${pollen}`;
+      el.title = `Feinstaub PM2,5: ${aq.pm2_5 != null ? aq.pm2_5.toFixed(0) : '–'} µg/m³ · PM10: ${aq.pm10 != null ? aq.pm10.toFixed(0) : '–'} µg/m³ · Ozon: ${aq.ozone != null ? aq.ozone.toFixed(0) : '–'} µg/m³`;
+      el.classList.remove('hidden');
+      updateIcons();
     }
 
     function generateMockWeather() {
@@ -686,6 +744,11 @@
         } catch (e) {
           console.error('Fehler bei den Wetterwarnungen:', e);
         }
+        try {
+          renderAirQuality();
+        } catch (e) {
+          console.error('Fehler bei der Luftqualität:', e);
+        }
 
         // 4. Statistics 24h
         try {
@@ -833,6 +896,12 @@
         desc.innerText = 'Nahezu identische Feuchtigkeitswerte.';
         expl.innerText = `Die absolute Feuchtigkeit ist drinnen (${ahIn.toFixed(1)} g/m³) und draußen (${ahOut.toFixed(1)} g/m³) fast gleich. Lüften hat keinen Einfluss auf Feuchte.`;
         tip.innerText = 'Tipp: Lüfte bei Bedarf, um verbrauchte Luft gegen Frischluft auszutauschen.';
+      }
+
+      // Luftqualitäts-Hinweis (P8): Bei belasteter Außenluft ans knappe Lüften erinnern
+      const aq = appState.airQuality;
+      if (aq && aq.european_aqi !== null && aq.european_aqi !== undefined && aq.european_aqi > 60) {
+        tip.innerText += ` ⚠ Außenluft aktuell belastet (AQI ${Math.round(aq.european_aqi)}, ${classifyAqi(aq.european_aqi).label}) – nur kurz stoßlüften.`;
       }
     }
 
@@ -1396,7 +1465,7 @@
         rawFeeds = (data && Array.isArray(data.feeds)) ? data.feeds : [];
         appState.feedCache[other.id] = { rawFeeds };
       }
-      return processRawFeeds(rawFeeds).aligned;
+      return processRawFeeds(rawFeeds, other.fields).aligned;
     }
 
     function updateCompareButton() {
@@ -1435,14 +1504,35 @@
       arrow.style.transform = container.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
     }
 
-    // Populate data table
+    // Populate data table (Extra-Felder aus dem Kanal-Schema erscheinen als eigene Spalten)
     function populateTable(feeds) {
       const tbody = document.getElementById('feed-table-body');
       tbody.innerHTML = '';
       const latest = feeds.slice(-10).reverse();
+      const extras = getLocationFields(appState.activeLocId).extra || [];
+
+      // Kopfzeile dynamisch aufbauen, damit konfigurierte Zusatz-Sensoren
+      // (z. B. CO₂) ohne HTML-Änderung sichtbar werden
+      const thead = document.getElementById('feed-table-head');
+      if (thead) {
+        const extraTh = extras.map(e => `<th class="p-3">${escapeHtml(e.label || e.key)}${e.unit ? ` (${escapeHtml(e.unit)})` : ''}</th>`).join('');
+        thead.innerHTML = `
+          <th class="p-3">Zeitstempel</th>
+          <th class="p-3">Innentemp. (°C)</th>
+          <th class="p-3">Innenfeuchte (%)</th>
+          <th class="p-3">Abs. Feuchte (Drinnen)</th>
+          ${extraTh}
+          <th class="p-3 text-right">Eintrag-ID</th>
+        `;
+      }
 
       latest.forEach(feed => {
         const ah = getAbsoluteHumidity(feed.temp, feed.humidity);
+        const extraTds = extras.map(e => {
+          const v = feed[e.key];
+          const dec = e.decimals !== undefined ? e.decimals : 0;
+          return `<td class="p-3 text-slate-400">${v === null || v === undefined ? '–' : v.toFixed(dec)}</td>`;
+        }).join('');
         const row = document.createElement('tr');
         row.className = 'hover:bg-slate-900/40 text-slate-300 transition-colors';
         row.innerHTML = `
@@ -1450,6 +1540,7 @@
           <td class="p-3 text-orange-400 font-semibold">${feed.temp.toFixed(1)} °C</td>
           <td class="p-3 text-indigo-400 font-semibold">${feed.humidity.toFixed(0)} %</td>
           <td class="p-3 text-slate-400">${ah.toFixed(2)} g/m³</td>
+          ${extraTds}
           <td class="p-3 text-right font-mono text-slate-500">${feed.id}</td>
         `;
         tbody.appendChild(row);
@@ -1727,7 +1818,9 @@
       }
 
       const num = (v, d) => (v === null || v === undefined || isNaN(v)) ? '' : v.toFixed(d).replace('.', ',');
-      const header = ['Zeit (ISO)', 'Datum', 'Uhrzeit', 'Temperatur (°C)', 'Luftfeuchte (%)', 'Absolute Feuchte (g/m³)', 'Taupunkt (°C)', 'Eintrag-ID'];
+      const extras = getLocationFields(appState.activeLocId).extra || [];
+      const header = ['Zeit (ISO)', 'Datum', 'Uhrzeit', 'Temperatur (°C)', 'Luftfeuchte (%)', 'Absolute Feuchte (g/m³)', 'Taupunkt (°C)',
+        ...extras.map(e => `${e.label || e.key}${e.unit ? ` (${e.unit})` : ''}`), 'Eintrag-ID'];
       const rows = feeds.map(f => {
         const ah = getAbsoluteHumidity(f.temp, f.humidity);
         const dp = getDewPoint(f.temp, f.humidity);
@@ -1739,6 +1832,7 @@
           num(f.humidity, 0),
           num(ah, 2),
           num(dp, 1),
+          ...extras.map(e => num(f[e.key], e.decimals !== undefined ? e.decimals : 0)),
           f.id != null ? f.id : ''
         ].join(';');
       });
@@ -1901,7 +1995,7 @@
 
         try {
           const data = await fetchFeeds(loc, { results: 400 });
-          const processed = processRawFeeds((data && data.feeds) || []);
+          const processed = processRawFeeds((data && data.feeds) || [], loc.fields);
 
           // Sensor-Status-Punkt: grün wenn beide Felder frisch, sonst rot
           const dot = el('dot');
