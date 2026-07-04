@@ -287,4 +287,59 @@ test('downsamplePoints: kleine Tracks bleiben unverändert', () => {
   assert.strictEqual(core.downsamplePoints(points, 5000), points);
 });
 
+test('segmentSpeeds: konstantes Tempo, null ohne Zeitdaten', () => {
+  const t0 = Date.UTC(2026, 6, 1, 10, 0, 0);
+  // ~100 m pro 60 s ≈ 6 km/h
+  const points = [];
+  for (let i = 0; i < 5; i++) points.push([48.0 + i * 0.0009, 9.0, null, t0 + i * 60000]);
+  const speeds = core.segmentSpeeds(points);
+  assert.strictEqual(speeds.length, 4);
+  speeds.forEach(v => assert.ok(Math.abs(v - 6.0) < 0.3, `v=${v}`));
+  const noTime = core.segmentSpeeds([[48, 9, null, null], [48.001, 9, null, null]]);
+  assert.strictEqual(noTime[0], null);
+});
+
+test('computeStreaks: aktuelle und längste Serie', () => {
+  const days = ['2026-06-28', '2026-06-29', '2026-06-30', '2026-07-02', '2026-07-03', '2026-07-04'];
+  const s = core.computeStreaks(days, '2026-07-04');
+  assert.strictEqual(s.current, 3);  // 02.–04.
+  assert.strictEqual(s.longest, 3);
+  // heute nichts, gestern schon → Serie hält noch
+  const s2 = core.computeStreaks(['2026-07-02', '2026-07-03'], '2026-07-04');
+  assert.strictEqual(s2.current, 2);
+  // Lücke seit vorgestern → Serie gerissen
+  const s3 = core.computeStreaks(['2026-07-01'], '2026-07-04');
+  assert.strictEqual(s3.current, 0);
+  assert.strictEqual(s3.longest, 1);
+});
+
+test('routeCells/routeSimilarity: gleiche Strecke ~1, fremde Strecke ~0', () => {
+  const mk = offset => {
+    const pts = [];
+    for (let i = 0; i < 100; i++) pts.push([48.0 + i * 0.0005 + offset, 9.0 + i * 0.0003, null, null]);
+    return pts;
+  };
+  const a = core.routeCells(mk(0));
+  const b = core.routeCells(mk(0.0001));  // GPS-Streuung ~11 m
+  const c = core.routeCells(mk(0.05));    // ganz woanders (~5,5 km)
+  assert.ok(core.routeSimilarity(a, a) === 1);
+  assert.ok(core.routeSimilarity(a, b) > 0.6, `sim=${core.routeSimilarity(a, b)}`);
+  assert.ok(core.routeSimilarity(a, c) < 0.05, `sim=${core.routeSimilarity(a, c)}`);
+});
+
+test('buildGpxXml: gültiges GPX mit Punkten, Höhe, Zeit und escaptem Namen', () => {
+  const xml = core.buildGpxXml({
+    name: 'Tour <A> & B',
+    points: [[48.1, 9.2, 312.5, Date.UTC(2026, 6, 1, 10, 0, 0)], [48.2, 9.3, null, null]]
+  });
+  assert.ok(xml.startsWith('<?xml'));
+  assert.ok(xml.includes('lat="48.1" lon="9.2"'));
+  assert.ok(xml.includes('<ele>312.5</ele>'));
+  assert.ok(xml.includes('<time>2026-07-01T10:00:00.000Z</time>'));
+  assert.ok(xml.includes('Tour &lt;A&gt; &amp; B'));
+  assert.ok(!xml.includes('<ele></ele>'));
+  // zweiter Punkt ohne ele/time
+  assert.ok(xml.includes('<trkpt lat="48.2" lon="9.3"></trkpt>'));
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);

@@ -15,6 +15,8 @@ async function ensureSchema(db) {
   // Tabellen aus älteren Versionen nachrüsten (ALTER schlägt fehl, wenn Spalte existiert → ignorieren)
   try { await db.exec("ALTER TABLE gpx_activities ADD COLUMN updated_at INTEGER"); } catch (e) { /* Spalte existiert */ }
   try { await db.exec("ALTER TABLE gpx_activities ADD COLUMN deleted INTEGER DEFAULT 0"); } catch (e) { /* Spalte existiert */ }
+  try { await db.exec("ALTER TABLE gpx_activities ADD COLUMN note TEXT"); } catch (e) { /* Spalte existiert */ }
+  try { await db.exec("ALTER TABLE gpx_activities ADD COLUMN start_weather TEXT"); } catch (e) { /* Spalte existiert */ }
 }
 
 function rowToActivity(row, withPoints) {
@@ -33,7 +35,9 @@ function rowToActivity(row, withPoints) {
     eleMax: row.ele_max,
     addedAt: row.added_at,
     updatedAt: row.updated_at,
-    deleted: !!row.deleted
+    deleted: !!row.deleted,
+    note: row.note || null,
+    startWeather: row.start_weather ? JSON.parse(row.start_weather) : null
   };
   if (withPoints && row.points) activity.points = JSON.parse(row.points);
   return activity;
@@ -56,7 +60,7 @@ export async function onRequest(context) {
     }
     // Liste ohne Punkte, inkl. Tombstones (nötig für den Lösch-Abgleich)
     const { results } = await env.DB
-      .prepare('SELECT uid, name, type, start_time, dist_m, total_sec, moving_sec, avg_speed, max_speed, elev_gain, ele_min, ele_max, added_at, updated_at, deleted FROM gpx_activities ORDER BY start_time DESC')
+      .prepare('SELECT uid, name, type, start_time, dist_m, total_sec, moving_sec, avg_speed, max_speed, elev_gain, ele_min, ele_max, added_at, updated_at, deleted, note, start_weather FROM gpx_activities ORDER BY start_time DESC')
       .all();
     return json(results.map(r => rowToActivity(r, false)));
   }
@@ -66,7 +70,7 @@ export async function onRequest(context) {
     if (!a.uid || !Array.isArray(a.points)) return json({ error: 'uid und points erforderlich' }, 400);
     // INSERT OR REPLACE mit deleted = 0: belebt auch Tombstones wieder (Undo)
     await env.DB
-      .prepare('INSERT OR REPLACE INTO gpx_activities (uid, name, type, start_time, dist_m, total_sec, moving_sec, avg_speed, max_speed, elev_gain, ele_min, ele_max, added_at, updated_at, deleted, points) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)')
+      .prepare('INSERT OR REPLACE INTO gpx_activities (uid, name, type, start_time, dist_m, total_sec, moving_sec, avg_speed, max_speed, elev_gain, ele_min, ele_max, added_at, updated_at, deleted, note, start_weather, points) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?)')
       .bind(
         a.uid,
         a.name || 'Aktivität',
@@ -82,6 +86,8 @@ export async function onRequest(context) {
         a.eleMax ?? null,
         a.addedAt ?? Date.now(),
         a.updatedAt ?? Date.now(),
+        a.note ?? null,
+        a.startWeather ? JSON.stringify(a.startWeather) : null,
         JSON.stringify(a.points)
       )
       .run();
@@ -92,8 +98,8 @@ export async function onRequest(context) {
     const a = await request.json();
     if (!a.uid) return json({ error: 'uid erforderlich' }, 400);
     await env.DB
-      .prepare('UPDATE gpx_activities SET name = COALESCE(?, name), type = COALESCE(?, type), updated_at = ? WHERE uid = ?')
-      .bind(a.name ?? null, a.type ?? null, a.updatedAt ?? Date.now(), a.uid)
+      .prepare('UPDATE gpx_activities SET name = COALESCE(?, name), type = COALESCE(?, type), note = COALESCE(?, note), start_weather = COALESCE(?, start_weather), updated_at = ? WHERE uid = ?')
+      .bind(a.name ?? null, a.type ?? null, a.note ?? null, a.startWeather ? JSON.stringify(a.startWeather) : null, a.updatedAt ?? Date.now(), a.uid)
       .run();
     return json({ ok: true });
   }

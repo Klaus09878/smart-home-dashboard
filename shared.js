@@ -25,6 +25,23 @@ function formatRelativeTime(date) {
   return `am ${formatDate(date)} um ${formatTime(date)}`;
 }
 
+// Open-Meteo Weather-Code → deutsche Beschreibung (Dashboard + GPX-Start-Wetter)
+function getWeatherDescription(code) {
+  const codes = {
+    0: 'Klarer Himmel', 1: 'Hauptsächlich klar', 2: 'Teilweise bewölkt', 3: 'Bedeckt',
+    45: 'Nebel', 48: 'Ablagernder Reifnebel',
+    51: 'Leichter Nieselregen', 53: 'Mäßiger Nieselregen', 55: 'Dichter Nieselregen',
+    56: 'Leichter gefrierender Nieselregen', 57: 'Dichter gefrierender Nieselregen',
+    61: 'Leichter Regen', 63: 'Mäßiger Regen', 65: 'Starker Regen',
+    66: 'Leichter gefrierender Regen', 67: 'Starker gefrierender Regen',
+    71: 'Leichter Schneefall', 73: 'Mäßiger Schneefall', 75: 'Starker Schneefall', 77: 'Schneegriesel',
+    80: 'Leichte Regenschauer', 81: 'Mäßige Regenschauer', 82: 'Starke Regenschauer',
+    85: 'Leichte Schneeschauer', 86: 'Starke Schneeschauer',
+    95: 'Gewitter', 96: 'Gewitter mit leichtem Hagel', 99: 'Gewitter mit schwerem Hagel'
+  };
+  return codes[code] || 'Unbekannt';
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.innerText = str;
