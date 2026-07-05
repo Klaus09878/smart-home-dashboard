@@ -471,11 +471,22 @@
         <button onclick="reloadData()" id="reload-btn" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Daten aktualisieren">
           <i data-lucide="refresh-cw" class="w-4.5 h-4.5 transition-transform" id="reload-icon"></i>
         </button>
+
+        <!-- Karten anpassen (P14): Sichtbarkeit + Reihenfolge der ClimateFlow-Karten -->
+        <div class="relative">
+          <button onclick="toggleClimateSettings()" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Karten anpassen (ein-/ausblenden, ordnen)">
+            <i data-lucide="layout-grid" class="w-4.5 h-4.5"></i>
+          </button>
+          <div id="cf-settings" class="hidden absolute right-0 top-full mt-2 z-[500] glass-panel border border-slate-800 rounded-xl p-3 shadow-2xl w-64">
+            <p class="text-[10px] text-slate-500 uppercase font-semibold mb-2">Karten ein-/ausblenden &amp; ordnen</p>
+            <div id="cf-settings-list" class="flex flex-col gap-1.5 text-xs text-slate-300"></div>
+          </div>
+        </div>
       </div>
     </header>
 
     <!-- MAIN VIEW: LOCATION DETAILED DASHBOARD -->
-    <main class="flex-1 flex flex-col gap-6 animate-slide-up">
+    <main id="climate-cards" class="flex-1 flex flex-col gap-6 animate-slide-up">
       
       <!-- Current Location Info Header (Editable Name) -->
       <div class="flex items-center justify-between">
@@ -491,7 +502,7 @@
       </div>
 
       <!-- KPI Hero Section (3 Cards) -->
-      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <section data-widget="cf-kpi" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         
         <!-- Inside Temp Card -->
         <div class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md">
@@ -587,7 +598,7 @@
       </section>
 
       <!-- Advanced Analytics: Ventilation Advice + 24h Stats -->
-      <section class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <section data-widget="cf-analytics" class="grid grid-cols-1 lg:grid-cols-5 gap-6">
         
         <!-- Ventilation Advisor Card (Col span 3) -->
         <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col justify-between lg:col-span-3 min-h-[300px]">
@@ -831,7 +842,7 @@
       </section>
 
       <!-- Visualisation: Interactive Chart.js Section -->
-      <section class="glass-panel rounded-2xl p-6 shadow-lg">
+      <section data-widget="cf-chart" class="glass-panel rounded-2xl p-6 shadow-lg">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
             <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -872,7 +883,7 @@
       </section>
 
       <!-- Langzeit-Archiv: tägliche Aggregate aus Cloudflare D1 -->
-      <section class="glass-panel rounded-2xl shadow-lg transition-all duration-300">
+      <section data-widget="cf-archive" class="glass-panel rounded-2xl shadow-lg transition-all duration-300">
         <button onclick="toggleArchiveCollapse()" class="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none">
           <div class="flex items-center gap-2">
             <i data-lucide="database" class="w-5 h-5 text-teal-400"></i>
@@ -899,7 +910,7 @@
       </section>
 
       <!-- Collapsible Historical Feed Data Table -->
-      <section class="glass-panel rounded-2xl shadow-lg transition-all duration-300">
+      <section data-widget="cf-table" class="glass-panel rounded-2xl shadow-lg transition-all duration-300">
         <button onclick="toggleTableCollapse()" class="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none">
           <div class="flex items-center gap-2">
             <i data-lucide="list" class="w-5 h-5 text-indigo-400"></i>

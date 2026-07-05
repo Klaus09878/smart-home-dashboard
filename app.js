@@ -2032,106 +2032,125 @@
       calendar: 'Nächste Termine'
     };
 
-    function getWidgetOrder() {
-      let order = Store.getJSON('hub_widget_order', []);
-      if (!Array.isArray(order)) order = [];
-      const known = Object.keys(HUB_WIDGET_META);
-      order = order.filter(id => known.includes(id));
-      known.forEach(id => { if (!order.includes(id)) order.push(id); });
-      return order;
-    }
-
-    function getHiddenWidgets() {
-      const h = Store.getJSON('hub_widget_hidden', []);
-      return Array.isArray(h) ? h : [];
-    }
-
-    function applyWidgetLayout() {
-      const container = document.getElementById('hub-widgets');
-      if (!container) return;
-      const hidden = new Set(getHiddenWidgets());
-      getWidgetOrder().forEach(id => {
-        const el = container.querySelector(`[data-widget="${id}"]`);
-        if (!el) return;
-        container.appendChild(el); // ans Ende → ergibt die gespeicherte Reihenfolge
-        el.classList.toggle('hidden', hidden.has(id));
-      });
-    }
-
-    function saveWidgetOrder() {
-      const container = document.getElementById('hub-widgets');
-      if (!container) return;
-      const order = [...container.querySelectorAll('[data-widget]')].map(el => el.dataset.widget);
-      Store.setJSON('hub_widget_order', order);
-    }
-
-    function initWidgetDrag() {
-      const container = document.getElementById('hub-widgets');
-      if (!container) return;
-      container.querySelectorAll('[data-widget]').forEach(el => {
-        // Nur der Griff aktiviert das Ziehen — sonst stören Inputs/Textauswahl
-        const grip = el.querySelector('.widget-grip');
-        if (grip) {
-          grip.addEventListener('mousedown', () => { el.draggable = true; });
-          grip.addEventListener('touchstart', () => { el.draggable = true; }, { passive: true });
-        }
-        el.addEventListener('dragstart', e => {
-          e.dataTransfer.setData('text/plain', el.dataset.widget);
-          e.dataTransfer.effectAllowed = 'move';
-          el.classList.add('opacity-50');
+    // Wiederverwendbare Drag-&-Ausblend-Layout-Schicht (Hub + ClimateFlow).
+    // Reihenfolge/Sichtbarkeit pro Profil im Store; Interaktion wahlweise per
+    // Griff-Ziehen (Hub) oder per Pfeil-Buttons im Panel (ClimateFlow).
+    function createLayout(cfg) {
+      const getOrder = () => {
+        let o = Store.getJSON(cfg.orderKey, []);
+        if (!Array.isArray(o)) o = [];
+        const known = Object.keys(cfg.meta);
+        o = o.filter(id => known.includes(id));
+        known.forEach(id => { if (!o.includes(id)) o.push(id); });
+        return o;
+      };
+      const getHidden = () => { const h = Store.getJSON(cfg.hiddenKey, []); return Array.isArray(h) ? h : []; };
+      const apply = () => {
+        const c = document.getElementById(cfg.container);
+        if (!c) return;
+        const hidden = new Set(getHidden());
+        getOrder().forEach(id => {
+          const el = c.querySelector(`[data-widget="${id}"]`);
+          if (!el) return;
+          c.appendChild(el);
+          el.classList.toggle('hidden', hidden.has(id));
         });
-        el.addEventListener('dragend', () => {
-          el.classList.remove('opacity-50');
-          el.draggable = false;
-        });
-        el.addEventListener('dragover', e => e.preventDefault());
-        el.addEventListener('drop', e => {
-          e.preventDefault();
-          const draggedId = e.dataTransfer.getData('text/plain');
-          if (!draggedId || draggedId === el.dataset.widget) return;
-          const draggedEl = container.querySelector(`[data-widget="${draggedId}"]`);
-          if (!draggedEl) return;
-          // Vor oder hinter dem Ziel einfügen, je nach DOM-Position
-          const kids = [...container.querySelectorAll('[data-widget]')];
-          if (kids.indexOf(draggedEl) < kids.indexOf(el)) {
-            el.after(draggedEl);
-          } else {
-            el.before(draggedEl);
+      };
+      const saveOrder = () => {
+        const c = document.getElementById(cfg.container);
+        if (!c) return;
+        Store.setJSON(cfg.orderKey, [...c.querySelectorAll('[data-widget]')].map(el => el.dataset.widget));
+      };
+      const move = (id, dir) => {
+        const order = getOrder();
+        const i = order.indexOf(id), j = i + dir;
+        if (i < 0 || j < 0 || j >= order.length) return;
+        [order[i], order[j]] = [order[j], order[i]];
+        Store.setJSON(cfg.orderKey, order);
+        apply(); renderPanel();
+      };
+      const initDrag = () => {
+        const c = document.getElementById(cfg.container);
+        if (!c) return;
+        c.querySelectorAll('[data-widget]').forEach(el => {
+          const grip = el.querySelector('.' + (cfg.gripClass || 'widget-grip'));
+          if (grip) {
+            grip.addEventListener('mousedown', () => { el.draggable = true; });
+            grip.addEventListener('touchstart', () => { el.draggable = true; }, { passive: true });
           }
-          saveWidgetOrder();
+          el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', el.dataset.widget); e.dataTransfer.effectAllowed = 'move'; el.classList.add('opacity-50'); });
+          el.addEventListener('dragend', () => { el.classList.remove('opacity-50'); el.draggable = false; });
+          el.addEventListener('dragover', e => e.preventDefault());
+          el.addEventListener('drop', e => {
+            e.preventDefault();
+            const draggedId = e.dataTransfer.getData('text/plain');
+            if (!draggedId || draggedId === el.dataset.widget) return;
+            const dragged = c.querySelector(`[data-widget="${draggedId}"]`);
+            if (!dragged) return;
+            const kids = [...c.querySelectorAll('[data-widget]')];
+            if (kids.indexOf(dragged) < kids.indexOf(el)) el.after(dragged); else el.before(dragged);
+            saveOrder();
+          });
         });
-      });
-    }
-
-    function toggleWidgetSettings() {
-      const panel = document.getElementById('widget-settings');
-      if (!panel) return;
-      if (panel.classList.contains('hidden')) {
-        const hidden = new Set(getHiddenWidgets());
-        const list = document.getElementById('widget-settings-list');
+      };
+      const renderPanel = () => {
+        const list = document.getElementById(cfg.panelList);
+        if (!list) return;
+        const hidden = new Set(getHidden());
+        const order = getOrder();
         list.innerHTML = '';
-        Object.entries(HUB_WIDGET_META).forEach(([id, label]) => {
-          const row = document.createElement('label');
-          row.className = 'flex items-center gap-2 cursor-pointer hover:text-white transition-colors';
+        order.forEach((id, idx) => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-2 justify-between';
+          const lbl = document.createElement('label');
+          lbl.className = 'flex items-center gap-2 cursor-pointer hover:text-white transition-colors min-w-0';
           const cb = document.createElement('input');
-          cb.type = 'checkbox';
-          cb.checked = !hidden.has(id);
-          cb.className = 'accent-teal-500';
+          cb.type = 'checkbox'; cb.checked = !hidden.has(id); cb.className = 'accent-teal-500 shrink-0';
           cb.onchange = () => {
-            const h = new Set(getHiddenWidgets());
+            const h = new Set(getHidden());
             if (cb.checked) h.delete(id); else h.add(id);
-            Store.setJSON('hub_widget_hidden', [...h]);
-            applyWidgetLayout();
+            Store.setJSON(cfg.hiddenKey, [...h]);
+            apply();
           };
-          row.appendChild(cb);
-          row.appendChild(document.createTextNode(label));
+          lbl.appendChild(cb);
+          lbl.appendChild(document.createTextNode(cfg.meta[id]));
+          row.appendChild(lbl);
+          if (cfg.reorderButtons) {
+            const btns = document.createElement('div');
+            btns.className = 'flex gap-0.5 shrink-0';
+            const up = document.createElement('button'); up.innerText = '▲'; up.className = 'px-1 text-slate-500 hover:text-white disabled:opacity-20'; up.disabled = idx === 0; up.onclick = () => move(id, -1);
+            const dn = document.createElement('button'); dn.innerText = '▼'; dn.className = 'px-1 text-slate-500 hover:text-white disabled:opacity-20'; dn.disabled = idx === order.length - 1; dn.onclick = () => move(id, 1);
+            btns.append(up, dn); row.appendChild(btns);
+          }
           list.appendChild(row);
         });
-        panel.classList.remove('hidden');
-      } else {
-        panel.classList.add('hidden');
-      }
+      };
+      const toggleSettings = () => {
+        const panel = document.getElementById(cfg.panel);
+        if (!panel) return;
+        if (panel.classList.contains('hidden')) { renderPanel(); panel.classList.remove('hidden'); }
+        else panel.classList.add('hidden');
+      };
+      return { apply, initDrag, toggleSettings, saveOrder, getOrder, getHidden, renderPanel, move };
     }
+
+    // Hub-Layout (Griff-Ziehen) — Wrapper erhalten die bestehenden onclick-Handler
+    const hubLayout = createLayout({ container: 'hub-widgets', meta: HUB_WIDGET_META, orderKey: 'hub_widget_order', hiddenKey: 'hub_widget_hidden', panel: 'widget-settings', panelList: 'widget-settings-list', gripClass: 'widget-grip' });
+    function applyWidgetLayout() { hubLayout.apply(); }
+    function initWidgetDrag() { hubLayout.initDrag(); }
+    function toggleWidgetSettings() { hubLayout.toggleSettings(); }
+
+    // ClimateFlow-Layout (P14): Karten aus-/einblenden + per Pfeil ordnen
+    const CF_CARD_META = {
+      'cf-kpi': 'Messwerte & Wetter',
+      'cf-analytics': 'Lüftungsberater & 24h-Statistik',
+      'cf-chart': 'Klimaverlauf',
+      'cf-archive': 'Langzeit-Archiv',
+      'cf-table': 'Rohdaten-Tabelle'
+    };
+    const climateLayout = createLayout({ container: 'climate-cards', meta: CF_CARD_META, orderKey: 'cf_order', hiddenKey: 'cf_hidden', panel: 'cf-settings', panelList: 'cf-settings-list', reorderButtons: true });
+    function applyClimateLayout() { climateLayout.apply(); }
+    function toggleClimateSettings() { climateLayout.toggleSettings(); }
 
     // ============ Hub-Widget: To-do-Liste 2.0 (P12) ============
     // Lokal-first (Store 'hub_todos') mit D1-Sync (/api/todos), Fälligkeiten,
@@ -2869,6 +2888,7 @@
 
       // Klimadaten erst beim ersten Öffnen des Dashboards laden (Performance)
       if (view === 'climate') {
+        applyClimateLayout(); // gespeicherte Karten-Reihenfolge/-Sichtbarkeit
         if (!appState.climateLoaded) {
           appState.climateLoaded = true;
           reloadData();
@@ -3004,13 +3024,15 @@
       applyWidgetLayout();
       initWidgetDrag();
 
-      // Widget-Einstellungs-Popover bei Klick außerhalb schließen
+      // Einstellungs-Popover bei Klick außerhalb schließen (Hub + ClimateFlow)
       document.addEventListener('click', event => {
-        const panel = document.getElementById('widget-settings');
-        if (panel && !panel.classList.contains('hidden') &&
-            !panel.contains(event.target) && !event.target.closest('button[onclick="toggleWidgetSettings()"]')) {
-          panel.classList.add('hidden');
-        }
+        [['widget-settings', 'toggleWidgetSettings()'], ['cf-settings', 'toggleClimateSettings()']].forEach(([panelId, handler]) => {
+          const panel = document.getElementById(panelId);
+          if (panel && !panel.classList.contains('hidden') &&
+              !panel.contains(event.target) && !event.target.closest(`button[onclick="${handler}"]`)) {
+            panel.classList.add('hidden');
+          }
+        });
       });
 
       window.addEventListener('hashchange', handleRoute);
