@@ -62,6 +62,14 @@ export async function onRequestGet(context) {
     return json({ error: 'Kein ntfy-Empfänger konfiguriert (weder Profil-Topic in D1 noch NTFY_TOPIC)' }, 503);
   }
 
+  // Heartbeat für die System-Diagnose (/api/health): belegt, dass der Cron läuft
+  if (env.DB) {
+    try {
+      await env.DB.exec("CREATE TABLE IF NOT EXISTS alert_state (key TEXT PRIMARY KEY, last_sent INTEGER)");
+      await env.DB.prepare('INSERT OR REPLACE INTO alert_state (key, last_sent) VALUES (?, ?)').bind('cron_heartbeat', Date.now()).run();
+    } catch (e) { /* Heartbeat ist best effort */ }
+  }
+
   const report = { checkedAt: new Date().toISOString(), recipients: recipients.map(r => r.profile), locations: {}, notified: [] };
   const now = Date.now();
 

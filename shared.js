@@ -164,6 +164,12 @@ function reportRuntimeError(kind, message) {
       'rotating_light',
       `err_${hash}`
     );
+    // Zusätzlich serverseitig protokollieren (System-Seite), best effort
+    fetch('/api/error-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page: `${location.pathname}${location.hash}`, message: `${kind}: ${msg}` })
+    }).catch(() => {});
   } catch (e) { /* Fehler-Reporting darf selbst nie werfen */ }
 }
 window.addEventListener('error', e => reportRuntimeError('Fehler', e.message));
