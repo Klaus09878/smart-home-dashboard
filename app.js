@@ -33,6 +33,7 @@
       insideData: [],
       outsideData: {},
       airQuality: null,
+      hourlyWeather: null,
       weatherConfig: null,
       chartInstance: null,
       archiveChart: null,
@@ -1911,6 +1912,7 @@
     }
 
     function drawArchiveChart(rows) {
+      appState.archiveRows = rows; // für den Tages-Detail-Klick (Punkt 21)
       const ctx = document.getElementById('archiveChart').getContext('2d');
       const labels = rows.map(r => {
         const parts = r.day.split('-');
@@ -1934,6 +1936,7 @@
           responsive: true,
           maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
+          onClick: (evt, els) => { if (els && els.length) showArchiveDayDetail(els[0].index); },
           plugins: {
             legend: { display: true, labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12 } },
             tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.95)', titleColor: '#f8fafc', bodyColor: '#cbd5e1' }
@@ -1948,6 +1951,51 @@
 
       if (appState.archiveChart) appState.archiveChart.destroy();
       appState.archiveChart = new Chart(ctx, config);
+    }
+
+    // Tagesdetail beim Klick auf einen Archiv-Tag (Punkt 21): Werte + Komfort +
+    // Vergleich „dieser Tag vor einem Jahr".
+    function showArchiveDayDetail(index) {
+      const rows = appState.archiveRows || [];
+      const r = rows[index];
+      if (!r) return;
+      const th = getThresholds();
+      const num = (v, d = 1, u = '') => (v == null || isNaN(v)) ? '–' : `${v.toFixed(d).replace('.', ',')}${u}`;
+      const score = comfortScore(r.t_avg, r.h_avg, null, th);
+      const d = new Date(`${r.day}T12:00:00`);
+      const dayLabel = d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+
+      // gleicher Tag im Vorjahr
+      const p = r.day.split('-');
+      const lastYearDay = `${+p[0] - 1}-${p[1]}-${p[2]}`;
+      const ly = rows.find(x => x.day === lastYearDay);
+      const cmp = ly
+        ? `<div class="mt-3 pt-3 border-t border-slate-800/60 text-xs text-slate-400">Vor einem Jahr (${lastYearDay}): Ø ${num(ly.t_avg, 1, ' °C')}, Feuchte ${num(ly.h_avg, 0, ' %')}, Komfort ${comfortScore(ly.t_avg, ly.h_avg, null, th) ?? '–'}/100.</div>`
+        : '';
+
+      const overlay = document.createElement('div');
+      overlay.className = 'fixed inset-0 z-[1700] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in';
+      overlay.innerHTML = `
+        <div class="glass-panel rounded-2xl p-6 shadow-2xl w-full max-w-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-base font-bold text-white">${dayLabel}</h3>
+            <button data-x class="p-1.5 rounded-lg text-slate-500 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2"><p class="text-[10px] text-slate-500 uppercase">Temp Ø</p><p class="text-sm font-bold text-white">${num(r.t_avg, 1, ' °C')}</p></div>
+            <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2"><p class="text-[10px] text-slate-500 uppercase">Min/Max</p><p class="text-sm font-bold text-white">${num(r.t_min, 0)}/${num(r.t_max, 0)}°</p></div>
+            <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2"><p class="text-[10px] text-slate-500 uppercase">Feuchte Ø</p><p class="text-sm font-bold text-indigo-400">${num(r.h_avg, 0, ' %')}</p></div>
+          </div>
+          <div class="mt-2 text-center"><span class="text-xs text-slate-400">Komfort-Score: </span><span class="text-sm font-bold text-emerald-400">${score ?? '–'}/100</span>${r.samples ? ` <span class="text-[10px] text-slate-500">· ${r.samples} Messungen</span>` : ''}</div>
+          ${cmp}
+        </div>`;
+      const close = () => { document.removeEventListener('keydown', onKey); overlay.remove(); };
+      const onKey = e => { if (e.key === 'Escape') close(); };
+      overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+      overlay.querySelector('[data-x]').onclick = close;
+      document.addEventListener('keydown', onKey);
+      document.body.appendChild(overlay);
+      updateIcons();
     }
 
     // ============ Push-Benachrichtigungen (ntfy.sh) ============
@@ -2277,14 +2325,30 @@
       return 2e15 + (t.createdAt || 0);
     }
 
+    // Farbe aus dem Kategorienamen ableiten (stabil, Punkt 19)
+    const TODO_COLORS = ['#f97316', '#14b8a6', '#6366f1', '#ec4899', '#eab308', '#22c55e', '#0ea5e9'];
+    function categoryColor(cat) {
+      if (!cat) return null;
+      let hash = 0;
+      for (let i = 0; i < cat.length; i++) hash = (hash * 31 + cat.charCodeAt(i)) | 0;
+      return TODO_COLORS[Math.abs(hash) % TODO_COLORS.length];
+    }
+    function endOfToday() { const d = new Date(); d.setHours(23, 59, 59, 999); return d.getTime(); }
+
     function renderTodos() {
       const listEl = document.getElementById('todo-list');
       const countEl = document.getElementById('todo-count');
       if (!listEl) return;
-      const todos = getTodos().filter(t => !t.deleted).sort((a, b) => todoSortKey(a) - todoSortKey(b));
+      // Manuelle Position (falls gesetzt) zuerst, sonst die smarte Sortierung
+      const todos = getTodos().filter(t => !t.deleted).sort((a, b) => {
+        const pa = a.pos || 1e6, pb = b.pos || 1e6;
+        return pa !== pb ? pa - pb : todoSortKey(a) - todoSortKey(b);
+      });
       const open = todos.filter(t => !t.done).length;
       const overdue = todos.filter(t => !t.done && t.dueMs && t.dueMs < Date.now()).length;
-      if (countEl) countEl.innerText = todos.length ? `${open} offen${overdue ? ` · ${overdue} überfällig` : ''}` : '';
+      const todayEnd = endOfToday();
+      const dueToday = todos.filter(t => !t.done && t.dueMs && t.dueMs <= todayEnd && t.dueMs >= Date.now()).length;
+      if (countEl) countEl.innerText = todos.length ? `${open} offen${overdue ? ` · ${overdue} überfällig` : ''}${dueToday ? ` · ${dueToday} heute` : ''}` : '';
 
       listEl.innerHTML = '';
       if (todos.length === 0) {
@@ -2301,6 +2365,16 @@
         cb.checked = !!t.done;
         cb.className = 'accent-teal-500 shrink-0 cursor-pointer';
         cb.onchange = () => toggleTodo(t.id, cb.checked);
+
+        // Kategorie-Farbpunkt (Punkt 19)
+        const catColor = categoryColor(t.category);
+        if (catColor) {
+          const dot = document.createElement('span');
+          dot.className = 'w-1.5 h-1.5 rounded-full shrink-0';
+          dot.style.backgroundColor = catColor;
+          dot.title = t.category;
+          row.appendChild(dot);
+        }
 
         const mid = document.createElement('div');
         mid.className = 'flex-1 min-w-0';
@@ -2373,15 +2447,21 @@
         title: 'To-do bearbeiten',
         description: t.text,
         fields: [
+          { key: 'text', label: 'Text', value: t.text },
           { key: 'due', label: 'Fällig am', type: 'date', value: t.dueMs ? new Date(t.dueMs).toISOString().substring(0, 10) : '' },
           { key: 'repeat', label: 'Wiederholung alle X Tage (0 = keine)', type: 'number', value: t.repeatDays || 0 },
+          { key: 'category', label: 'Kategorie (optional, für Farbe)', value: t.category || '', placeholder: 'Haushalt' },
+          { key: 'pos', label: 'Position (0 = automatisch)', type: 'number', value: t.pos || 0 },
           { key: 'shared', label: 'Gemeinsam (für alle Profile sichtbar)', type: 'checkbox', value: !!t.shared }
         ],
         submitLabel: 'Speichern'
       });
       if (vals === null) return;
+      if (vals.text.trim()) t.text = vals.text.trim();
       t.dueMs = vals.due ? new Date(`${vals.due}T09:00:00`).getTime() : null;
       t.repeatDays = Math.max(0, parseInt(vals.repeat, 10) || 0) || null;
+      t.category = vals.category.trim() || null;
+      t.pos = Math.max(0, parseInt(vals.pos, 10) || 0) || null;
       t.shared = !!vals.shared;
       touchTodo(t);
       saveTodos(list);
@@ -2420,30 +2500,80 @@
       if (!el || !appState.weatherConfig) return;
       try {
         const conf = appState.weatherConfig;
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&daily=temperature_2m_max,temperature_2m_min,weather_code&forecast_days=3&timezone=auto`;
+        // Zusätzlich stündlich Temperatur + Regenwahrscheinlichkeit (Punkt 18)
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&daily=temperature_2m_max,temperature_2m_min,weather_code&hourly=temperature_2m,precipitation_probability,weather_code&forecast_days=3&timezone=auto&timeformat=unixtime`;
         const res = await fetch(url);
         if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
-        const daily = (await res.json()).daily;
+        const data = await res.json();
+        const daily = data.daily;
         if (!daily || !daily.time) throw new Error('keine Tagesdaten');
+        appState.hourlyWeather = data.hourly || null;
 
         el.innerHTML = '';
         daily.time.forEach((day, i) => {
           const label = i === 0 ? 'Heute' : new Date(`${day}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short' });
           const cell = document.createElement('div');
-          cell.className = 'bg-slate-900/60 border border-slate-800/60 rounded-xl p-2 text-center';
-          cell.title = getWeatherDescription(daily.weather_code[i]);
+          cell.className = 'bg-slate-900/60 border border-slate-800/60 rounded-xl p-2 text-center cursor-pointer hover:border-slate-700 transition-colors';
+          cell.title = getWeatherDescription(daily.weather_code[i]) + ' — für Stunden antippen';
           cell.innerHTML = `
             <p class="text-[10px] text-slate-500 font-semibold">${label}</p>
             <i data-lucide="${weatherIconFor(daily.weather_code[i])}" class="w-4 h-4 mx-auto my-1 text-teal-400"></i>
             <p class="text-[11px] text-slate-200 font-semibold">${Math.round(daily.temperature_2m_max[i])}°<span class="text-slate-500 font-normal"> / ${Math.round(daily.temperature_2m_min[i])}°</span></p>
           `;
+          cell.onclick = () => showHourlyForecast(i);
           el.appendChild(cell);
         });
+        renderRainHint();
         updateIcons();
       } catch (err) {
         console.warn('Hub-Vorschau fehlgeschlagen:', err);
         el.innerHTML = '<p class="text-xs text-slate-500 col-span-3">Vorschau nicht verfügbar.</p>';
       }
+    }
+
+    // Stunden-Leiste für einen Tag im Vorschau-Widget (Punkt 18)
+    function showHourlyForecast(dayIndex) {
+      const box = document.getElementById('hub-hourly');
+      const h = appState.hourlyWeather;
+      if (!box || !h || !h.time) return;
+      const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0); dayStart.setDate(dayStart.getDate() + dayIndex);
+      const from = dayStart.getTime(), to = from + 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      const cells = [];
+      h.time.forEach((ts, i) => {
+        const ms = ts * 1000;
+        if (ms < from || ms >= to) return;
+        if (dayIndex === 0 && ms < now - 3600000) return; // vergangene Stunden heute überspringen
+        const hr = new Date(ms).getHours();
+        const pop = h.precipitation_probability ? h.precipitation_probability[i] : null;
+        cells.push(`<div class="flex flex-col items-center gap-0.5 shrink-0 w-9">
+          <span class="text-[9px] text-slate-500">${hr}h</span>
+          <i data-lucide="${weatherIconFor(h.weather_code ? h.weather_code[i] : 0)}" class="w-3.5 h-3.5 text-teal-400"></i>
+          <span class="text-[10px] text-slate-200">${Math.round(h.temperature_2m[i])}°</span>
+          <span class="text-[9px] ${pop >= 50 ? 'text-blue-400 font-semibold' : 'text-slate-600'}">${pop != null ? pop + '%' : ''}</span>
+        </div>`);
+      });
+      box.innerHTML = `<div class="flex gap-1 overflow-x-auto pt-2 mt-2 border-t border-slate-800/60">${cells.join('')}</div>`;
+      box.classList.remove('hidden');
+      updateIcons();
+    }
+
+    // Regenhinweis: nächster Regen in den kommenden ~12 h (Punkt 18)
+    function renderRainHint() {
+      const el = document.getElementById('hub-rain-hint');
+      const h = appState.hourlyWeather;
+      if (!el || !h || !h.time || !h.precipitation_probability) { if (el) el.classList.add('hidden'); return; }
+      const now = Date.now();
+      let hit = null;
+      for (let i = 0; i < h.time.length; i++) {
+        const ms = h.time[i] * 1000;
+        if (ms < now || ms > now + 12 * 3600000) continue;
+        if (h.precipitation_probability[i] >= 60) { hit = { ms, pop: h.precipitation_probability[i] }; break; }
+      }
+      if (!hit) { el.classList.add('hidden'); return; }
+      const t = new Date(hit.ms).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      el.innerHTML = `<i data-lucide="cloud-rain" class="w-3.5 h-3.5 inline text-blue-400"></i> Regen wahrscheinlich gegen ${t} Uhr (${hit.pop} %).`;
+      el.classList.remove('hidden');
     }
 
     // ============ Hub-Widget: Kalender (.ics über /api/ical) ============
@@ -2469,34 +2599,54 @@
       loadHubCalendar(true);
     }
 
+    // Einen .ics-Feed laden und zu konkreten Terminen im Fenster auflösen.
+    async function fetchIcalEvents(url, fromMs, toMs) {
+      const res = await fetch(`/api/ical?url=${encodeURIComponent(url)}`);
+      if (res.status === 404 || res.status === 503 || res.status === 405) { const e = new Error('proxy'); e.unavailable = true; throw e; }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return expandRecurring(parseIcsEvents(await res.text()), fromMs, toMs);
+    }
+
+    // Kalender-Widget: bis zu zwei Feeds (Farbpunkt je Kalender), Punkt 17.
     async function loadHubCalendar(force = false) {
       const el = document.getElementById('hub-cal-list');
       if (!el) return;
-      const url = Store.get('ical_url');
-      if (!url) {
+      const url1 = Store.get('ical_url');
+      const url2 = Store.get('ical_url2');
+      if (!url1 && !url2) {
         el.innerHTML = 'Kein Kalender verbunden — über das Zahnrad eine .ics-URL hinterlegen (z. B. Google Kalender „geheime Adresse").';
         return;
       }
 
+      const now = Date.now();
+      const from = now - 24 * 60 * 60 * 1000;
+      const horizon = now + 14 * 24 * 60 * 60 * 1000;
+      const colors = ['bg-orange-400', 'bg-indigo-400'];
+      const feeds = [url1, url2].filter(Boolean);
+
       try {
-        const res = await fetch(`/api/ical?url=${encodeURIComponent(url)}`);
-        if (res.status === 404 || res.status === 503 || res.status === 405) {
+        let all = [];
+        let proxyMissing = false;
+        for (let i = 0; i < feeds.length; i++) {
+          try {
+            const evs = await fetchIcalEvents(feeds[i], from, horizon);
+            evs.forEach(e => all.push({ ...e, cal: i }));
+          } catch (err) {
+            if (err.unavailable) proxyMissing = true; else throw err;
+          }
+        }
+        if (proxyMissing && all.length === 0) {
           el.innerHTML = 'Kalender-Proxy (/api/ical) noch nicht deployt — erscheint nach dem nächsten Cloudflare-Deploy automatisch.';
           return;
         }
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `HTTP ${res.status}`);
-        }
-        const events = parseIcsEvents(await res.text());
 
-        const now = Date.now();
-        const from = now - 24 * 60 * 60 * 1000;
-        const horizon = now + 14 * 24 * 60 * 60 * 1000;
-        // Serientermine (RRULE) werden zu konkreten Terminen aufgelöst
-        const upcoming = expandRecurring(events, from, horizon)
+        const upcoming = all
           .filter(e => e.startMs >= now - (e.allDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000))
-          .slice(0, 5);
+          .sort((a, b) => a.startMs - b.startMs)
+          .slice(0, 6);
 
         if (upcoming.length === 0) {
           el.innerHTML = 'Keine Termine in den nächsten 14 Tagen.';
@@ -2509,7 +2659,9 @@
           const dayLabel = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
           const row = document.createElement('div');
           row.className = 'flex items-center gap-2';
+          const dot = feeds.length > 1 ? `<span class="w-1.5 h-1.5 rounded-full shrink-0 ${colors[e.cal] || colors[0]}"></span>` : '';
           row.innerHTML = `
+            ${dot}
             <span class="shrink-0 w-20 text-[10px] font-semibold text-orange-300">${dayLabel}${e.allDay ? '' : ` ${formatTime(d)}`}</span>
             <span class="flex-1 min-w-0 truncate text-slate-300">${escapeHtml(e.summary || '(ohne Titel)')}${e.recurring ? ' ↻' : ''}</span>
           `;
@@ -2711,6 +2863,7 @@
       { key: 'mold',    label: 'Schimmelrisiko',      icon: 'droplet',   thLabel: 'Grenze %',  thDef: 80 },
       { key: 'frost',   label: 'Frost',               icon: 'snowflake', thLabel: 'Grenze °C', thDef: 0 },
       { key: 'heat',    label: 'Hitze',               icon: 'flame',     thLabel: 'Grenze °C', thDef: 30 },
+      { key: 'vent',    label: 'Lüftungsfenster (morgens)', icon: 'wind' },
       { key: 'errors',  label: 'App-Fehler',          icon: 'bug' },
       { key: 'weekly',  label: 'Klima-Wochenbericht', icon: 'bar-chart-3' },
       { key: 'monthly', label: 'GPX-Monatsbericht',   icon: 'route' },
@@ -2719,7 +2872,7 @@
     const NOTIFY_DEFAULTS = {
       types: {
         sensor: { on: true }, mold: { on: true, threshold: 80 }, frost: { on: true, threshold: 0 },
-        heat: { on: true, threshold: 30 }, errors: { on: true }, weekly: { on: true },
+        heat: { on: true, threshold: 30 }, vent: { on: false }, errors: { on: true }, weekly: { on: true },
         monthly: { on: true }, todo: { on: true }
       },
       quiet: { on: false, from: 22, to: 7 }

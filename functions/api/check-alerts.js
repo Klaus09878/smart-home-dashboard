@@ -50,6 +50,23 @@ function surfaceRhRaw(inTemp, inRh, outTemp, fRsi = 0.7) {
   const vaporPressure = (inRh / 100) * satVaporPressure(inTemp);
   return { surfaceTemp, rh: (vaporPressure / satVaporPressure(surfaceTemp)) * 100 };
 }
+function absHumidity(t, rh) { return (216.74 * ((rh / 100) * satVaporPressure(t))) / (t + 273.15); }
+
+// Bestes Lüftungsfenster der nächsten 12 h: die Stunde mit der geringsten
+// Außen-Absolutfeuchte, sofern sie deutlich unter der Innenfeuchte liegt.
+function bestVentWindow(inAH, hourly, nowMs) {
+  if (!hourly || !hourly.time) return null;
+  let best = null;
+  for (let i = 0; i < hourly.time.length; i++) {
+    const ms = hourly.time[i] * 1000;
+    if (ms < nowMs || ms > nowMs + 12 * 3600000) continue;
+    const ot = hourly.temperature_2m[i], orh = hourly.relative_humidity_2m[i];
+    if (ot == null || orh == null) continue;
+    const outAH = absHumidity(ot, orh);
+    if (outAH < inAH - 1.0 && (!best || outAH < best.outAH)) best = { ms, outAH, ot };
+  }
+  return best;
+}
 
 function lastRealValue(feeds, field) {
   for (let i = feeds.length - 1; i >= 0; i--) {
@@ -120,9 +137,9 @@ export async function onRequestGet(context) {
       // ---- Außenwetter (Open-Meteo): Frost, Hitze, Schimmel-Grundlage ----
       const coords = (await getCoordOverride(env.DB, locId)) || loc;
       R.weatherCoords = { lat: coords.lat, lon: coords.lon, source: coords === loc ? 'default' : 'dashboard' };
-      let frostMin = null, heatMax = null, moldRh = null, moldTemp = null, outTemp = null;
+      let frostMin = null, heatMax = null, moldRh = null, moldTemp = null, outTemp = null, ventWindow = null;
       try {
-        const wres = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m&daily=temperature_2m_min,temperature_2m_max&forecast_days=2&timezone=auto&timeformat=unixtime`);
+        const wres = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m&daily=temperature_2m_min,temperature_2m_max&hourly=temperature_2m,relative_humidity_2m&forecast_days=2&timezone=auto&timeformat=unixtime`);
         if (wres.ok) {
           const w = await wres.json();
           const mins = ((w.daily || {}).temperature_2m_min || []).filter(v => v != null && !isNaN(v));
@@ -135,6 +152,8 @@ export async function onRequestGet(context) {
             const s = surfaceRhRaw(t.value, h.value, outTemp);
             moldRh = Math.min(100, s.rh);
             moldTemp = s.surfaceTemp;
+            // Bestes Lüftungsfenster (Punkt 16) — nur mit frischen Innenwerten sinnvoll
+            ventWindow = bestVentWindow(absHumidity(t.value, h.value), w.hourly, now);
           }
         }
       } catch (e) { R.weatherError = e.message; }
@@ -190,6 +209,18 @@ export async function onRequestGet(context) {
           };
         }));
       }
+
+      // Lüftungsfenster-Push (Punkt 16): nur morgens (Berlin 6–10 Uhr) und wenn
+      // es ein gutes Fenster gibt. Typ 'vent' ist per Voreinstellung aus (opt-in).
+      const berlinHour = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/Berlin' }).format(new Date()));
+      if (ventWindow && berlinHour >= 6 && berlinHour <= 10) {
+        const when = new Date(ventWindow.ms).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' });
+        report.notified.push(...await dispatch(env, recipients, 'vent', locId, () => ({
+          title: 'ClimateFlow Lüftungstipp',
+          body: `Gutes Lüftungsfenster bei ${loc.label} gegen ${when} Uhr (außen ${ventWindow.ot.toFixed(0)} °C, trockener als drinnen). Kurz stoßlüften senkt die Feuchte.`,
+          tags: 'wind', priority: 'default'
+        })));
+      }
     } catch (err) {
       R.error = err.message;
     }
@@ -203,16 +234,19 @@ export async function onRequestGet(context) {
         if (rec.profile === '_global') continue; // globales Fallback-Topic hat keine To-dos
         const cfg = typeCfg(rec.rules, 'todo');
         if (!cfg.on || isQuietNow(rec.rules)) continue;
+        // fällig heute oder überfällig (bis in ~12 h, damit die Erinnerung am
+        // Fälligkeitstag kommt, nicht erst danach — Punkt 19)
+        const horizon = Date.now() + 12 * 60 * 60 * 1000;
         const { results } = await env.DB.prepare(
-          "SELECT text FROM todos WHERE (profile = ? OR shared = 1) AND done = 0 AND deleted = 0 AND due_ms IS NOT NULL AND due_ms < ? ORDER BY due_ms LIMIT 5"
-        ).bind(rec.profile, Date.now()).all();
-        const overdue = results || [];
-        if (!overdue.length) continue;
+          "SELECT text, due_ms FROM todos WHERE (profile = ? OR shared = 1) AND done = 0 AND deleted = 0 AND due_ms IS NOT NULL AND due_ms < ? ORDER BY due_ms LIMIT 5"
+        ).bind(rec.profile, horizon).all();
+        const due = results || [];
+        if (!due.length) continue;
         const dedupeMs = (cfg.dedupeH ?? 24) * 60 * 60 * 1000;
         if (!(await shouldSend(env.DB, `${rec.profile}:todo:overdue`, dedupeMs))) continue;
         await pushTo(rec.topic, {
           title: 'Offene To-dos',
-          body: `Überfällig:\n${overdue.map(t => `• ${t.text}`).join('\n')}`,
+          body: `Fällig/überfällig:\n${due.map(t => `• ${t.text}${t.due_ms < Date.now() ? ' (überfällig)' : ''}`).join('\n')}`,
           tags: 'check', priority: 'default'
         });
         report.notified.push(`${rec.profile}:todo:overdue`);

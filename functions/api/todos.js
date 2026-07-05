@@ -14,11 +14,15 @@ const json = (obj, status = 200) =>
 
 async function ensureSchema(db) {
   await db.exec("CREATE TABLE IF NOT EXISTS todos (id TEXT PRIMARY KEY, profile TEXT, text TEXT, done INTEGER DEFAULT 0, due_ms INTEGER, repeat_days INTEGER, shared INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER, deleted INTEGER DEFAULT 0)");
+  // Nachrüsten (Kategorie/Position, Punkt 19) — Fehler = Spalte existiert schon
+  try { await db.exec("ALTER TABLE todos ADD COLUMN category TEXT"); } catch (e) { /* existiert */ }
+  try { await db.exec("ALTER TABLE todos ADD COLUMN pos INTEGER"); } catch (e) { /* existiert */ }
 }
 
 const rowToTodo = r => ({
   id: r.id, owner: r.profile, text: r.text, done: !!r.done,
   dueMs: r.due_ms, repeatDays: r.repeat_days, shared: !!r.shared,
+  category: r.category || null, pos: r.pos || null,
   createdAt: r.created_at, updatedAt: r.updated_at, deleted: !!r.deleted
 });
 
@@ -50,11 +54,12 @@ export async function onRequest(context) {
       // Besitzer bleibt beim ersten Anleger; neue Einträge gehören dem Aufrufer
       const owner = existing ? existing.profile : (t.owner || me);
       await env.DB.prepare(
-        'INSERT OR REPLACE INTO todos (id, profile, text, done, due_ms, repeat_days, shared, created_at, updated_at, deleted) VALUES (?,?,?,?,?,?,?,?,?,?)'
+        'INSERT OR REPLACE INTO todos (id, profile, text, done, due_ms, repeat_days, shared, created_at, updated_at, deleted, category, pos) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
       ).bind(
         t.id, owner, (t.text || '').toString().substring(0, 500),
         t.done ? 1 : 0, t.dueMs ?? null, t.repeatDays ?? null, t.shared ? 1 : 0,
-        Number(t.createdAt) || Date.now(), updatedAt, t.deleted ? 1 : 0
+        Number(t.createdAt) || Date.now(), updatedAt, t.deleted ? 1 : 0,
+        t.category ? t.category.toString().substring(0, 40) : null, t.pos ?? null
       ).run();
       written++;
     }
