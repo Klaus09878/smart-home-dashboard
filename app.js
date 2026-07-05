@@ -163,24 +163,47 @@
       loadArchiveView();
     }
 
-    function updateTabLabels() {
-      const tabG = document.getElementById('tab-gillian');
-      const tabS = document.getElementById('tab-sean');
-      if (tabG) tabG.innerText = getLocationName('gillian').replace('Schlafzimmer ', '');
-      if (tabS) tabS.innerText = getLocationName('sean').replace('Schlafzimmer ', '');
-      document.getElementById('detail-loc-title').innerText = getLocationName(appState.activeLocId);
+    // Standort-Tabs dynamisch aus LOCATIONS rendern (unterstützt beliebig viele
+    // Standorte, auch die über die Oberfläche angelegten aus D1).
+    function renderLocationTabs() {
+      const wrap = document.getElementById('nav-location-tabs');
+      if (wrap) {
+        wrap.innerHTML = '';
+        LOCATIONS.forEach(loc => {
+          const active = loc.id === appState.activeLocId;
+          const btn = document.createElement('button');
+          btn.id = `tab-${loc.id}`;
+          btn.className = active
+            ? 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 text-slate-950 shadow-md shadow-teal-500/10 transition-all'
+            : 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all';
+          btn.innerText = getLocationName(loc.id).replace('Schlafzimmer ', '');
+          btn.onclick = () => switchLocation(loc.id);
+          wrap.appendChild(btn);
+        });
+      }
+      const titleEl = document.getElementById('detail-loc-title');
+      if (titleEl) titleEl.innerText = getLocationName(appState.activeLocId);
     }
 
-    function highlightActiveTab() {
-      const tabG = document.getElementById('tab-gillian');
-      const tabS = document.getElementById('tab-sean');
-      
-      if (appState.activeLocId === 'gillian') {
-        tabG.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 text-slate-950 shadow-md shadow-teal-500/10 transition-all';
-        tabS.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all';
-      } else {
-        tabS.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 text-slate-950 shadow-md shadow-teal-500/10 transition-all';
-        tabG.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all';
+    // Alte Aufrufer bleiben gültig (Rendern deckt beides ab)
+    function updateTabLabels() { renderLocationTabs(); }
+    function highlightActiveTab() { renderLocationTabs(); }
+
+    // Über die Oberfläche angelegte Standorte (D1) beim Start ergänzen (P8).
+    async function loadDynamicLocations() {
+      try {
+        const data = await apiFetch('/api/locations');
+        (data.locations || []).forEach(l => {
+          if (LOCATIONS.some(x => x.id === l.id)) return;
+          LOCATIONS.push({
+            id: l.id,
+            defaultName: l.name || l.id,
+            defaultWeather: { lat: l.lat, lon: l.lon, name: l.name || l.id },
+            fields: l.fields || { temp: 'field1', humidity: 'field2', extra: [] }
+          });
+        });
+      } catch (err) {
+        // kein D1 / keine Zusatz-Standorte → nur die fest verdrahteten
       }
     }
 
@@ -2440,6 +2463,15 @@
           card.querySelectorAll('button')[1].onclick = () => editLocationThresholds(loc.id);
           locEl.appendChild(card);
         });
+
+        // Admin: Zusatz-Standort anlegen (P8)
+        if (window.Store && Store.isAdmin) {
+          const add = document.createElement('button');
+          add.className = 'bg-slate-900/40 border border-dashed border-slate-700 hover:border-teal-500/40 rounded-xl p-3 text-sm text-slate-400 hover:text-teal-300 transition-colors flex items-center justify-center gap-2';
+          add.innerHTML = '<i data-lucide="plus" class="w-4 h-4"></i> Standort hinzufügen';
+          add.onclick = addLocation;
+          locEl.appendChild(add);
+        }
       }
 
       // Kalender-Status
@@ -2497,6 +2529,34 @@
       renderSettings();
       if (typeof renderActiveView === 'function') renderActiveView();
       showNotification('Schwellwerte gespeichert.');
+    }
+
+    // Zusatz-Standort über die Oberfläche anlegen (P8, nur Admin). Der Read-Key
+    // wird nur an den Server geschickt und dort gespeichert, nie clientseitig.
+    async function addLocation() {
+      const id = prompt('Kurz-ID (a–z, 0–9, _-), z. B. "wohnzimmer":', '');
+      if (id === null || !/^[a-z0-9_-]{2,32}$/.test(id.trim())) { if (id !== null) showNotification('Ungültige ID.', 'error'); return; }
+      const name = prompt('Anzeigename:', ''); if (name === null) return;
+      const channel = prompt('ThingSpeak Kanal-ID:', ''); if (channel === null || !channel.trim()) return;
+      const readKey = prompt('ThingSpeak Read API Key:', ''); if (readKey === null || !readKey.trim()) return;
+      const lat = prompt('Breitengrad (lat), z. B. 48.78:', '48.78'); if (lat === null) return;
+      const lon = prompt('Längengrad (lon), z. B. 9.18:', '9.18'); if (lon === null) return;
+      const tempField = prompt('Feld für Temperatur:', 'field1') || 'field1';
+      const humField = prompt('Feld für Luftfeuchte:', 'field2') || 'field2';
+      try {
+        await apiFetch('/api/locations', {
+          method: 'POST',
+          body: JSON.stringify({
+            id: id.trim(), name: name.trim() || id.trim(), channel: channel.trim(), readKey: readKey.trim(),
+            lat: parseFloat(lat.replace(',', '.')), lon: parseFloat(lon.replace(',', '.')),
+            fields: { temp: tempField, humidity: humField, extra: [] }
+          })
+        });
+        showNotification('Standort angelegt – lade neu…');
+        setTimeout(() => location.reload(), 900);
+      } catch (err) {
+        showNotification(err.unavailable ? 'Cloud-DB nicht eingerichtet.' : `Fehlgeschlagen: ${err.message}`, 'error');
+      }
     }
 
     function editHubGoals() {
@@ -2935,6 +2995,8 @@
       // Profil + Einstellungen laden, bevor irgendetwas gelesen wird
       await Store.init();
       updateProfileBadge();
+      // Zusatz-Standorte aus D1 ergänzen, bevor Tabs/Configs rendern
+      await loadDynamicLocations();
 
       updateIcons();
       initConfigs();

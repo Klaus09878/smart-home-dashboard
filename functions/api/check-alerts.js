@@ -20,6 +20,25 @@ const CHANNELS = {
 const STALE_MS = 2 * 60 * 60 * 1000;
 const FRESH_MS = 2 * 60 * 60 * 1000; // Innenwert zu alt für die Schimmelprüfung
 
+// Fest verdrahtete + über die Oberfläche angelegte Standorte (D1) zusammenführen.
+async function loadChannels(env) {
+  const out = {};
+  for (const [id, loc] of Object.entries(CHANNELS)) {
+    out[id] = { channel: loc.channel, apiKey: env[loc.envKey], label: loc.label, lat: loc.lat, lon: loc.lon, tempField: loc.tempField, humField: loc.humField };
+  }
+  if (env.DB) {
+    try {
+      await env.DB.exec("CREATE TABLE IF NOT EXISTS locations (id TEXT PRIMARY KEY, name TEXT, channel TEXT, read_key TEXT, lat REAL, lon REAL, fields TEXT, created_by TEXT, created_at INTEGER)");
+      const { results } = await env.DB.prepare('SELECT id, name, channel, read_key, lat, lon, fields FROM locations').all();
+      (results || []).forEach(r => {
+        let f = {}; try { f = r.fields ? JSON.parse(r.fields) : {}; } catch (e) { /* Defaults */ }
+        out[r.id] = { channel: r.channel, apiKey: r.read_key, label: r.name || r.id, lat: r.lat, lon: r.lon, tempField: f.temp || 'field1', humField: f.humidity || 'field2' };
+      });
+    } catch (e) { /* nur fest verdrahtete Standorte */ }
+  }
+  return out;
+}
+
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
 
@@ -72,10 +91,11 @@ export async function onRequestGet(context) {
 
   const report = { checkedAt: new Date().toISOString(), recipients: recipients.map(r => r.profile), locations: {}, notified: [] };
   const now = Date.now();
+  const channels = await loadChannels(env);
 
-  for (const [locId, loc] of Object.entries(CHANNELS)) {
-    const apiKey = env[loc.envKey];
-    if (!apiKey) { report.locations[locId] = { error: `${loc.envKey} nicht konfiguriert` }; continue; }
+  for (const [locId, loc] of Object.entries(channels)) {
+    const apiKey = loc.apiKey;
+    if (!apiKey) { report.locations[locId] = { error: `Read-Key für ${locId} nicht konfiguriert` }; continue; }
     const R = report.locations[locId] = {};
 
     try {

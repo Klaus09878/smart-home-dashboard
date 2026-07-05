@@ -420,9 +420,8 @@
       <!-- Action & Location Controls -->
       <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
         <!-- Location Selector Tabs -->
-        <div id="nav-location-tabs" class="bg-slate-950 p-1 rounded-xl border border-slate-850 flex gap-1">
-          <button onclick="switchLocation('gillian')" id="tab-gillian" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">Gillian</button>
-          <button onclick="switchLocation('sean')" id="tab-sean" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all">Sean</button>
+        <div id="nav-location-tabs" class="bg-slate-950 p-1 rounded-xl border border-slate-850 flex gap-1 flex-wrap">
+          <!-- Standort-Tabs werden dynamisch aus LOCATIONS gerendert (renderLocationTabs) -->
         </div>
 
         <!-- Weather Location Picker Button -->
