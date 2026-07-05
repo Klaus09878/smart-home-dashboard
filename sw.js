@@ -2,7 +2,7 @@
 // Strategie: Network-first für alles Eigene (damit Deployments sofort ankommen),
 // Cache als Offline-Fallback. API-Aufrufe (ThingSpeak, Open-Meteo, CDNs) gehen
 // immer direkt ans Netz und werden nicht gecacht.
-const CACHE_NAME = 'smarthub-v9';
+const CACHE_NAME = 'smarthub-v10';
 const APP_SHELL = [
   './',
   './gpx.html',
@@ -19,11 +19,15 @@ const APP_SHELL = [
 ];
 
 self.addEventListener('install', event => {
+  // Kein automatisches skipWaiting: der neue SW wartet, bis der Nutzer im
+  // „Neue Version"-Toast auf „Neu laden" tippt (postMessage 'skipWaiting').
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL))
   );
+});
+
+self.addEventListener('message', event => {
+  if (event.data === 'skipWaiting') self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {

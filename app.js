@@ -88,14 +88,17 @@
       return Store.get(`loc_name_${locId}`) || (loc ? loc.defaultName : '');
     }
 
-    function renameActiveLocation() {
+    async function renameActiveLocation() {
       const locId = appState.activeLocId;
       const currentName = getLocationName(locId);
-      const newName = prompt(`Neuen Namen für diesen Standort eingeben:`, currentName);
-      
-      if (newName !== null && newName.trim() !== '') {
-        Store.set(`loc_name_${locId}`, newName.trim());
-        document.getElementById('detail-loc-title').innerText = newName.trim();
+      const vals = await modalPrompt({
+        title: 'Standort umbenennen',
+        fields: [{ key: 'name', label: 'Name', value: currentName }],
+        submitLabel: 'Speichern'
+      });
+      if (vals && vals.name.trim() !== '') {
+        Store.set(`loc_name_${locId}`, vals.name.trim());
+        document.getElementById('detail-loc-title').innerText = vals.name.trim();
         updateTabLabels();
         showNotification('Name erfolgreich geändert!');
       }
@@ -1880,20 +1883,20 @@
     }
 
     // ============ Push-Benachrichtigungen (ntfy.sh) ============
-    function configureNtfy() {
+    async function configureNtfy() {
       const current = getNtfyTopic();
-      const topic = prompt(
-        'ntfy.sh-Topic für Push-Benachrichtigungen (leer lassen = deaktivieren).\n\n' +
-        'Einrichtung: Die kostenlose ntfy-App aufs Handy laden und dort dasselbe Topic abonnieren. ' +
-        'Der Name sollte geheim sein (wie ein Passwort).',
-        current || 'smarthub-' + Math.random().toString(36).substring(2, 8)
-      );
-      if (topic === null) return;
-      if (topic.trim() === '') {
+      const vals = await modalPrompt({
+        title: 'Push-Benachrichtigungen (ntfy.sh)',
+        description: 'Lade die kostenlose ntfy-App aufs Handy und abonniere dasselbe Topic. Der Name sollte geheim sein (wie ein Passwort). Leer lassen = deaktivieren.',
+        fields: [{ key: 'topic', label: 'ntfy-Topic', value: current || 'smarthub-' + Math.random().toString(36).substring(2, 8) }],
+        submitLabel: 'Speichern'
+      });
+      if (vals === null) return;
+      if (vals.topic.trim() === '') {
         Store.remove('ntfy_topic');
         showNotification('Push-Benachrichtigungen deaktiviert.');
       } else {
-        Store.set('ntfy_topic', topic.trim());
+        Store.set('ntfy_topic', vals.topic.trim());
         showNotification('Push aktiviert – Test-Nachricht gesendet.');
         sendPush('Smart Home Hub', 'Push-Benachrichtigungen sind eingerichtet ✔', 'tada');
       }
@@ -2135,7 +2138,9 @@
     }
 
     // Hub-Layout (Griff-Ziehen) — Wrapper erhalten die bestehenden onclick-Handler
-    const hubLayout = createLayout({ container: 'hub-widgets', meta: HUB_WIDGET_META, orderKey: 'hub_widget_order', hiddenKey: 'hub_widget_hidden', panel: 'widget-settings', panelList: 'widget-settings-list', gripClass: 'widget-grip' });
+    // reorderButtons: Pfeil-Buttons im Panel zusätzlich zum Griff-Ziehen —
+    // HTML5-Drag funktioniert auf iOS Safari nicht, die Pfeile schon (Punkt 1).
+    const hubLayout = createLayout({ container: 'hub-widgets', meta: HUB_WIDGET_META, orderKey: 'hub_widget_order', hiddenKey: 'hub_widget_hidden', panel: 'widget-settings', panelList: 'widget-settings-list', gripClass: 'widget-grip', reorderButtons: true });
     function applyWidgetLayout() { hubLayout.apply(); }
     function initWidgetDrag() { hubLayout.initDrag(); }
     function toggleWidgetSettings() { hubLayout.toggleSettings(); }
@@ -2283,25 +2288,24 @@
       saveTodos(list);
     }
 
-    function editTodo(id) {
+    async function editTodo(id) {
       const list = getTodos();
       const t = list.find(x => x.id === id);
       if (!t) return;
-      const dueStr = prompt('Fällig am (TT.MM.JJJJ, leer = kein Datum):',
-        t.dueMs ? new Date(t.dueMs).toLocaleDateString('de-DE') : '');
-      if (dueStr === null) return;
-      if (dueStr.trim() === '') {
-        t.dueMs = null;
-      } else {
-        const m = dueStr.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
-        if (!m) { showNotification('Datum im Format TT.MM.JJJJ.', 'error'); return; }
-        const yr = m[3].length === 2 ? 2000 + +m[3] : +m[3];
-        t.dueMs = new Date(yr, +m[2] - 1, +m[1], 9, 0, 0).getTime();
-      }
-      const repStr = prompt('Wiederholung alle X Tage (0 = keine):', t.repeatDays || 0);
-      if (repStr !== null) t.repeatDays = Math.max(0, parseInt(repStr, 10) || 0) || null;
-      const shareStr = confirm('Gemeinsamer Eintrag (für alle Profile sichtbar)?\nOK = geteilt, Abbrechen = privat');
-      t.shared = shareStr;
+      const vals = await modalPrompt({
+        title: 'To-do bearbeiten',
+        description: t.text,
+        fields: [
+          { key: 'due', label: 'Fällig am', type: 'date', value: t.dueMs ? new Date(t.dueMs).toISOString().substring(0, 10) : '' },
+          { key: 'repeat', label: 'Wiederholung alle X Tage (0 = keine)', type: 'number', value: t.repeatDays || 0 },
+          { key: 'shared', label: 'Gemeinsam (für alle Profile sichtbar)', type: 'checkbox', value: !!t.shared }
+        ],
+        submitLabel: 'Speichern'
+      });
+      if (vals === null) return;
+      t.dueMs = vals.due ? new Date(`${vals.due}T09:00:00`).getTime() : null;
+      t.repeatDays = Math.max(0, parseInt(vals.repeat, 10) || 0) || null;
+      t.shared = !!vals.shared;
       touchTodo(t);
       saveTodos(list);
       showNotification('To-do aktualisiert.');
@@ -2366,23 +2370,25 @@
     }
 
     // ============ Hub-Widget: Kalender (.ics über /api/ical) ============
-    function configureIcal() {
-      const current = Store.get('ical_url') || '';
-      const url = prompt(
-        'URL eines Kalender-Feeds (.ics) — z. B. die „geheime Adresse im iCal-Format" ' +
-        'eines Google Kalenders (Einstellungen → Kalender → Kalender integrieren).\n\n' +
-        'Leer lassen = Widget deaktivieren.',
-        current
-      );
-      if (url === null) return;
-      if (url.trim() === '') {
-        Store.remove('ical_url');
-      } else if (!/^https:\/\//i.test(url.trim())) {
-        showNotification('Bitte eine https://-URL angeben.', 'error');
-        return;
-      } else {
-        Store.set('ical_url', url.trim());
-      }
+    async function configureIcal() {
+      const vals = await modalPrompt({
+        title: 'Kalender verbinden',
+        description: 'Zwei .ics-Feeds möglich (z. B. privat + gemeinsam) — etwa die „geheime Adresse im iCal-Format" eines Google Kalenders. Leer lassen = deaktivieren.',
+        fields: [
+          { key: 'url', label: 'Kalender 1 (.ics-URL)', type: 'url', value: Store.get('ical_url') || '' },
+          { key: 'url2', label: 'Kalender 2 (optional)', type: 'url', value: Store.get('ical_url2') || '' }
+        ],
+        submitLabel: 'Speichern'
+      });
+      if (vals === null) return;
+      const setUrl = (key, v) => {
+        v = (v || '').trim();
+        if (v === '') { Store.remove(key); return true; }
+        if (!/^https:\/\//i.test(v)) { showNotification('Bitte eine https://-URL angeben.', 'error'); return false; }
+        Store.set(key, v); return true;
+      };
+      if (!setUrl('ical_url', vals.url)) return;
+      if (!setUrl('ical_url2', vals.url2)) return;
       loadHubCalendar(true);
     }
 
@@ -2521,25 +2527,33 @@
       updateIcons();
     }
 
-    function renameLocation(locId) {
-      const newName = prompt('Neuer Name für diesen Standort:', getLocationName(locId));
-      if (newName === null || newName.trim() === '') return;
-      Store.set(`loc_name_${locId}`, newName.trim());
+    async function renameLocation(locId) {
+      const vals = await modalPrompt({
+        title: 'Standort umbenennen',
+        fields: [{ key: 'name', label: 'Name', value: getLocationName(locId) }]
+      });
+      if (!vals || vals.name.trim() === '') return;
+      Store.set(`loc_name_${locId}`, vals.name.trim());
       updateTabLabels();
       renderSettings();
       showNotification('Name geändert.');
     }
 
-    function editLocationThresholds(locId) {
+    async function editLocationThresholds(locId) {
       const th = getThresholds(locId);
-      const num = (label, val) => {
-        const s = prompt(label, val);
-        return s === null ? null : parseFloat(s.toString().replace(',', '.'));
-      };
-      const tempMin = num('Temperatur Minimum (°C):', th.tempMin); if (tempMin === null) return;
-      const tempMax = num('Temperatur Maximum (°C):', th.tempMax); if (tempMax === null) return;
-      const humMin = num('Feuchte Minimum (%):', th.humMin); if (humMin === null) return;
-      const humMax = num('Feuchte Maximum (%):', th.humMax); if (humMax === null) return;
+      const vals = await modalPrompt({
+        title: 'Wohlfühlband bearbeiten',
+        description: `Für ${getLocationName(locId)}. Steuert Komfort-Bewertung, Score und Warnschwellen.`,
+        fields: [
+          { key: 'tempMin', label: 'Temperatur Minimum (°C)', type: 'number', value: th.tempMin },
+          { key: 'tempMax', label: 'Temperatur Maximum (°C)', type: 'number', value: th.tempMax },
+          { key: 'humMin', label: 'Feuchte Minimum (%)', type: 'number', value: th.humMin },
+          { key: 'humMax', label: 'Feuchte Maximum (%)', type: 'number', value: th.humMax }
+        ]
+      });
+      if (!vals) return;
+      const n = v => parseFloat(String(v).replace(',', '.'));
+      const tempMin = n(vals.tempMin), tempMax = n(vals.tempMax), humMin = n(vals.humMin), humMax = n(vals.humMax);
       if ([tempMin, tempMax, humMin, humMax].some(v => isNaN(v)) || tempMin >= tempMax || humMin >= humMax || humMin < 0 || humMax > 100) {
         showNotification('Ungültige Werte (Min < Max, Feuchte 0–100).', 'error');
         return;
@@ -2552,23 +2566,37 @@
 
     // Zusatz-Standort über die Oberfläche anlegen (P8, nur Admin). Der Read-Key
     // wird nur an den Server geschickt und dort gespeichert, nie clientseitig.
+    // Extra-Felder (z. B. CO₂) als "key:field:Label:Einheit"-Zeilen (P20).
     async function addLocation() {
-      const id = prompt('Kurz-ID (a–z, 0–9, _-), z. B. "wohnzimmer":', '');
-      if (id === null || !/^[a-z0-9_-]{2,32}$/.test(id.trim())) { if (id !== null) showNotification('Ungültige ID.', 'error'); return; }
-      const name = prompt('Anzeigename:', ''); if (name === null) return;
-      const channel = prompt('ThingSpeak Kanal-ID:', ''); if (channel === null || !channel.trim()) return;
-      const readKey = prompt('ThingSpeak Read API Key:', ''); if (readKey === null || !readKey.trim()) return;
-      const lat = prompt('Breitengrad (lat), z. B. 48.78:', '48.78'); if (lat === null) return;
-      const lon = prompt('Längengrad (lon), z. B. 9.18:', '9.18'); if (lon === null) return;
-      const tempField = prompt('Feld für Temperatur:', 'field1') || 'field1';
-      const humField = prompt('Feld für Luftfeuchte:', 'field2') || 'field2';
+      const vals = await modalPrompt({
+        title: 'Standort hinzufügen',
+        description: 'ThingSpeak-Kanal + Read-Key (wird nur serverseitig gespeichert). Extra-Sensoren optional.',
+        fields: [
+          { key: 'id', label: 'Kurz-ID (a–z, 0–9, _-)', placeholder: 'wohnzimmer' },
+          { key: 'name', label: 'Anzeigename', placeholder: 'Wohnzimmer' },
+          { key: 'channel', label: 'ThingSpeak Kanal-ID' },
+          { key: 'readKey', label: 'ThingSpeak Read API Key' },
+          { key: 'lat', label: 'Breitengrad (lat)', type: 'number', value: '48.78' },
+          { key: 'lon', label: 'Längengrad (lon)', type: 'number', value: '9.18' },
+          { key: 'tempField', label: 'Feld für Temperatur', value: 'field1' },
+          { key: 'humField', label: 'Feld für Luftfeuchte', value: 'field2' },
+          { key: 'extra', label: 'Extra-Sensoren (optional)', placeholder: 'co2:field3:CO₂:ppm', hint: 'Pro Zeile key:field:Label:Einheit — mit Komma trennen' }
+        ]
+      });
+      if (!vals) return;
+      if (!/^[a-z0-9_-]{2,32}$/.test((vals.id || '').trim())) { showNotification('Ungültige ID.', 'error'); return; }
+      if (!vals.channel.trim() || !vals.readKey.trim()) { showNotification('Kanal und Read-Key erforderlich.', 'error'); return; }
+      const extra = (vals.extra || '').split(',').map(s => s.trim()).filter(Boolean).map(s => {
+        const [key, field, label, unit] = s.split(':').map(x => (x || '').trim());
+        return key && field ? { key, field, label: label || key, unit: unit || '', decimals: 0 } : null;
+      }).filter(Boolean);
       try {
         await apiFetch('/api/locations', {
           method: 'POST',
           body: JSON.stringify({
-            id: id.trim(), name: name.trim() || id.trim(), channel: channel.trim(), readKey: readKey.trim(),
-            lat: parseFloat(lat.replace(',', '.')), lon: parseFloat(lon.replace(',', '.')),
-            fields: { temp: tempField, humidity: humField, extra: [] }
+            id: vals.id.trim(), name: vals.name.trim() || vals.id.trim(), channel: vals.channel.trim(), readKey: vals.readKey.trim(),
+            lat: parseFloat(String(vals.lat).replace(',', '.')), lon: parseFloat(String(vals.lon).replace(',', '.')),
+            fields: { temp: vals.tempField || 'field1', humidity: vals.humField || 'field2', extra }
           })
         });
         showNotification('Standort angelegt – lade neu…');
@@ -2578,14 +2606,18 @@
       }
     }
 
-    function editHubGoals() {
+    async function editHubGoals() {
       const g = Store.getJSON('gpx_goals', { yearKm: 0, weekKm: 0 }) || { yearKm: 0, weekKm: 0 };
-      const yearStr = prompt('Jahresziel in km (0 = kein Ziel):', g.yearKm || 0);
-      if (yearStr === null) return;
-      const weekStr = prompt('Wochenziel in km (0 = kein Ziel):', g.weekKm || 0);
-      if (weekStr === null) return;
-      const yearKm = Math.max(0, parseFloat(yearStr.toString().replace(',', '.')) || 0);
-      const weekKm = Math.max(0, parseFloat(weekStr.toString().replace(',', '.')) || 0);
+      const vals = await modalPrompt({
+        title: 'GPX-Ziele',
+        fields: [
+          { key: 'yearKm', label: 'Jahresziel in km (0 = kein Ziel)', type: 'number', value: g.yearKm || 0 },
+          { key: 'weekKm', label: 'Wochenziel in km (0 = kein Ziel)', type: 'number', value: g.weekKm || 0 }
+        ]
+      });
+      if (!vals) return;
+      const yearKm = Math.max(0, parseFloat(String(vals.yearKm).replace(',', '.')) || 0);
+      const weekKm = Math.max(0, parseFloat(String(vals.weekKm).replace(',', '.')) || 0);
       Store.setJSON('gpx_goals', { yearKm, weekKm });
       renderSettings();
       showNotification('Ziele gespeichert.');
@@ -2734,8 +2766,13 @@
       showNotification('Widget-Layout zurückgesetzt.');
     }
 
-    function clearLocalData() {
-      if (!confirm('Alle lokalen Daten dieses Profils löschen? Cloud-synchronisierte Einstellungen kommen beim nächsten Laden zurück.')) return;
+    async function clearLocalData() {
+      const ok = await modalConfirm({
+        title: 'Lokale Daten löschen?',
+        message: 'Alle lokalen Daten dieses Profils werden entfernt. Cloud-synchronisierte Einstellungen kommen beim nächsten Laden zurück.',
+        confirmLabel: 'Löschen', danger: true
+      });
+      if (!ok) return;
       const prefix = `p_${Store.profile}_`;
       Object.keys(localStorage).filter(k => k.startsWith(prefix)).forEach(k => localStorage.removeItem(k));
       showNotification('Lokale Daten gelöscht – lade neu…');
@@ -3058,10 +3095,8 @@
       updateHubClock();
       setInterval(updateHubClock, 1000);
 
-      // PWA: Service Worker registrieren (macht die App installierbar & offlinefähig)
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(err => console.warn('Service Worker Registrierung fehlgeschlagen:', err));
-      }
+      // PWA: Service Worker registrieren (+ „Neue Version"-Hinweis)
+      registerServiceWorker();
     }
 
     window.addEventListener('DOMContentLoaded', init);

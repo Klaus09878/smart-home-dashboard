@@ -404,14 +404,18 @@ function getGoals() {
   return { yearKm: 0, weekKm: 0 };
 }
 
-function editGoals() {
+async function editGoals() {
   const g = getGoals();
-  const yearStr = prompt('Jahresziel in km (0 = kein Ziel):', g.yearKm || 0);
-  if (yearStr === null) return;
-  const weekStr = prompt('Wochenziel in km (0 = kein Ziel):', g.weekKm || 0);
-  if (weekStr === null) return;
-  const yearKm = Math.max(0, parseFloat(yearStr.toString().replace(',', '.')) || 0);
-  const weekKm = Math.max(0, parseFloat(weekStr.toString().replace(',', '.')) || 0);
+  const vals = await modalPrompt({
+    title: 'GPX-Ziele',
+    fields: [
+      { key: 'yearKm', label: 'Jahresziel in km (0 = kein Ziel)', type: 'number', value: g.yearKm || 0 },
+      { key: 'weekKm', label: 'Wochenziel in km (0 = kein Ziel)', type: 'number', value: g.weekKm || 0 }
+    ]
+  });
+  if (!vals) return;
+  const yearKm = Math.max(0, parseFloat(String(vals.yearKm).replace(',', '.')) || 0);
+  const weekKm = Math.max(0, parseFloat(String(vals.weekKm).replace(',', '.')) || 0);
   Store.setJSON('gpx_goals', { yearKm, weekKm });
   renderSummary();
   showToast('Ziele gespeichert.');
@@ -1030,9 +1034,9 @@ async function changeActivityType(newType) {
 async function renameActivity() {
   const act = state.activities.find(a => a.id === state.selectedId);
   if (!act) return;
-  const newName = prompt('Neuer Name für diese Aktivität:', act.name);
-  if (newName !== null && newName.trim() !== '') {
-    act.name = newName.trim();
+  const vals = await modalPrompt({ title: 'Aktivität umbenennen', fields: [{ key: 'name', label: 'Name', value: act.name }] });
+  if (vals && vals.name.trim() !== '') {
+    act.name = vals.name.trim();
     act.updatedAt = Date.now();
     await dbPut(act);
     if (act.uid && state.cloud === 'ok') {
@@ -1060,7 +1064,8 @@ function exportGpx() {
 async function deleteActivity() {
   const act = state.activities.find(a => a.id === state.selectedId);
   if (!act) return;
-  if (!confirm(`„${act.name}" wirklich löschen?`)) return;
+  const ok = await modalConfirm({ title: 'Aktivität löschen?', message: `„${act.name}" wirklich löschen?`, confirmLabel: 'Löschen', danger: true });
+  if (!ok) return;
   await dbDelete(act.id);
 
   // Löschung für den Cloud-Sync vormerken (überlebt auch Offline-Phasen)
@@ -1109,9 +1114,7 @@ async function init() {
     }
   });
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+  registerServiceWorker();
 }
 
 window.addEventListener('DOMContentLoaded', init);

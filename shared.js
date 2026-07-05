@@ -90,6 +90,95 @@ function showToast(message, type = 'success', action = null, durationMs = 4000) 
   }, durationMs);
 }
 
+// ============ Modale Dialoge (ersetzen prompt/confirm im App-Stil) ============
+// Promise-basiert: `const ok = await modalConfirm({...})` / `const vals = await
+// modalPrompt({...})` (null bei Abbruch). Tastatur: Esc = abbrechen, Enter =
+// bestätigen/absenden. Fokus landet automatisch im Dialog.
+function _mkOverlay() {
+  const overlay = document.createElement('div');
+  overlay.className = 'fixed inset-0 z-[1700] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in';
+  return overlay;
+}
+
+function modalConfirm(opts = {}) {
+  return new Promise(resolve => {
+    const { title = 'Bestätigen', message = '', confirmLabel = 'OK', cancelLabel = 'Abbrechen', danger = false } = opts;
+    const overlay = _mkOverlay();
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML = `
+      <div class="glass-panel rounded-2xl p-6 shadow-2xl w-full max-w-sm">
+        <h3 class="text-lg font-bold text-white mb-2">${escapeHtml(title)}</h3>
+        <p class="text-sm text-slate-300 mb-5 whitespace-pre-line">${escapeHtml(message)}</p>
+        <div class="flex justify-end gap-2">
+          <button data-act="cancel" class="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-sm text-slate-200 hover:border-slate-500 transition-colors">${escapeHtml(cancelLabel)}</button>
+          <button data-act="ok" class="px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${danger ? 'bg-red-500/20 border border-red-500/40 text-red-200 hover:bg-red-500/30' : 'bg-teal-500/20 border border-teal-500/40 text-teal-200 hover:bg-teal-500/30'}">${escapeHtml(confirmLabel)}</button>
+        </div>
+      </div>`;
+    const close = val => { document.removeEventListener('keydown', onKey); overlay.remove(); resolve(val); };
+    const onKey = e => { if (e.key === 'Escape') close(false); else if (e.key === 'Enter') close(true); };
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(false); });
+    overlay.querySelector('[data-act="cancel"]').onclick = () => close(false);
+    overlay.querySelector('[data-act="ok"]').onclick = () => close(true);
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    overlay.querySelector('[data-act="ok"]').focus();
+  });
+}
+
+// fields: [{ key, label, type?('text'|'number'|'select'|'checkbox'|'url'),
+//   value?, placeholder?, options?([{value,label}]), hint? }]
+// Rückgabe: Werte-Objekt (Strings/boolean) oder null bei Abbruch.
+function modalPrompt(opts = {}) {
+  return new Promise(resolve => {
+    const { title = '', description = '', fields = [], submitLabel = 'Speichern' } = opts;
+    const overlay = _mkOverlay();
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    const fieldHtml = fields.map((f, i) => {
+      const id = `mp-field-${i}`;
+      const hint = f.hint ? `<span class="block text-[10px] text-slate-500 mt-0.5">${escapeHtml(f.hint)}</span>` : '';
+      if (f.type === 'select') {
+        const os = (f.options || []).map(o => `<option value="${escapeHtml(String(o.value))}" ${String(o.value) === String(f.value) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+        return `<label class="block mb-3"><span class="text-xs text-slate-400">${escapeHtml(f.label)}</span><select id="${id}" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:border-teal-500/50 focus:outline-none">${os}</select>${hint}</label>`;
+      }
+      if (f.type === 'checkbox') {
+        return `<label class="flex items-center gap-2 mb-3 cursor-pointer text-sm text-slate-200"><input type="checkbox" id="${id}" ${f.value ? 'checked' : ''} class="accent-teal-500"> ${escapeHtml(f.label)}</label>`;
+      }
+      return `<label class="block mb-3"><span class="text-xs text-slate-400">${escapeHtml(f.label)}</span><input type="${f.type || 'text'}" id="${id}" value="${f.value != null ? escapeHtml(String(f.value)) : ''}" placeholder="${escapeHtml(f.placeholder || '')}" ${f.type === 'number' ? 'inputmode="decimal"' : ''} class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-teal-500/50 focus:outline-none">${hint}</label>`;
+    }).join('');
+    overlay.innerHTML = `
+      <div class="glass-panel rounded-2xl p-6 shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto">
+        <h3 class="text-lg font-bold text-white mb-1">${escapeHtml(title)}</h3>
+        ${description ? `<p class="text-xs text-slate-400 mb-4">${escapeHtml(description)}</p>` : '<div class="mb-2"></div>'}
+        <form>${fieldHtml}
+          <div class="flex justify-end gap-2 mt-5">
+            <button type="button" data-act="cancel" class="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-sm text-slate-200 hover:border-slate-500 transition-colors">Abbrechen</button>
+            <button type="submit" class="px-4 py-2 rounded-xl bg-teal-500/20 border border-teal-500/40 text-teal-200 text-sm font-semibold hover:bg-teal-500/30 transition-colors">${escapeHtml(submitLabel)}</button>
+          </div>
+        </form>
+      </div>`;
+    const close = val => { document.removeEventListener('keydown', onKey); overlay.remove(); resolve(val); };
+    const onKey = e => { if (e.key === 'Escape') close(null); };
+    const readValues = () => {
+      const out = {};
+      fields.forEach((f, i) => {
+        const el = document.getElementById(`mp-field-${i}`);
+        if (!el) return;
+        out[f.key] = f.type === 'checkbox' ? el.checked : el.value;
+      });
+      return out;
+    };
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(null); });
+    overlay.querySelector('[data-act="cancel"]').onclick = () => close(null);
+    overlay.querySelector('form').addEventListener('submit', e => { e.preventDefault(); close(readValues()); });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    const first = overlay.querySelector('input, select');
+    if (first) first.focus();
+  });
+}
+
 // ============ API-Schicht (/api/* → Cloudflare Pages Functions) ============
 // Wirft Error mit .unavailable = true, wenn die API (noch) nicht eingerichtet
 // ist (404: Functions fehlen, 503: Env-Var/D1-Binding nicht konfiguriert).
@@ -175,6 +264,34 @@ function reportRuntimeError(kind, message) {
 window.addEventListener('error', e => reportRuntimeError('Fehler', e.message));
 window.addEventListener('unhandledrejection', e =>
   reportRuntimeError('Unbehandelte Promise-Ablehnung', e.reason && (e.reason.message || e.reason)));
+
+// ============ Service Worker + Update-Hinweis (PWA) ============
+// Registriert den SW und bietet bei einer neuen Version einen „Neu laden"-Toast
+// an (statt still die alte Version weiter auszuliefern).
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      if (!nw) return;
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+          showToast('Neue Version verfügbar.', 'info', {
+            label: 'Neu laden',
+            onClick: () => { (reg.waiting || nw).postMessage('skipWaiting'); }
+          }, 20000);
+        }
+      });
+    });
+  }).catch(err => console.warn('Service Worker Registrierung fehlgeschlagen:', err));
+
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    location.reload();
+  });
+}
 
 // ============ ntfy.sh Push-Benachrichtigungen ============
 // Topic wird in localStorage ('ntfy_topic') gespeichert; Konfiguration siehe README.
