@@ -14,16 +14,26 @@ Multi-Projekt-Plattform auf Cloudflare Pages: Homescreen-Hub mit Klimadashboard
 | `tests/core.test.js` | Testsuite für lib/core.js (`npm test`) |
 | `shared.js` | Gemeinsame Helfer: Formatierer, Icons, Toasts (`showToast`), API-Schicht (`apiFetch`), ntfy-Push (`sendPush`) |
 | `tailwind.css` | Statisch gebautes Tailwind-CSS (`npm run build:css` nach Klassen-Änderungen!) |
-| `functions/_middleware.js` | Cloudflare Pages Middleware: HTTP Basic Auth (`AUTH_USER` / `AUTH_PASS`) |
-| `functions/api/feeds/[locId].js` | ThingSpeak-Proxy (versteckt Keys, 60 s Edge-Cache) |
+| `settings-sync.js` | Profil-Schicht `Store`: Login-Profil-Präfix + D1-Spiegelung der Einstellungen (Offline-Queue, updatedAt-Merge) |
+| `functions/_middleware.js` | Cloudflare Pages Middleware: Mehrbenutzer-Login (`AUTH_USER`/`AUTH_PASS` + `AUTH_USERS`) bzw. Cloudflare Access |
+| `functions/_auth.js` | Auth-Helfer (Nutzerliste parsen, Profil identifizieren) — von Middleware & API genutzt |
+| `functions/_notify.js` | Benachrichtigungs-Verteiler: Profile+Regeln aus D1, Ruhezeiten, per-Profil-Dedupe |
+| `functions/api/whoami.js` | Verrät dem Client das aktive Login-Profil (+ Profilliste für Admin) |
+| `functions/api/settings.js` | Profilbezogener D1-Einstellungsspeicher (Sync-Backend für `Store`) |
+| `functions/api/feeds/[locId].js` | ThingSpeak-Proxy (versteckt Keys, 60 s Edge-Cache; löst auch D1-Standorte auf) |
 | `functions/api/gpx.js` | GPX-Aktivitäten in Cloudflare D1 (CRUD, Sync-Backend) |
 | `functions/api/climate.js` | Langzeit-Archiv: tägliche Klima-Aggregate in D1 |
-| `functions/api/check-alerts.js` | Serverseitiger Sensor-, Schimmelrisiko- **und Frost**-Check + ntfy-Push (für externen Cron) |
-| `functions/api/weekly-report.js` | Wöchentlicher Klima-Report per ntfy (D1-Archiv + Vorwochen-Trend, für wöchentlichen Cron) |
-| `functions/api/ical.js` | CORS-Proxy für Kalender-Feeds (.ics) — fürs Kalender-Widget auf dem Hub |
-| `functions/api/config.js` | Key-Value-Speicher in D1 (z. B. Wetter-Koordinaten für die Server-Checks) |
+| `functions/api/check-alerts.js` | Sensor-/Schimmel-/Frost-/Hitze-Check + überfällige To-dos → ntfy (pro Profil) |
+| `functions/api/weekly-report.js` | Wöchentlicher Klima-Report (D1-Archiv + Vorwochen-Trend) |
+| `functions/api/monthly-report.js` | Monatlicher GPX-Rückblick (km, Touren, Höhenmeter, Serie) |
+| `functions/api/todos.js` | To-do-Liste in D1 (Sync, geteilte Einträge) |
+| `functions/api/locations.js` | Zusatz-Standorte in D1 (Admin; Read-Key nur serverseitig) |
+| `functions/api/health.js` | System-Diagnose (D1, Env-Vars, Cron-Heartbeat, Messwert-Zeiten) |
+| `functions/api/error-log.js` | Fehler-Ringpuffer in D1 (für die System-Seite) |
+| `functions/api/ical.js` | CORS-Proxy für Kalender-Feeds (.ics) — fürs Kalender-Widget |
+| `functions/api/config.js` | Globaler Key-Value-Speicher in D1 (Wetter-Koordinaten für die Server-Checks) |
 | `gpx.js` | GPX-Viewer-Logik (aus gpx.html ausgelagert) |
-| `tests/smoke.test.js` | Deploy-Schutz: prüft IDs/Handler/Dateiverweise über alle Seiten (`npm test`) |
+| `tests/core.test.js` / `tests/smoke.test.js` | Kern-Tests + Deploy-Schutz (`npm test`) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | PWA: installierbar auf dem iPhone-/Android-Homescreen, Offline-Fallback |
 
 ## 🔧 Einrichtung Cloud-Funktionen (To-do)
@@ -44,13 +54,15 @@ Nach der Einrichtung schalten sie sich automatisch scharf:
    - Dashboard: Glocken-Symbol im ClimateFlow-Header → dasselbe Topic eintragen (Warnungen bei Sensor-Ausfall, Schimmelrisiko).
    - Serverseitig (auch bei geschlossenem Browser): Env-Var `NTFY_TOPIC` = Topic setzen und einen kostenlosen Cron-Dienst (z. B. cron-job.org) alle 1–6 h `GET https://<domain>/api/check-alerts` aufrufen lassen. Dieser Endpunkt warnt bei **Sensor-Ausfall** (>2 h keine Werte, max. 1×/6 h), **Schimmel-/Kondensatrisiko** an kalten Wandstellen (Außentemperatur via Open-Meteo, max. 1×/12 h) und **Frost** (Tiefstwert der nächsten 2 Tage ≤ 0 °C, max. 1×/18 h). Die Entprellung braucht das D1-Binding `DB` (Schritt 1).
    - **Wochenbericht**: zusätzlich einen zweiten Cron-Job anlegen, der 1×/Woche (z. B. sonntags 19:00) `GET https://<domain>/api/weekly-report` aufruft — verschickt eine Wochen-Zusammenfassung (Ø/Min/Max, Komfort-Score, Vorwochen-Trend) als Push. Beide Jobs brauchen die Basic-Auth-Zugangsdaten (bei cron-job.org unter „Authentication" hinterlegen).
-4. **Build automatisieren (empfohlen):** Pages → *Settings → Builds & deployments*:
+   - **GPX-Monatsbericht** (optional): dritter Cron-Job 1×/Monat (z. B. am 1. um 18:00) auf `GET https://<domain>/api/monthly-report` — km, Touren, Höhenmeter, längste Serie des Vormonats.
+   - **Pro-Profil:** Sind mehrere Login-Profile eingerichtet (siehe Schritt 4), schickt der Server jede Warnung an das ntfy-Topic **jedes** Profils, das den Typ aktiviert hat — mit dessen eigenen Schwellen und Ruhezeiten (Benachrichtigungs-Center in den Einstellungen). Ohne Profile gilt weiter das globale `NTFY_TOPIC`.
+4. **Mehrbenutzer-Profile** (optional): Jedes Login-Passwort ist ein eigener, personalisierter Bereich (eigene Widgets, To-dos, ntfy-Topic, Ziele, Schwellwerte — geräteübergreifend über D1 synchronisiert). Pages → *Settings → Environment variables* → **`AUTH_USERS`** = `gillian:passwortG;sean:passwortS` (Namen/Passwörter ohne `:` und `;`). Das bestehende `AUTH_USER`/`AUTH_PASS` bleibt das Admin-Konto (darf Standorte anlegen). Ohne `AUTH_USERS` gibt es nur das eine Konto.
+5. **Build automatisieren (empfohlen):** Pages → *Settings → Builds & deployments*:
    Build command = `npm run build` (führt Tests aus und baut das CSS), Build output directory = `/`.
    Damit kann das committete `tailwind.css` nie mehr veralten und fehlerhafte Kernlogik bricht den Deploy ab.
    Bis dahin gilt: nach HTML/Klassen-Änderungen lokal `npm run build:css` ausführen und committen.
-5. **Nach Schritt 2 (Proxy aktiv): Fallback-Keys entfernen.** In `app.js` die `thingspeakUrl`-Einträge
-   aus `LOCATIONS` und den Direktzugriff-Zweig in `fetchFeeds()` löschen — erst dann sind die
-   Read-Keys wirklich aus dem Client verschwunden. (Der Code loggt bis dahin eine Warnung in die Konsole.)
+
+> Die ThingSpeak-Read-Keys sind bereits aus dem Frontend entfernt — die Werte laufen ausschließlich über den `/api/feeds`-Proxy. D1-Tabellen (`user_settings`, `todos`, `locations`, `error_log`, `climate_daily`, `gpx_activities`, `alert_state`, `app_config`) legt der Code beim ersten Zugriff selbst an.
 
 **Grundprinzip für neue Projekte:** Jedes weitere Unterprojekt bekommt seine eigene
 HTML-Seite (wie `gpx.html`) und eine Kachel auf dem Hub — so bleibt `index.html`
