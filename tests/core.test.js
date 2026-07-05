@@ -255,6 +255,49 @@ test('parseIcsEvents: UTC-Zeit, Ganztag, gefaltete Zeile, RRULE-Markierung', () 
   assert.deepStrictEqual(core.parseIcsEvents('<html>Fehler</html>'), []);
 });
 
+test('ventilationStats: Anzahl, Ø-Feuchteabfall, Tageszählung', () => {
+  const now = Date.UTC(2026, 6, 15, 12, 0, 0);
+  const day = 86400000;
+  const events = [
+    { startMs: now - 1 * day, humDrop: 8 },
+    { startMs: now - 1 * day + 3600000, humDrop: 6 },
+    { startMs: now - 5 * day, humDrop: 10 },
+    { startMs: now - 20 * day, humDrop: 99 } // außerhalb des 14-Tage-Fensters
+  ];
+  const s = core.ventilationStats(events, { nowMs: now, days: 14 });
+  assert.strictEqual(s.count, 3);
+  assert.ok(Math.abs(s.avgHumDrop - 8) < 1e-9);
+  assert.strictEqual(s.dailyCounts.length, 14);
+  assert.ok(Math.abs(s.perDay - 3 / 14) < 1e-9);
+});
+
+test('climateRecords: Extremwerte + Komfort-Serie', () => {
+  const rows = [
+    { day: '2026-01-01', t_min: -2, t_max: 5, t_avg: 21, h_avg: 50 }, // Komfort ~100
+    { day: '2026-01-02', t_min: 1, t_max: 8, t_avg: 22, h_avg: 52 }, // ~100
+    { day: '2026-01-03', t_min: 3, t_max: 25, t_avg: 30, h_avg: 80 }, // heiß+feucht → niedrig
+    { day: '2026-01-04', t_min: 4, t_max: 10, t_avg: 20, h_avg: 45 }  // ~100
+  ];
+  const r = core.climateRecords(rows);
+  assert.strictEqual(r.warmest.day, '2026-01-03');
+  assert.strictEqual(r.coldest.day, '2026-01-01');
+  assert.strictEqual(r.wettest.day, '2026-01-03');
+  assert.strictEqual(r.comfortStreak, 2); // 01.+02. zusammenhängend, 03. bricht
+});
+
+test('trendForecast: steigende Feuchte erreicht Schwelle in der Zukunft', () => {
+  const t0 = Date.UTC(2026, 0, 1, 10, 0, 0);
+  const aligned = [];
+  for (let i = 0; i < 7; i++) aligned.push({ time: new Date(t0 + i * 1800000), humidity: 50 + i * 2, temp: 21 });
+  // +2 %/30min = 4 %/h; von 62 (letzter) auf 70 → ~2 h
+  const tf = core.trendForecast(aligned, { threshold: 70 });
+  assert.ok(Math.abs(tf.slopePerHour - 4) < 0.001, `slope=${tf.slopePerHour}`);
+  assert.strictEqual(tf.current, 62);
+  assert.ok(tf.etaMs > aligned[aligned.length - 1].time.getTime());
+  // ohne Trend (zu wenige Punkte) → null
+  assert.strictEqual(core.trendForecast([{ time: new Date(t0), humidity: 50 }]), null);
+});
+
 test('expandRecurring: wöchentlich expandiert im Fenster, EXDATE ausgenommen', () => {
   const events = [{
     startMs: Date.UTC(2026, 6, 7, 10, 0, 0), // Di 07.07.2026 12:00 Berlin ~ 10:00Z

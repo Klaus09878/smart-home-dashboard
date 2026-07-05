@@ -727,6 +727,16 @@
           console.error('Fehler bei der Lüftungs-Erfolgskontrolle:', e);
         }
         try {
+          renderVentilationDiary(feeds);
+        } catch (e) {
+          console.error('Fehler beim Lüftungs-Tagebuch:', e);
+        }
+        try {
+          renderHumidityTrend(feeds, th);
+        } catch (e) {
+          console.error('Fehler bei der Trend-Prognose:', e);
+        }
+        try {
           renderHeatingIndicator(feeds);
         } catch (e) {
           console.error('Fehler beim Heizindikator:', e);
@@ -1109,6 +1119,63 @@
         `<span class="text-emerald-400 font-semibold">Zuletzt gelüftet ${dayLabel} ${formatTime(last.start)} Uhr:</span> ` +
         `Feuchte <strong class="text-white">−${last.humDrop.toFixed(0)} %</strong> (${last.humBefore.toFixed(0)} → ${last.humAfter.toFixed(0)} %), ` +
         `Temperatur −${last.tempDrop.toFixed(1)} °C${countNote}.`;
+    }
+
+    // Lüftungs-Tagebuch (P5): erkannte Stoßlüftungen der letzten 14 Tage als
+    // Statistik + Tagesbalken (ventilationStats, lib/core.js).
+    function renderVentilationDiary(feeds) {
+      const barsEl = document.getElementById('vent-diary-bars');
+      const statEl = document.getElementById('vent-diary-stat');
+      if (!barsEl) return;
+
+      const cutoff = Date.now() - 15 * 24 * 60 * 60 * 1000;
+      const recent = feeds.filter(f => f.time.getTime() >= cutoff);
+      const events = detectVentilationEvents(recent).map(e => ({ startMs: e.start.getTime(), humDrop: e.humDrop }));
+      const stats = ventilationStats(events, { days: 14 });
+
+      if (statEl) {
+        statEl.innerText = stats.count === 0
+          ? 'noch keine Lüftung erkannt'
+          : `${stats.count}× · Ø ${stats.perDay.toFixed(1)}/Tag${stats.avgHumDrop ? ` · −${stats.avgHumDrop.toFixed(0)} %` : ''}${stats.topHour != null ? ` · meist ${stats.topHour}–${(stats.topHour + 1) % 24} Uhr` : ''}`;
+      }
+
+      const max = Math.max(1, ...stats.dailyCounts.map(d => d.count));
+      barsEl.innerHTML = '';
+      stats.dailyCounts.forEach(d => {
+        const bar = document.createElement('div');
+        const h = d.count === 0 ? 4 : Math.round((d.count / max) * 36) + 4;
+        bar.className = `flex-1 rounded-t ${d.count > 0 ? 'bg-teal-500/70' : 'bg-slate-800'}`;
+        bar.style.height = `${h}px`;
+        const dd = new Date(`${d.day}T12:00:00`);
+        bar.title = `${dd.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' })}: ${d.count}× gelüftet`;
+        barsEl.appendChild(bar);
+      });
+    }
+
+    // Feuchte-Trend-Prognose (P7): lineare Regression über die letzten ~3 h,
+    // warnt, wann die obere Feuchte-Schwelle erreicht wird (trendForecast).
+    function renderHumidityTrend(feeds, th) {
+      const row = document.getElementById('vent-trend-row');
+      const el = document.getElementById('vent-trend');
+      if (!row || !el) return;
+
+      const aligned = feeds.map(f => ({ time: f.time, humidity: f.humidity, temp: f.temp }));
+      const threshold = (th && th.humMax) || 60;
+      const tf = trendForecast(aligned, { field: 'humidity', threshold });
+      if (!tf || Math.abs(tf.slopePerHour) < 0.3) { row.classList.add('hidden'); return; }
+
+      const dir = tf.slopePerHour > 0 ? 'steigt' : 'fällt';
+      let msg = `Feuchte ${dir} um ~${Math.abs(tf.slopePerHour).toFixed(1)} %/h (aktuell ${tf.current.toFixed(0)} %).`;
+      if (tf.etaMs) {
+        const hrs = (tf.etaMs - Date.now()) / 3600000;
+        if (hrs > 0 && hrs < 12) {
+          const when = new Date(tf.etaMs).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+          msg += ` Bei diesem Trend werden ${threshold} % gegen ${when} Uhr erreicht — vorher lüften.`;
+        }
+      }
+      el.innerText = msg;
+      row.classList.remove('hidden');
+      updateIcons();
     }
 
     // ============ Heizaufwand-Indikator ============
@@ -1686,12 +1753,65 @@
         emptyEl.classList.add('hidden');
         wrap.classList.remove('hidden');
         drawArchiveChart(rows);
+        renderArchiveRecords(rows);
       } catch (err) {
         appState.archiveLoadedFor = null;
         if (err.unavailable) {
           showMessage('Cloud-Datenbank (D1) noch nicht eingerichtet — siehe README, Abschnitt „Einrichtung Cloud-Funktionen". Danach erscheinen hier die täglichen Langzeit-Werte.');
         } else {
           showMessage(`Archiv konnte nicht geladen werden: ${err.message}`);
+        }
+      }
+    }
+
+    // Rekorde & Monatsvergleich aus dem Tages-Archiv (P6)
+    function renderArchiveRecords(rows) {
+      const recEl = document.getElementById('archive-records');
+      const cmpEl = document.getElementById('archive-month-compare');
+      if (!recEl) return;
+
+      const rec = climateRecords(rows, 80);
+      if (!rec) { recEl.classList.add('hidden'); if (cmpEl) cmpEl.classList.add('hidden'); return; }
+
+      const fmtDay = d => { const p = d.split('-'); return `${p[2]}.${p[1]}.`; };
+      const card = (label, value, sub, color) => `
+        <div class="bg-slate-900/50 border border-slate-800/60 rounded-xl p-2.5 text-center">
+          <p class="text-[9px] text-slate-500 uppercase font-semibold">${label}</p>
+          <p class="text-sm font-bold ${color} mt-0.5">${value}</p>
+          <p class="text-[10px] text-slate-400">${sub}</p>
+        </div>`;
+      recEl.innerHTML =
+        (rec.warmest ? card('Wärmster Tag', `${rec.warmest.value.toFixed(1)} °C`, fmtDay(rec.warmest.day), 'text-orange-400') : '') +
+        (rec.coldest ? card('Kältester Tag', `${rec.coldest.value.toFixed(1)} °C`, fmtDay(rec.coldest.day), 'text-blue-400') : '') +
+        (rec.wettest ? card('Feuchtester Tag', `${rec.wettest.value.toFixed(0)} %`, fmtDay(rec.wettest.day), 'text-indigo-400') : '') +
+        (rec.bestComfort ? card('Bester Komfort', `${rec.bestComfort.score}/100`, fmtDay(rec.bestComfort.day), 'text-emerald-400') : '') +
+        card('Wohlfühl-Serie', `${rec.comfortStreak} Tage`, 'am Stück', 'text-teal-400');
+      recEl.classList.remove('hidden');
+
+      // Monatsvergleich: aktueller vs. voriger Kalendermonat
+      if (cmpEl) {
+        const now = new Date();
+        const key = (y, m) => `${y}-${String(m + 1).padStart(2, '0')}`;
+        const curKey = key(now.getFullYear(), now.getMonth());
+        const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevKey = key(prev.getFullYear(), prev.getMonth());
+        const agg = mk => {
+          const sub = rows.filter(r => r.day.startsWith(mk) && r.t_avg != null);
+          if (!sub.length) return null;
+          const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+          return {
+            t: mean(sub.map(r => r.t_avg)),
+            h: mean(sub.map(r => r.h_avg).filter(v => v != null)),
+            score: Math.round(mean(sub.map(r => comfortScore(r.t_avg, r.h_avg, null, getThresholds())).filter(v => v != null)))
+          };
+        };
+        const c = agg(curKey), p = agg(prevKey);
+        if (c && p) {
+          const arrow = d => d > 0.1 ? '↑' : d < -0.1 ? '↓' : '→';
+          cmpEl.innerHTML = `<strong class="text-slate-200">Monatsvergleich:</strong> Ø ${c.t.toFixed(1)} °C (${arrow(c.t - p.t)} ${(c.t - p.t >= 0 ? '+' : '')}${(c.t - p.t).toFixed(1)} vs. Vormonat), Feuchte ${c.h.toFixed(0)} % (${arrow(c.h - p.h)} ${(c.h - p.h >= 0 ? '+' : '')}${(c.h - p.h).toFixed(0)} %), Komfort ${c.score}/100 (${arrow(c.score - p.score)} ${(c.score - p.score >= 0 ? '+' : '')}${c.score - p.score}).`;
+          cmpEl.classList.remove('hidden');
+        } else {
+          cmpEl.classList.add('hidden');
         }
       }
     }
