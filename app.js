@@ -1,5 +1,24 @@
 // ClimateFlow Dashboard + Hub-Navigation.
 // Ausgelagert aus index.html; nutzt lib/core.js (getestete Kernlogik) und shared.js.
+//
+// ── Modul-Übersicht (Abschnitte in dieser Datei) ────────────────────────────
+//   1. Konfiguration & Zustand      LOCATIONS, appState, Store-Zugriffe
+//   2. Standort & Schwellwerte       initConfigs, getThresholds, Tabs
+//   3. Daten laden                   fetchFeeds, reloadData, loadIndoorData,
+//                                    Offline-Snapshot, loadOutdoorWeather, AQI
+//   4. Klima-Auswertung/Render       KPIs, Lüftungsberater/-tagebuch/-trend,
+//                                    Schimmel, Komfort, Heizindikator, Chart
+//   5. Langzeit-Archiv               loadArchiveView, Rekorde, Tagesdetail
+//   6. Push (ntfy)                   configureNtfy, checkWeatherWarnings
+//   7. Einstellungsseite (P1)        renderSettings, Theme, Profil, Logout
+//   8. Benachrichtigungs-Center (P4) NOTIFY_TYPES, notify_rules
+//   9. Hub-Widgets                   Uhr, Wetter/Vorschau, To-dos, Kalender
+//  10. Layout-Factory               createLayout (Hub + ClimateFlow), Onboarding
+//  11. Navigation & init            HUB_VIEWS, handleRoute, init
+// Anmerkung: Ein physisches Aufteilen in mehrere Dateien scheitert daran, dass
+// klassische <script>-Dateien ihre top-level const/let NICHT teilen (kein
+// Bundler); der gemeinsame Zustand (appState etc.) müsste sonst global werden.
+// ────────────────────────────────────────────────────────────────────────────
 
 // Configuration for both locations.
     // fields: generalisiertes Kanal-Schema (siehe processRawFeeds in lib/core.js).
@@ -2692,6 +2711,9 @@
           <span class="text-sm text-slate-300 flex items-center gap-1.5"><i data-lucide="${light ? 'sun' : 'moon'}" class="w-4 h-4 text-amber-400"></i> Erscheinungsbild</span>
           <button onclick="toggleTheme()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors">${light ? 'Heller Modus' : 'Dunkler Modus'} · umschalten</button>
         </div>`;
+        if (window.Store && Store.mode === 'server') {
+          html += `<div class="mt-2 flex justify-end"><button onclick="logout()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-red-500/40 text-xs text-slate-400 hover:text-red-300 transition-colors flex items-center gap-1.5"><i data-lucide="log-out" class="w-3.5 h-3.5"></i> Abmelden</button></div>`;
+        }
         pEl.innerHTML = html;
       }
 
@@ -3209,6 +3231,20 @@
       const p = (window.Store && Store.profile) || 'default';
       if (!p || p === 'default') return '';
       return p.charAt(0).toUpperCase() + p.slice(1);
+    }
+
+    // Abmelden (Punkt 28). Bei Cloudflare Access über dessen Logout-URL, sonst
+    // per 401-Endpunkt (verwirft die gespeicherten Basic-Auth-Zugangsdaten).
+    async function logout() {
+      const ok = await modalConfirm({ title: 'Abmelden?', message: 'Du wirst abgemeldet und musst dich neu anmelden.', confirmLabel: 'Abmelden' });
+      if (!ok) return;
+      if (window.Store && Store.authMode === 'access') {
+        location.href = '/cdn-cgi/access/logout';
+        return;
+      }
+      try { await fetch('/api/logout', { cache: 'no-store' }); } catch (e) { /* 401 erwartet */ }
+      showNotification('Abgemeldet. Zugangsdaten werden neu abgefragt…');
+      setTimeout(() => location.reload(), 800);
     }
 
     // Theme umschalten (Punkt 10) — pro Profil im Store gespeichert

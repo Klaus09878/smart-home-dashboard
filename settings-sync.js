@@ -19,6 +19,7 @@ const Store = (function () {
     profile: 'default',
     isAdmin: false,
     mode: 'local',      // 'server' sobald /api/whoami + D1 erreichbar
+    authMode: 'basic',  // 'basic' | 'access' (aus whoami)
     profiles: null,
     ready: false,
     _initPromise: null
@@ -75,6 +76,7 @@ const Store = (function () {
     get profile() { return state.profile; },
     get isAdmin() { return state.isAdmin; },
     get mode() { return state.mode; },
+    get authMode() { return state.authMode; },
     get profiles() { return state.profiles; },
     get ready() { return state.ready; },
 
@@ -181,6 +183,7 @@ const Store = (function () {
       state.profile = (who.user || 'default').replace(/[^\w.-]/g, '_');
       state.isAdmin = !!who.isAdmin;
       state.profiles = who.profiles || null;
+      state.authMode = who.mode || 'basic';
       state.mode = 'server';
     } catch (e) {
       state.profile = localStorage.getItem('active_profile_local') || 'default';

@@ -16,7 +16,8 @@ Multi-Projekt-SPA auf Cloudflare Pages (statisch + Functions), Mehrbenutzer-Logi
 - `settings-sync.js` — `Store` (Profil + D1-Sync). Wird VOR app.js/gpx.js geladen.
 - `functions/_auth.js` — Nutzerliste/Identität; `functions/_notify.js` — Push-Verteiler (Profile+Regeln aus D1, Ruhezeiten `Europe/Berlin`, per-Profil-Dedupe, Fallback `NTFY_TOPIC`).
 - `functions/api/` — `whoami`, `settings` (D1 `user_settings`), `feeds/[locId]` (Proxy, löst auch D1-`locations`), `gpx`, `climate`, `todos`, `locations` (Admin), `health`, `error-log`, `ical`, `config`, `check-alerts`/`weekly-report`/`monthly-report` (Cron). D1-Binding `DB`, Schema zur Laufzeit. Magnus-/Komfort-Formeln dort bewusst inline dupliziert — bei Formel-Änderungen beide Stellen anfassen.
-- `tests/core.test.js` + `tests/smoke.test.js` — `npm test`; Smoke-Test prüft ID-/Handler-/Dateiverweise über alle Seiten.
+- `tests/core.test.js` + `tests/smoke.test.js` — `npm test`; Smoke-Test prüft ID-/Handler-/Dateiverweise über alle Seiten. `tests/e2e.spec.js` (Playwright, `npm run test:e2e`) läuft separat, nicht im Deploy-Build.
+- Dialoge über `modalPrompt`/`modalConfirm` (shared.js), nie `prompt()`/`confirm()`. Theme via `applyTheme`/`getTheme` (raw `localStorage.theme` + profilbezogen im Store). Icon-Buttons brauchen nur `title` — `updateIcons` setzt `aria-label` automatisch.
 - `tailwind.css` — GEBAUT, nie von Hand editieren.
 
 ## Nicht-offensichtliche Regeln

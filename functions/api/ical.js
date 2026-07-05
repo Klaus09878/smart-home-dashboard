@@ -4,9 +4,22 @@
 // Feed serverseitig und reicht ihn durch (5 Min Edge-Cache, 512-KB-Deckel).
 //
 // Aufruf: GET /api/ical?url=https%3A%2F%2F...
-// Hinter der Basic-Auth-Middleware — kein offener Proxy.
+// Hinter der Basic-Auth-Middleware — und zusätzlich auf bekannte Kalender-Hosts
+// beschränkt (Punkt 27), damit der Proxy nicht als offener Fetch missbraucht wird.
 
 const MAX_BYTES = 512 * 1024;
+// Erlaubte Host-Endungen (Google, Apple/iCloud, Outlook/Office365, Nextcloud-Cloud …)
+const ALLOWED_HOST_SUFFIXES = [
+  'google.com', 'googleusercontent.com', 'calendar.google.com',
+  'icloud.com', 'me.com',
+  'outlook.com', 'outlook.office365.com', 'office365.com', 'live.com',
+  'yahoo.com', 'fastmail.com', 'posteo.de', 'mailbox.org', 'gmx.net', 'web.de'
+];
+
+function hostAllowed(host) {
+  host = host.toLowerCase();
+  return ALLOWED_HOST_SUFFIXES.some(s => host === s || host.endsWith('.' + s));
+}
 
 export async function onRequestGet(context) {
   const target = new URL(context.request.url).searchParams.get('url');
@@ -14,6 +27,16 @@ export async function onRequestGet(context) {
   if (!target || !/^https:\/\//i.test(target)) {
     return new Response(JSON.stringify({ error: 'Parameter url (https://…) erforderlich' }), {
       status: 400, headers: { 'Content-Type': 'application/json' }
+    });
+  }
+
+  let host;
+  try { host = new URL(target).hostname; } catch (e) {
+    return new Response(JSON.stringify({ error: 'Ungültige URL' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+  }
+  if (!hostAllowed(host)) {
+    return new Response(JSON.stringify({ error: `Kalender-Host nicht erlaubt: ${host}. Unterstützt werden u. a. Google, iCloud, Outlook.` }), {
+      status: 403, headers: { 'Content-Type': 'application/json' }
     });
   }
 

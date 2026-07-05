@@ -54,7 +54,15 @@ export async function onRequestGet(context) {
   const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
-  const res = await fetch(upstream);
+  // Rate-Limit (429) einmal mit kurzer Pause erneut versuchen (Punkt 25).
+  let res = await fetch(upstream);
+  if (res.status === 429) {
+    await new Promise(r => setTimeout(r, 1200));
+    res = await fetch(upstream);
+  }
+  if (res.status === 429) {
+    return json({ error: 'ThingSpeak-Ratenlimit erreicht – bitte kurz warten.' }, 429);
+  }
   if (!res.ok) return json({ error: `ThingSpeak-Fehler ${res.status}` }, 502);
 
   const body = await res.text();

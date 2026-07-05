@@ -34,6 +34,8 @@ Multi-Projekt-Plattform auf Cloudflare Pages: Homescreen-Hub mit Klimadashboard
 | `functions/api/config.js` | Globaler Key-Value-Speicher in D1 (Wetter-Koordinaten für die Server-Checks) |
 | `gpx.js` | GPX-Viewer-Logik (aus gpx.html ausgelagert) |
 | `tests/core.test.js` / `tests/smoke.test.js` | Kern-Tests + Deploy-Schutz (`npm test`) |
+| `tests/e2e.spec.js` + `playwright.config.js` | Browser-E2E-Tests (`npm i -D @playwright/test && npx playwright install chromium && npm run test:e2e`) — nicht Teil des Deploy-Builds |
+| `functions/api/logout.js` | Abmeldung (401 bzw. Cloudflare-Access-Logout) |
 | `manifest.webmanifest`, `sw.js`, `icons/` | PWA: installierbar auf dem iPhone-/Android-Homescreen, Offline-Fallback |
 
 ## 🔧 Einrichtung Cloud-Funktionen (To-do)
