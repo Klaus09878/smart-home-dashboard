@@ -2,6 +2,8 @@
 <html lang="de" class="dark">
 <head>
   <meta charset="UTF-8">
+  <!-- Theme sofort anwenden (vor dem Paint), verhindert Aufblitzen (Punkt 10) -->
+  <script>(function(){try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.remove('dark');document.documentElement.classList.add('light');}}catch(e){}})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart Home Hub</title>
   <!-- SEO & Meta Tags -->
@@ -24,8 +26,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Chart.js CDN -->
+  <!-- Chart.js CDN + Zoom/Pan-Plugin (Punkt 12) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
@@ -859,6 +863,12 @@
             <button onclick="setChartTimeframe(-1)" id="btn-tf-all" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all">Alle</button>
             <span class="w-px h-5 bg-slate-800 mx-0.5 hidden sm:block"></span>
             <button onclick="toggleCompareMode()" id="btn-compare" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all" title="Beide Standorte im selben Chart vergleichen">Vergleich</button>
+            <button onclick="resetChartZoom()" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all" title="Zoom zurücksetzen">
+              <i data-lucide="zoom-out" class="w-4 h-4"></i>
+            </button>
+            <button onclick="exportChartImage()" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all" title="Chart als Bild speichern">
+              <i data-lucide="image-down" class="w-4 h-4"></i>
+            </button>
           </div>
         </div>
 

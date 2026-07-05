@@ -1112,6 +1112,7 @@ async function deleteActivity() {
 async function init() {
   // Profil + Einstellungen laden, bevor Ziele/Notizen gelesen werden
   await Store.init();
+  applyTheme(getTheme());
   updateIcons();
   await refreshActivities();
   if (state.activities.length > 0) selectActivity(state.activities[0].id);

@@ -3,6 +3,13 @@
 
 function updateIcons() {
   if (window.lucide) window.lucide.createIcons();
+  // Barrierefreiheit (Punkt 15): Icon-Buttons ohne Text bekommen ein aria-label
+  // aus ihrem title, damit Screenreader sie ansagen.
+  try {
+    document.querySelectorAll('button[title]:not([aria-label]), a[title]:not([aria-label])').forEach(el => {
+      if (el.title) el.setAttribute('aria-label', el.title);
+    });
+  } catch (e) { /* defensive */ }
 }
 
 function formatTime(date) {
@@ -264,6 +271,23 @@ function reportRuntimeError(kind, message) {
 window.addEventListener('error', e => reportRuntimeError('Fehler', e.message));
 window.addEventListener('unhandledrejection', e =>
   reportRuntimeError('Unbehandelte Promise-Ablehnung', e.reason && (e.reason.message || e.reason)));
+
+// ============ Theme (hell/dunkel, Punkt 10) ============
+// theme: 'dark' | 'light'. Wird sofort im <head> aus dem rohen localStorage
+// angewandt; die profilbezogene Kopie liegt zusätzlich im Store.
+function applyTheme(theme) {
+  const light = theme === 'light';
+  document.documentElement.classList.toggle('light', light);
+  document.documentElement.classList.toggle('dark', !light);
+  try { localStorage.setItem('theme', light ? 'light' : 'dark'); } catch (e) { /* ignore */ }
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', light ? '#eef2f7' : '#0f172a');
+}
+
+function getTheme() {
+  if (window.Store && window.Store.ready) return Store.get('theme') || 'dark';
+  try { return localStorage.getItem('theme') || 'dark'; } catch (e) { return 'dark'; }
+}
 
 // ============ Service Worker + Update-Hinweis (PWA) ============
 // Registriert den SW und bietet bei einer neuen Version einen „Neu laden"-Toast

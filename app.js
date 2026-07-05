@@ -365,6 +365,11 @@
       if (reloadIcon) reloadIcon.classList.add('animate-spin');
       if (!silent) toggleLoadingOverlay(true);
 
+      // Skeleton-Pulsieren beim allerersten Laden (noch keine Werte) — Punkt 11
+      const firstLoad = appState.insideData.length === 0;
+      const kpiCard = document.querySelector('[data-widget="cf-kpi"]');
+      if (firstLoad && kpiCard) kpiCard.classList.add('animate-pulse');
+
       try {
         await Promise.all([
           loadIndoorData(),
@@ -378,6 +383,7 @@
         showNotification('Fehler beim Abrufen der Live-Daten.', 'error');
       } finally {
         if (!silent) toggleLoadingOverlay(false);
+        if (kpiCard) kpiCard.classList.remove('animate-pulse');
         if (reloadIcon) {
           setTimeout(() => {
             reloadIcon.classList.remove('animate-spin');
@@ -431,6 +437,7 @@
         appState.isDemoMode = false;
         document.getElementById('demo-banner').classList.add('hidden');
         updateStatusText(true);
+        saveOfflineSnapshot(activeLoc.id, processed.aligned); // für Offline-Start (Punkt 13)
 
         // Tages-Aggregate ins D1-Langzeit-Archiv schreiben (asynchron, best effort)
         archiveClimateDaily();
@@ -443,10 +450,39 @@
           appState.lastSensorUpdate = { temp: processed.lastTempTime, humidity: processed.lastHumTime };
           showNotification('Aktualisierung fehlgeschlagen – zeige letzte bekannte Daten.', 'error');
         } else {
-          console.warn('ThingSpeak laden fehlgeschlagen, aktiviere Demo-Modus:', err);
-          activateDemoMode();
+          // Frischer Offline-Start: persistierten Snapshot nutzen (Punkt 13)
+          const snap = loadOfflineSnapshot(activeLoc.id);
+          if (snap && snap.length > 0) {
+            console.warn('Offline – zeige gespeicherten Stand:', err);
+            appState.insideData = snap;
+            const last = snap[snap.length - 1];
+            appState.lastSensorUpdate = { temp: last.time, humidity: last.time };
+            appState.isDemoMode = false;
+            const ageMin = Math.round((Date.now() - last.time.getTime()) / 60000);
+            const ageTxt = ageMin < 60 ? `vor ${ageMin} Min.` : `vor ${Math.round(ageMin / 60)} Std.`;
+            showNotification(`Offline – Stand: ${ageTxt}.`, 'info');
+          } else {
+            console.warn('ThingSpeak laden fehlgeschlagen, aktiviere Demo-Modus:', err);
+            activateDemoMode();
+          }
         }
       }
+    }
+
+    // Kompakter Offline-Snapshot (letzte ~1000 Messpaare) im localStorage —
+    // gerätelokal, nicht profil-synchron. Ermöglicht KPI/Chart auch offline.
+    function saveOfflineSnapshot(locId, aligned) {
+      try {
+        const slim = aligned.slice(-1000).map(a => ({ t: a.time.getTime(), te: a.temp, h: a.humidity }));
+        localStorage.setItem(`climate_offline_${locId}`, JSON.stringify(slim));
+      } catch (e) { /* Quota o. Ä. → ignorieren */ }
+    }
+    function loadOfflineSnapshot(locId) {
+      try {
+        const raw = localStorage.getItem(`climate_offline_${locId}`);
+        if (!raw) return null;
+        return JSON.parse(raw).map(a => ({ time: new Date(a.t), temp: a.te, humidity: a.h }));
+      } catch (e) { return null; }
     }
 
     // Fetch local weather from Open-Meteo for active coordinates
@@ -1481,6 +1517,11 @@
                     : `${name}: ${context.parsed.y.toFixed(1)}`;
                 }
               }
+            },
+            // Zoomen (Mausrad/Pinch) + Schwenken (Ziehen) auf der Zeitachse (Punkt 12)
+            zoom: {
+              zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+              pan: { enabled: true, mode: 'x' }
             }
           },
           scales: {
@@ -1594,6 +1635,19 @@
       }
       updateCompareButton();
       drawChart();
+    }
+
+    // Chart-Zoom zurücksetzen / als PNG exportieren (Punkt 12)
+    function resetChartZoom() {
+      if (appState.chartInstance && appState.chartInstance.resetZoom) appState.chartInstance.resetZoom();
+    }
+    function exportChartImage() {
+      if (!appState.chartInstance) return;
+      const a = document.createElement('a');
+      a.href = appState.chartInstance.toBase64Image('image/png', 1);
+      a.download = `klimaverlauf_${getLocationName(appState.activeLocId).replace(/[^\wäöüÄÖÜß-]+/g, '_')}_${new Date().toISOString().substring(0, 10)}.png`;
+      a.click();
+      showNotification('Chart als Bild gespeichert.');
     }
 
     function toggleTableCollapse() {
@@ -2300,6 +2354,15 @@
       t.deleted = true; // Tombstone (für den Sync), lokal ausgeblendet
       touchTodo(t);
       saveTodos(list);
+      // Rückgängig anbieten (Punkt 14)
+      showToast('To-do gelöscht.', 'info', {
+        label: 'Rückgängig',
+        onClick: () => {
+          const l = getTodos();
+          const item = l.find(x => x.id === id);
+          if (item) { item.deleted = false; touchTodo(item); saveTodos(l); }
+        }
+      });
     }
 
     async function editTodo(id) {
@@ -2472,6 +2535,11 @@
         } else if (Store.mode !== 'server') {
           html += `<p class="text-[11px] text-slate-500 mt-1">Auf dem Server ist jedes Login-Passwort ein eigenes Profil. Lokal wird „Standard" verwendet.</p>`;
         }
+        const light = getTheme() === 'light';
+        html += `<div class="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between">
+          <span class="text-sm text-slate-300 flex items-center gap-1.5"><i data-lucide="${light ? 'sun' : 'moon'}" class="w-4 h-4 text-amber-400"></i> Erscheinungsbild</span>
+          <button onclick="toggleTheme()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors">${light ? 'Heller Modus' : 'Dunkler Modus'} · umschalten</button>
+        </div>`;
         pEl.innerHTML = html;
       }
 
@@ -2990,6 +3058,15 @@
       return p.charAt(0).toUpperCase() + p.slice(1);
     }
 
+    // Theme umschalten (Punkt 10) — pro Profil im Store gespeichert
+    function toggleTheme() {
+      const next = getTheme() === 'light' ? 'dark' : 'light';
+      applyTheme(next);
+      Store.set('theme', next);
+      renderSettings();
+      showNotification(next === 'light' ? 'Heller Modus aktiv.' : 'Dunkler Modus aktiv.');
+    }
+
     // Kleines Profil-Abzeichen im Hub-Header (Name + Abmelde-Hinweis)
     function updateProfileBadge() {
       const el = document.getElementById('profile-badge');
@@ -3066,6 +3143,7 @@
       // Profil + Einstellungen laden, bevor irgendetwas gelesen wird
       await Store.init();
       updateProfileBadge();
+      applyTheme(getTheme()); // profilbezogenes Theme anwenden
       // Zusatz-Standorte aus D1 ergänzen, bevor Tabs/Configs rendern
       await loadDynamicLocations();
 
