@@ -148,6 +148,11 @@ let _errorPushCount = 0;
 function reportRuntimeError(kind, message) {
   try {
     if (_errorPushCount >= 3) return;
+    // Regel „App-Fehler" respektieren, falls konfiguriert
+    if (window.Store && window.Store.ready && typeof window.Store.getJSON === 'function') {
+      const r = window.Store.getJSON('notify_rules', null);
+      if (r && r.types && r.types.errors && r.types.errors.on === false) return;
+    }
     const msg = (message || '').toString().substring(0, 300);
     if (!msg || msg === 'Script error.') return; // Cross-Origin-Rauschen ignorieren
     _errorPushCount++;

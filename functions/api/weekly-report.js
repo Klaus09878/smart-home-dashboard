@@ -7,16 +7,15 @@
 // Datenquelle: D1-Langzeit-Archiv (climate_daily). Ohne D1 bzw. ohne Archiv-
 // zeilen wird direkt aus ThingSpeak aggregiert (dann ohne Vorwochen-Trend).
 //
-// Einrichtung (Pages → Settings → Environment variables): wie check-alerts —
-// NTFY_TOPIC (Pflicht), TS_KEY_GILLIAN / TS_KEY_SEAN (für den Fallback),
-// D1-Binding "DB" (für Archiv-Daten, Trend und Doppelversand-Schutz von 5 Tagen).
+// Verteilung an alle Profile mit aktiviertem Wochenbericht (Topic + Regeln aus
+// D1), Fallback globales NTFY_TOPIC — siehe _notify.js. Doppelversand-Schutz
+// (5 Tage) steckt in der Dedupe des Verteilers.
+import { loadRecipients, dispatch } from '../_notify.js';
 
 const CHANNELS = {
   gillian: { channel: '3417815', envKey: 'TS_KEY_GILLIAN', label: 'Gillian' },
   sean:    { channel: '3417935', envKey: 'TS_KEY_SEAN',    label: 'Sean' }
 };
-
-const DEDUPE_MS = 5 * 24 * 60 * 60 * 1000; // max. 1 Report pro 5 Tage
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
@@ -126,23 +125,15 @@ async function loadWeekFromThingSpeak(apiKey, channel) {
     .sort((a, b) => a.day.localeCompare(b.day));
 }
 
-async function shouldSend(db, key) {
-  if (!db) return true; // ohne D1 verlässt sich der Schutz auf den wöchentlichen Cron
-  await db.exec("CREATE TABLE IF NOT EXISTS alert_state (key TEXT PRIMARY KEY, last_sent INTEGER)");
-  const row = await db.prepare('SELECT last_sent FROM alert_state WHERE key = ?').bind(key).first();
-  if (row && Date.now() - row.last_sent < DEDUPE_MS) return false;
-  await db.prepare('INSERT OR REPLACE INTO alert_state (key, last_sent) VALUES (?, ?)').bind(key, Date.now()).run();
-  return true;
-}
-
 export async function onRequestGet(context) {
   const { env } = context;
 
-  if (!env.NTFY_TOPIC) {
-    return json({ error: 'Env-Variable NTFY_TOPIC nicht konfiguriert' }, 503);
+  const recipients = await loadRecipients(env);
+  if (recipients.length === 0) {
+    return json({ error: 'Kein ntfy-Empfänger konfiguriert (weder Profil-Topic in D1 noch NTFY_TOPIC)' }, 503);
   }
 
-  const report = { generatedAt: new Date().toISOString(), locations: {}, sent: false };
+  const report = { generatedAt: new Date().toISOString(), recipients: recipients.map(r => r.profile), locations: {}, sent: false };
   const lines = [];
 
   for (const [locId, loc] of Object.entries(CHANNELS)) {
@@ -194,17 +185,11 @@ export async function onRequestGet(context) {
     report.locations[locId] = { ...agg, source };
   }
 
-  if (!(await shouldSend(env.DB, 'weekly_report'))) {
-    report.skipped = 'Report wurde in den letzten 5 Tagen bereits verschickt (Dedupe).';
-    return json(report);
-  }
-
-  await fetch(`https://ntfy.sh/${encodeURIComponent(env.NTFY_TOPIC)}`, {
-    method: 'POST',
-    body: `Klima-Wochenbericht:\n\n${lines.join('\n\n')}`,
-    headers: { 'Title': 'ClimateFlow Wochenbericht', 'Tags': 'bar_chart' }
-  });
-  report.sent = true;
+  const body = `Klima-Wochenbericht:\n\n${lines.join('\n\n')}`;
+  report.notified = await dispatch(env, recipients, 'weekly', 'report', () => ({
+    title: 'ClimateFlow Wochenbericht', body, tags: 'bar_chart', priority: 'default'
+  }));
+  report.sent = report.notified.length > 0;
 
   return json(report);
 }

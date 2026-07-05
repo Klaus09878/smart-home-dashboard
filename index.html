@@ -238,6 +238,143 @@
       </div>
     </div>
 
+    <!-- ============ VIEW: EINSTELLUNGEN ============ -->
+    <div id="view-settings" class="hidden flex-1 flex-col animate-fade-in">
+      <header class="glass-panel rounded-2xl p-4 mb-6 flex items-center gap-3 shadow-lg">
+        <button onclick="navigateTo('home')" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Zurück zum Hub">
+          <i data-lucide="arrow-left" class="w-4.5 h-4.5"></i>
+        </button>
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-600 to-slate-800 flex items-center justify-center text-white shadow-md">
+          <i data-lucide="settings" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight text-white">Einstellungen</h1>
+          <p class="text-xs text-slate-400 mt-0.5">Personalisierung, Benachrichtigungen &amp; Daten</p>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl w-full mx-auto pb-8">
+
+        <!-- Profil -->
+        <section class="glass-panel rounded-2xl p-5 shadow-lg">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+            <i data-lucide="user-circle" class="w-4 h-4 text-teal-400"></i> Profil
+          </h2>
+          <div id="settings-profile" class="text-sm text-slate-300 space-y-2">–</div>
+        </section>
+
+        <!-- Einrichtungs-Assistent -->
+        <section class="glass-panel rounded-2xl p-5 shadow-lg">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+            <i data-lucide="wand-2" class="w-4 h-4 text-indigo-400"></i> Einrichtung
+          </h2>
+          <p class="text-xs text-slate-400 mb-3" id="onboarding-status">Geführte Ersteinrichtung: Push, Schwellwerte, Kalender &amp; Ziele.</p>
+          <button onclick="openOnboarding()" class="px-4 py-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-200 hover:bg-indigo-500/25 text-sm font-semibold transition-colors flex items-center gap-2">
+            <i data-lucide="sparkles" class="w-4 h-4"></i> Assistent starten
+          </button>
+        </section>
+
+        <!-- Benachrichtigungen (P4) -->
+        <section class="glass-panel rounded-2xl p-5 shadow-lg lg:col-span-2">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+            <i data-lucide="bell" class="w-4 h-4 text-orange-400"></i> Benachrichtigungen
+          </h2>
+          <div class="flex flex-wrap items-center gap-2 mb-4">
+            <button onclick="configureNtfy()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors flex items-center gap-1.5">
+              <i data-lucide="radio" class="w-3.5 h-3.5"></i> ntfy-Topic: <span id="settings-ntfy-topic" class="font-mono text-teal-300">–</span>
+            </button>
+            <button onclick="sendTestPush()" class="px-3 py-1.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-200 hover:bg-teal-500/25 text-xs font-semibold transition-colors flex items-center gap-1.5">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i> Test-Push
+            </button>
+          </div>
+          <div id="notify-rules" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+          <!-- Ruhezeiten -->
+          <div class="mt-4 pt-4 border-t border-slate-800/60 flex flex-wrap items-center gap-3">
+            <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+              <input type="checkbox" id="quiet-on" class="accent-teal-500" onchange="saveNotifyRulesFromUI()">
+              Ruhezeit (keine Info-Pushes)
+            </label>
+            <span class="text-xs text-slate-400 flex items-center gap-1">von
+              <input type="number" id="quiet-from" min="0" max="23" class="w-14 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200" onchange="saveNotifyRulesFromUI()"> Uhr bis
+              <input type="number" id="quiet-to" min="0" max="23" class="w-14 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200" onchange="saveNotifyRulesFromUI()"> Uhr
+            </span>
+            <span class="text-[11px] text-slate-500">Sicherheits-Warnungen (Sensor/Schimmel/Frost) kommen trotzdem.</span>
+          </div>
+        </section>
+
+        <!-- Standorte -->
+        <section class="glass-panel rounded-2xl p-5 shadow-lg lg:col-span-2">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+            <i data-lucide="home" class="w-4 h-4 text-emerald-400"></i> Standorte
+          </h2>
+          <div id="settings-locations" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+        </section>
+
+        <!-- Kalender -->
+        <section class="glass-panel rounded-2xl p-5 shadow-lg">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+            <i data-lucide="calendar" class="w-4 h-4 text-orange-400"></i> Kalender
+          </h2>
+          <p class="text-xs text-slate-400 mb-3" id="settings-ical-state">–</p>
+          <div class="flex gap-2">
+            <button onclick="configureIcal()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors">.ics-URL</button>
+            <button onclick="loadHubCalendar(true); showNotification('Kalender aktualisiert.')" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors">Testen</button>
+          </div>
+        </section>
+
+        <!-- Ziele -->
+        <section class="glass-panel rounded-2xl p-5 shadow-lg">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+            <i data-lucide="target" class="w-4 h-4 text-rose-400"></i> GPX-Ziele
+          </h2>
+          <p class="text-xs text-slate-400 mb-3" id="settings-goals-state">–</p>
+          <button onclick="editHubGoals()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors">Ziele bearbeiten</button>
+        </section>
+
+        <!-- System (P15, in Phase 3 befüllt) -->
+        <section class="glass-panel rounded-2xl p-5 shadow-lg lg:col-span-2">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+            <i data-lucide="activity" class="w-4 h-4 text-sky-400"></i> System &amp; Diagnose
+            <button onclick="loadHealth()" class="ml-auto px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-300 transition-colors">Aktualisieren</button>
+          </h2>
+          <div id="settings-health" class="text-sm text-slate-300">Auf „Aktualisieren" tippen, um den Systemstatus zu prüfen.</div>
+        </section>
+
+        <!-- Daten -->
+        <section class="glass-panel rounded-2xl p-5 shadow-lg lg:col-span-2">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
+            <i data-lucide="database" class="w-4 h-4 text-slate-400"></i> Daten &amp; Widgets
+          </h2>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="exportSettingsJson()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors flex items-center gap-1.5"><i data-lucide="download" class="w-3.5 h-3.5"></i> Einstellungen exportieren</button>
+            <button onclick="document.getElementById('settings-import-input').click()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors flex items-center gap-1.5"><i data-lucide="upload" class="w-3.5 h-3.5"></i> Importieren</button>
+            <button onclick="resetHubLayout()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors">Widget-Layout zurücksetzen</button>
+            <button onclick="clearLocalData()" class="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 text-xs transition-colors">Lokale Daten löschen</button>
+          </div>
+          <input type="file" id="settings-import-input" accept=".json,application/json" class="hidden" onchange="importSettingsJson(event)">
+        </section>
+
+      </div>
+    </div>
+
+    <!-- Onboarding-Assistent (P16) -->
+    <div id="onboarding-modal" class="hidden fixed inset-0 z-[1600] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4" onclick="if (event.target === this) closeOnboarding()">
+      <div class="glass-panel rounded-2xl p-6 shadow-2xl w-full max-w-md">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="sparkles" class="w-5 h-5 text-indigo-400"></i> Einrichtung</h3>
+          <button onclick="closeOnboarding()" class="p-1.5 rounded-lg text-slate-500 hover:text-white transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </div>
+        <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-4">
+          <div id="onboarding-progress" class="h-full bg-gradient-to-r from-indigo-500 to-teal-400 transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <div id="onboarding-body" class="min-h-[140px] text-sm text-slate-300"></div>
+        <div class="flex items-center justify-between mt-5">
+          <button id="onboarding-skip" onclick="onboardingNext(true)" class="text-xs text-slate-500 hover:text-slate-300 transition-colors">Überspringen</button>
+          <button id="onboarding-next" onclick="onboardingNext(false)" class="px-4 py-2 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-200 hover:bg-indigo-500/30 text-sm font-semibold transition-colors">Weiter</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ============ VIEW: CLIMATEFLOW DASHBOARD ============ -->
     <div id="view-climate" class="hidden flex-1 flex-col">
 
