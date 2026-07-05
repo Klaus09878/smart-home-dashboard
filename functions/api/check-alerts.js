@@ -10,7 +10,7 @@
 // Env (Pages → Settings → Environment variables):
 //   NTFY_TOPIC                    – Fallback-Topic (wenn keine Profile in D1)
 //   TS_KEY_GILLIAN / TS_KEY_SEAN  – ThingSpeak Read-Keys (wie beim feeds-Proxy)
-import { loadRecipients, dispatch, typeCfg } from '../_notify.js';
+import { loadRecipients, dispatch, typeCfg, isQuietNow, shouldSend, pushTo } from '../_notify.js';
 
 const CHANNELS = {
   gillian: { channel: '3417815', envKey: 'TS_KEY_GILLIAN', label: 'Gillian', lat: 48.7758, lon: 9.1829, tempField: 'field1', humField: 'field2' },
@@ -168,6 +168,31 @@ export async function onRequestGet(context) {
     } catch (err) {
       R.error = err.message;
     }
+  }
+
+  // ---- Überfällige To-dos je Profil erinnern (P12) ----
+  if (env.DB) {
+    try {
+      await env.DB.exec("CREATE TABLE IF NOT EXISTS todos (id TEXT PRIMARY KEY, profile TEXT, text TEXT, done INTEGER DEFAULT 0, due_ms INTEGER, repeat_days INTEGER, shared INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER, deleted INTEGER DEFAULT 0)");
+      for (const rec of recipients) {
+        if (rec.profile === '_global') continue; // globales Fallback-Topic hat keine To-dos
+        const cfg = typeCfg(rec.rules, 'todo');
+        if (!cfg.on || isQuietNow(rec.rules)) continue;
+        const { results } = await env.DB.prepare(
+          "SELECT text FROM todos WHERE (profile = ? OR shared = 1) AND done = 0 AND deleted = 0 AND due_ms IS NOT NULL AND due_ms < ? ORDER BY due_ms LIMIT 5"
+        ).bind(rec.profile, Date.now()).all();
+        const overdue = results || [];
+        if (!overdue.length) continue;
+        const dedupeMs = (cfg.dedupeH ?? 24) * 60 * 60 * 1000;
+        if (!(await shouldSend(env.DB, `${rec.profile}:todo:overdue`, dedupeMs))) continue;
+        await pushTo(rec.topic, {
+          title: 'Offene To-dos',
+          body: `Überfällig:\n${overdue.map(t => `• ${t.text}`).join('\n')}`,
+          tags: 'check', priority: 'default'
+        });
+        report.notified.push(`${rec.profile}:todo:overdue`);
+      }
+    } catch (e) { report.todoError = e.message; }
   }
 
   return json(report);

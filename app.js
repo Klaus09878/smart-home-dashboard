@@ -1990,23 +1990,66 @@
       }
     }
 
-    // ============ Hub-Widget: To-do-Liste (profilbezogen, D1-Sync in Phase 4) ============
+    // ============ Hub-Widget: To-do-Liste 2.0 (P12) ============
+    // Lokal-first (Store 'hub_todos') mit D1-Sync (/api/todos), Fälligkeiten,
+    // Wiederholungen und gemeinsamen Einträgen (für beide Profile sichtbar).
+    const DAY_MS = 24 * 60 * 60 * 1000;
+
     function getTodos() {
       const t = Store.getJSON('hub_todos', []);
       return Array.isArray(t) ? t : [];
     }
-    function saveTodos(list) {
+    function saveTodos(list, sync = true) {
       Store.setJSON('hub_todos', list);
       renderTodos();
+      if (sync) syncTodos();
+    }
+    function touchTodo(t) { t.updatedAt = Date.now(); return t; }
+
+    // Zwei-Wege-Abgleich mit D1 (LWW über updatedAt, Tombstones via deleted)
+    let _todoSyncing = false;
+    async function syncTodos() {
+      if (_todoSyncing || !(window.Store)) return;
+      _todoSyncing = true;
+      try {
+        const local = getTodos();
+        if (local.length) {
+          await apiFetch('/api/todos', { method: 'POST', body: JSON.stringify({ items: local }) });
+        }
+        const data = await apiFetch('/api/todos');
+        const server = (data && data.todos) || [];
+        const byId = {};
+        local.forEach(t => { byId[t.id] = t; });
+        server.forEach(t => {
+          const cur = byId[t.id];
+          if (!cur || (t.updatedAt || 0) >= (cur.updatedAt || 0)) byId[t.id] = t;
+        });
+        const merged = Object.values(byId);
+        Store.setJSON('hub_todos', merged);
+        renderTodos();
+      } catch (err) {
+        if (!err.unavailable) console.warn('To-do-Sync fehlgeschlagen:', err);
+        // offline / kein D1 → bleibt rein lokal
+      } finally {
+        _todoSyncing = false;
+      }
+    }
+
+    function todoSortKey(t) {
+      // offen zuerst; überfällige/fällige nach Datum; undatierte danach; erledigte zuletzt
+      if (t.done) return 3e15 + (t.updatedAt || 0);
+      if (t.dueMs) return t.dueMs;
+      return 2e15 + (t.createdAt || 0);
     }
 
     function renderTodos() {
       const listEl = document.getElementById('todo-list');
       const countEl = document.getElementById('todo-count');
       if (!listEl) return;
-      const todos = getTodos().sort((a, b) => (a.done === b.done) ? a.createdAt - b.createdAt : (a.done ? 1 : -1));
+      const todos = getTodos().filter(t => !t.deleted).sort((a, b) => todoSortKey(a) - todoSortKey(b));
       const open = todos.filter(t => !t.done).length;
-      if (countEl) countEl.innerText = todos.length > 0 ? `${open} offen` : '';
+      const overdue = todos.filter(t => !t.done && t.dueMs && t.dueMs < Date.now()).length;
+      if (countEl) countEl.innerText = todos.length ? `${open} offen${overdue ? ` · ${overdue} überfällig` : ''}` : '';
 
       listEl.innerHTML = '';
       if (todos.length === 0) {
@@ -2014,31 +2057,92 @@
         return;
       }
       todos.forEach(t => {
+        const isOverdue = !t.done && t.dueMs && t.dueMs < Date.now();
         const row = document.createElement('div');
-        row.className = 'flex items-center gap-2 group/todo';
+        row.className = 'flex items-center gap-1.5 group/todo';
+
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.checked = !!t.done;
         cb.className = 'accent-teal-500 shrink-0 cursor-pointer';
-        cb.onchange = () => {
-          const list = getTodos();
-          const item = list.find(x => x.id === t.id);
-          if (item) { item.done = cb.checked; saveTodos(list); }
-        };
-        const span = document.createElement('span');
-        span.className = `flex-1 min-w-0 truncate text-xs ${t.done ? 'line-through text-slate-600' : 'text-slate-300'}`;
-        span.innerText = t.text;
+        cb.onchange = () => toggleTodo(t.id, cb.checked);
+
+        const mid = document.createElement('div');
+        mid.className = 'flex-1 min-w-0';
+        const dueBadge = t.dueMs
+          ? `<span class="text-[9px] ${isOverdue ? 'text-red-400 font-semibold' : 'text-slate-500'}">${new Date(t.dueMs).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}${t.repeatDays ? ' ↻' : ''}</span>`
+          : (t.repeatDays ? '<span class="text-[9px] text-slate-500">↻</span>' : '');
+        mid.innerHTML = `<span class="block truncate text-xs ${t.done ? 'line-through text-slate-600' : 'text-slate-300'}">${t.shared ? '<i data-lucide=\'users\' class=\'w-2.5 h-2.5 inline text-indigo-400\'></i> ' : ''}${escapeHtml(t.text)}</span>${dueBadge}`;
+
+        const opts = document.createElement('button');
+        opts.className = 'p-0.5 rounded text-slate-600 hover:text-teal-300 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
+        opts.title = 'Fällig/Wiederholung/geteilt';
+        opts.innerHTML = '<i data-lucide="sliders-horizontal" class="w-3 h-3"></i>';
+        opts.onclick = () => editTodo(t.id);
+
         const del = document.createElement('button');
         del.className = 'p-0.5 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
         del.title = 'Löschen';
         del.innerHTML = '<i data-lucide="x" class="w-3 h-3"></i>';
-        del.onclick = () => saveTodos(getTodos().filter(x => x.id !== t.id));
-        row.appendChild(cb);
-        row.appendChild(span);
-        row.appendChild(del);
+        del.onclick = () => deleteTodo(t.id);
+
+        row.append(cb, mid, opts, del);
         listEl.appendChild(row);
       });
       updateIcons();
+    }
+
+    function toggleTodo(id, checked) {
+      const list = getTodos();
+      const t = list.find(x => x.id === id);
+      if (!t) return;
+      t.done = checked;
+      touchTodo(t);
+      // Wiederkehrende Aufgabe: beim Abhaken den nächsten Termin erzeugen
+      if (checked && t.repeatDays > 0) {
+        const baseMs = t.dueMs && t.dueMs > Date.now() - 30 * DAY_MS ? t.dueMs : Date.now();
+        list.push(touchTodo({
+          id: `${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+          text: t.text, done: false,
+          dueMs: baseMs + t.repeatDays * DAY_MS,
+          repeatDays: t.repeatDays, shared: t.shared,
+          createdAt: Date.now()
+        }));
+      }
+      saveTodos(list);
+    }
+
+    function deleteTodo(id) {
+      const list = getTodos();
+      const t = list.find(x => x.id === id);
+      if (!t) return;
+      t.deleted = true; // Tombstone (für den Sync), lokal ausgeblendet
+      touchTodo(t);
+      saveTodos(list);
+    }
+
+    function editTodo(id) {
+      const list = getTodos();
+      const t = list.find(x => x.id === id);
+      if (!t) return;
+      const dueStr = prompt('Fällig am (TT.MM.JJJJ, leer = kein Datum):',
+        t.dueMs ? new Date(t.dueMs).toLocaleDateString('de-DE') : '');
+      if (dueStr === null) return;
+      if (dueStr.trim() === '') {
+        t.dueMs = null;
+      } else {
+        const m = dueStr.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
+        if (!m) { showNotification('Datum im Format TT.MM.JJJJ.', 'error'); return; }
+        const yr = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+        t.dueMs = new Date(yr, +m[2] - 1, +m[1], 9, 0, 0).getTime();
+      }
+      const repStr = prompt('Wiederholung alle X Tage (0 = keine):', t.repeatDays || 0);
+      if (repStr !== null) t.repeatDays = Math.max(0, parseInt(repStr, 10) || 0) || null;
+      const shareStr = confirm('Gemeinsamer Eintrag (für alle Profile sichtbar)?\nOK = geteilt, Abbrechen = privat');
+      t.shared = shareStr;
+      touchTodo(t);
+      saveTodos(list);
+      showNotification('To-do aktualisiert.');
     }
 
     function addTodo(event) {
@@ -2047,7 +2151,11 @@
       const text = input.value.trim();
       if (!text) return;
       const list = getTodos();
-      list.push({ id: Date.now() + Math.random().toString(36).slice(2, 6), text, done: false, createdAt: Date.now() });
+      list.push(touchTodo({
+        id: `${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+        text, done: false, dueMs: null, repeatDays: null, shared: false,
+        createdAt: Date.now()
+      }));
       input.value = '';
       saveTodos(list);
     }
@@ -2138,14 +2246,15 @@
         const events = parseIcsEvents(await res.text());
 
         const now = Date.now();
+        const from = now - 24 * 60 * 60 * 1000;
         const horizon = now + 14 * 24 * 60 * 60 * 1000;
-        const upcoming = events.filter(e =>
-          e.startMs >= now - (e.allDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000) && e.startMs <= horizon
-        ).slice(0, 4);
+        // Serientermine (RRULE) werden zu konkreten Terminen aufgelöst
+        const upcoming = expandRecurring(events, from, horizon)
+          .filter(e => e.startMs >= now - (e.allDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000))
+          .slice(0, 5);
 
         if (upcoming.length === 0) {
-          el.innerHTML = 'Keine Termine in den nächsten 14 Tagen.' +
-            (events.some(e => e.recurring) ? '<p class="text-[10px] text-slate-600 mt-1">Hinweis: Serientermine werden nur mit ihrem ersten Datum erkannt.</p>' : '');
+          el.innerHTML = 'Keine Termine in den nächsten 14 Tagen.';
           return;
         }
 
@@ -2596,6 +2705,7 @@
         loadHubPreviews();
         loadGpxWidget();
         renderTodos();
+        syncTodos();
         loadHubForecast();
         loadHubCalendar();
       }

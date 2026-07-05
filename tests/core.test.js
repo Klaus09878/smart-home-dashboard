@@ -255,6 +255,46 @@ test('parseIcsEvents: UTC-Zeit, Ganztag, gefaltete Zeile, RRULE-Markierung', () 
   assert.deepStrictEqual(core.parseIcsEvents('<html>Fehler</html>'), []);
 });
 
+test('expandRecurring: wöchentlich expandiert im Fenster, EXDATE ausgenommen', () => {
+  const events = [{
+    startMs: Date.UTC(2026, 6, 7, 10, 0, 0), // Di 07.07.2026 12:00 Berlin ~ 10:00Z
+    summary: 'Sport', allDay: false, rrule: 'FREQ=WEEKLY;INTERVAL=1',
+    exdates: [Date.UTC(2026, 6, 21, 10, 0, 0)] // 21.07. fällt aus
+  }];
+  const occ = core.expandRecurring(events, Date.UTC(2026, 6, 1), Date.UTC(2026, 6, 31, 23, 59));
+  const days = occ.map(o => new Date(o.startMs).getUTCDate());
+  assert.deepStrictEqual(days, [7, 14, 28]); // 21. ausgenommen
+  assert.ok(occ.every(o => o.recurring === true));
+});
+
+test('expandRecurring: COUNT begrenzt die Anzahl', () => {
+  const events = [{ startMs: Date.UTC(2026, 0, 1, 8, 0, 0), summary: 'A', rrule: 'FREQ=DAILY;COUNT=3' }];
+  const occ = core.expandRecurring(events, Date.UTC(2026, 0, 1), Date.UTC(2026, 1, 1));
+  assert.strictEqual(occ.length, 3);
+});
+
+test('expandRecurring: UNTIL beendet die Serie', () => {
+  const events = [{ startMs: Date.UTC(2026, 0, 1, 8, 0, 0), summary: 'A', rrule: 'FREQ=DAILY;UNTIL=20260105T000000Z' }];
+  const occ = core.expandRecurring(events, Date.UTC(2026, 0, 1), Date.UTC(2026, 1, 1));
+  assert.strictEqual(occ.length, 4); // 1.,2.,3.,4. (5. um 00:00 ausgeschlossen? >UNTIL bei 00:00:00 → 5. 08:00 liegt nach UNTIL)
+});
+
+test('expandRecurring: BYDAY erzeugt mehrere Wochentage', () => {
+  // Start Mo 05.01.2026, jede Woche Mo+Mi+Fr
+  const events = [{ startMs: Date.UTC(2026, 0, 5, 9, 0, 0), summary: 'Kurs', rrule: 'FREQ=WEEKLY;BYDAY=MO,WE,FR' }];
+  const occ = core.expandRecurring(events, Date.UTC(2026, 0, 5), Date.UTC(2026, 0, 11, 23, 59));
+  // erste Woche: Mo 5., Mi 7., Fr 9.
+  const days = occ.map(o => new Date(o.startMs).getUTCDate()).sort((a, b) => a - b);
+  assert.deepStrictEqual(days, [5, 7, 9]);
+});
+
+test('expandRecurring: Einzeltermin ohne RRULE bleibt erhalten', () => {
+  const events = [{ startMs: Date.UTC(2026, 5, 15, 10, 0), summary: 'Einmalig', allDay: false }];
+  const occ = core.expandRecurring(events, Date.UTC(2026, 5, 1), Date.UTC(2026, 5, 30));
+  assert.strictEqual(occ.length, 1);
+  assert.strictEqual(occ[0].recurring, false);
+});
+
 console.log('lib/core.js – GPX');
 
 test('haversine: 1° Länge am Äquator ≈ 111,2 km', () => {
