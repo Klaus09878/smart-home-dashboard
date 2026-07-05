@@ -156,7 +156,7 @@ async function importGpxText(xmlText, fileName) {
   const activity = {
     uid: genUid(),
     name,
-    type: guessType(stats.avgSpeed),
+    type: guessTypeWithHints(storedPoints, stats.avgSpeed),
     points: storedPoints,
     distM: stats.distM,
     totalSec: stats.totalSec,
@@ -631,6 +631,83 @@ function cellsFor(act) {
   return state.cellCache.get(act.id);
 }
 
+// ============ Auto-Typ-Lernen (P10) ============
+// Korrigiert der Nutzer den geratenen Aktivitätstyp, merkt sich das System die
+// Routen-Signatur → Typ. Beim nächsten Import derselben Strecke wird sofort
+// richtig geraten. Signatur bewusst grob (downsample 200) für kleinen Speicher.
+function getTypeHints() {
+  const h = Store.getJSON('gpx_type_hints', []);
+  return Array.isArray(h) ? h : [];
+}
+function recordTypeHint(points, type) {
+  if (!points || points.length < 2) return;
+  const cells = [...routeCells(downsamplePoints(points, 200))];
+  const hints = getTypeHints().filter(h => routeSimilarity(new Set(h.cells), new Set(cells)) < 0.75);
+  hints.unshift({ cells, type });
+  Store.setJSON('gpx_type_hints', hints.slice(0, 20)); // jüngste 20 behalten
+}
+function guessTypeWithHints(points, avgSpeed) {
+  if (points && points.length >= 2) {
+    const cells = routeCells(downsamplePoints(points, 200));
+    for (const h of getTypeHints()) {
+      if (routeSimilarity(new Set(h.cells), cells) >= 0.75) return h.type;
+    }
+  }
+  return guessType(avgSpeed);
+}
+
+// ============ Segment-Vergleich mit der Bestzeit (P9) ============
+function compareWithBest() {
+  const act = state.activities.find(a => a.id === state.selectedId);
+  const ref = state.routeRef;
+  const resEl = document.getElementById('segment-compare-result');
+  if (!act || !ref || !resEl) return;
+
+  const segs = compareTracks(ref.points, act.points, 200);
+  if (segs.length === 0) { resEl.innerText = 'Vergleich nicht möglich (fehlende Zeitdaten).'; resEl.classList.remove('hidden'); return; }
+
+  drawSegmentComparison(act, segs);
+
+  const totalDelta = segs[segs.length - 1].deltaSec;
+  // größten Zeitverlust-Abschnitt finden (max. Zunahme des Deltas)
+  let worst = { from: 0, inc: -Infinity, at: 0 };
+  for (let i = 1; i < segs.length; i++) {
+    const inc = segs[i].deltaSec - segs[i - 1].deltaSec;
+    if (inc > worst.inc) worst = { from: segs[i - 1].distM, inc, at: segs[i].distM };
+  }
+  const sign = totalDelta >= 0 ? '+' : '';
+  resEl.innerHTML = `Gegenüber der Bestzeit (${escapeHtml(ref.name)}): <strong class="${totalDelta > 0 ? 'text-red-400' : 'text-emerald-400'}">${sign}${Math.round(totalDelta)} s</strong>. ` +
+    (worst.inc > 1 ? `Größter Rückstand zwischen km ${(worst.from / 1000).toFixed(1)}–${(worst.at / 1000).toFixed(1)}.` : 'Sehr gleichmäßig.') +
+    ` <span class="text-slate-500">(grün = schneller, rot = langsamer)</span>`;
+  resEl.classList.remove('hidden');
+}
+
+// Aktuelle Route auf der Karte nach Zeit-Delta einfärben (grün schneller/rot langsamer).
+function drawSegmentComparison(act, segs) {
+  ensureMap();
+  if (state.trackLayer) { state.map.removeLayer(state.trackLayer); state.trackLayer = null; }
+  if (state.heatmapLayer) { state.map.removeLayer(state.heatmapLayer); state.heatmapLayer = null; }
+
+  const pts = act.points;
+  const deltaAt = distM => {
+    let best = segs[0];
+    for (const s of segs) { if (s.distM <= distM) best = s; else break; }
+    return best.deltaSec;
+  };
+  const layers = [];
+  let cum = 0;
+  for (let i = 1; i < pts.length; i++) {
+    cum += haversine(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
+    const d = deltaAt(cum);
+    const color = d > 2 ? '#ef4444' : d < -2 ? '#10b981' : '#eab308';
+    layers.push(L.polyline([[pts[i - 1][0], pts[i - 1][1]], [pts[i][0], pts[i][1]]], { color, weight: 4, opacity: 0.9 }));
+  }
+  const bounds = L.latLngBounds(pts.map(p => [p[0], p[1]]));
+  layers.push(L.circleMarker([pts[0][0], pts[0][1]], { radius: 6, color: '#10b981', fillColor: '#10b981', fillOpacity: 1 }).bindTooltip('Start'));
+  state.trackLayer = L.layerGroup(layers).addTo(state.map);
+  state.map.fitBounds(bounds, { padding: [24, 24] });
+}
+
 // Findet Aktivitäten auf (nahezu) derselben Strecke und rankt sie nach Zeit.
 function renderRouteMatches(act) {
   const card = document.getElementById('segments-card');
@@ -647,8 +724,14 @@ function renderRouteMatches(act) {
     return routeSimilarity(myCells, cellsFor(other)) >= 0.75;
   });
 
+  const compareBtn = document.getElementById('segment-compare-btn');
+  const compareRes = document.getElementById('segment-compare-result');
+  if (compareRes) compareRes.classList.add('hidden');
+
   if (matches.length === 0) {
     card.classList.add('hidden');
+    state.routeRef = null;
+    if (compareBtn) compareBtn.classList.add('hidden');
     return;
   }
 
@@ -656,6 +739,10 @@ function renderRouteMatches(act) {
     .filter(a => (a.movingSec || a.totalSec))
     .sort((a, b) => (a.movingSec || a.totalSec) - (b.movingSec || b.totalSec));
   if (all.length < 2) { card.classList.add('hidden'); return; }
+
+  // Referenz für den Segmentvergleich: schnellste Tour, die nicht die aktuelle ist
+  state.routeRef = all.find(a => a.id !== act.id) || null;
+  if (compareBtn) compareBtn.classList.toggle('hidden', !state.routeRef);
 
   subEl.innerText = `Diese Strecke bist du ${all.length}× ${act.type === 'ride' || act.type === 'moto' ? 'gefahren' : 'gelaufen bzw. gegangen'} — Rangliste nach Bewegungszeit.`;
   listEl.innerHTML = '';
@@ -924,11 +1011,17 @@ function drawElevationChart(act) {
 async function changeActivityType(newType) {
   const act = state.activities.find(a => a.id === state.selectedId);
   if (!act) return;
+  const wasGuess = act.type;
   act.type = newType;
   act.updatedAt = Date.now();
   await dbPut(act);
   if (act.uid && state.cloud === 'ok') {
     apiFetch('/api/gpx', { method: 'PUT', body: JSON.stringify({ uid: act.uid, type: newType, updatedAt: act.updatedAt }) }).catch(() => {});
+  }
+  // Korrektur merken → nächste Aufzeichnung derselben Strecke wird richtig geraten
+  if (wasGuess !== newType) {
+    recordTypeHint(act.points, newType);
+    showToast('Typ geändert — für diese Strecke gemerkt. 🎓');
   }
   renderActivityList();
   renderDetail(act);

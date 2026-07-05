@@ -445,6 +445,24 @@ test('routeCells/routeSimilarity: gleiche Strecke ~1, fremde Strecke ~0', () => 
   assert.ok(core.routeSimilarity(a, c) < 0.05, `sim=${core.routeSimilarity(a, c)}`);
 });
 
+test('compareTracks: langsamere Tour hat positives, wachsendes Delta', () => {
+  const t0 = Date.UTC(2026, 0, 1, 10, 0, 0);
+  const ref = [], slow = [];
+  // Referenz: 100 m alle 60 s; langsam: 100 m alle 120 s (doppelte Zeit)
+  for (let i = 0; i < 20; i++) {
+    const lat = 48 + i * 0.0009, lon = 9;
+    ref.push([lat, lon, null, t0 + i * 60000]);
+    slow.push([lat, lon, null, t0 + i * 120000]);
+  }
+  const cmp = core.compareTracks(ref, slow, 300);
+  assert.ok(cmp.length >= 3);
+  assert.ok(cmp.every(s => s.deltaSec > 0), 'alle Deltas positiv');
+  // Delta wächst mit der Distanz (langsamer bleibt langsamer)
+  assert.ok(cmp[cmp.length - 1].deltaSec > cmp[0].deltaSec);
+  // leere Eingabe → leeres Ergebnis
+  assert.deepStrictEqual(core.compareTracks([], slow), []);
+});
+
 test('buildGpxXml: gültiges GPX mit Punkten, Höhe, Zeit und escaptem Namen', () => {
   const xml = core.buildGpxXml({
     name: 'Tour <A> & B',
