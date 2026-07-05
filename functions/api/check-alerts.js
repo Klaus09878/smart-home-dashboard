@@ -86,7 +86,12 @@ export async function onRequestGet(context) {
     try {
       await env.DB.exec("CREATE TABLE IF NOT EXISTS alert_state (key TEXT PRIMARY KEY, last_sent INTEGER)");
       await env.DB.prepare('INSERT OR REPLACE INTO alert_state (key, last_sent) VALUES (?, ?)').bind('cron_heartbeat', Date.now()).run();
-    } catch (e) { /* Heartbeat ist best effort */ }
+      // D1-Hygiene (Punkt 9): verwaiste Dedupe-Zeilen (> 30 Tage, außer Heartbeat)
+      // und alte To-do-Tombstones (> 30 Tage gelöscht) entfernen.
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      await env.DB.prepare("DELETE FROM alert_state WHERE key != 'cron_heartbeat' AND last_sent < ?").bind(cutoff).run();
+      try { await env.DB.prepare('DELETE FROM todos WHERE deleted = 1 AND updated_at < ?').bind(cutoff).run(); } catch (e) { /* todos evtl. nicht vorhanden */ }
+    } catch (e) { /* Heartbeat/Cleanup ist best effort */ }
   }
 
   const report = { checkedAt: new Date().toISOString(), recipients: recipients.map(r => r.profile), locations: {}, notified: [] };

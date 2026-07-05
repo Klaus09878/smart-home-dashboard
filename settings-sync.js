@@ -141,6 +141,7 @@ const Store = (function () {
   }
 
   async function pullServer() {
+    let changed = 0;
     try {
       const data = await apiFetch('/api/settings');
       const settings = data.settings || {};
@@ -154,12 +155,25 @@ const Store = (function () {
               typeof entry.value === 'string' ? entry.value : JSON.stringify(entry.value));
           }
           localStorage.setItem(metaKey(key), String(serverTs));
+          changed++;
         }
       });
     } catch (err) {
       if (!err.unavailable) console.warn('Einstellungen laden fehlgeschlagen:', err);
     }
+    return changed;
   }
+
+  // Öffentlicher Pull (periodisch / bei Tab-Fokus, Punkt 6). Dispatcht
+  // 'store-updated', wenn ein anderer Gerät etwas geändert hat.
+  api.pull = async function () {
+    if (state.mode !== 'server') return 0;
+    const changed = await pullServer();
+    if (changed > 0) {
+      try { window.dispatchEvent(new CustomEvent('store-updated', { detail: { changed } })); } catch (e) { /* alt */ }
+    }
+    return changed;
+  };
 
   async function doInit() {
     try {

@@ -46,7 +46,8 @@
       hubPreviewAt: 0,
       // Standort-Vergleichsmodus im Klimaverlauf-Chart
       compareMode: false,
-      compareData: null
+      compareData: null,
+      compareLocId: null
     };
 
     // Sensor gilt als ausgefallen, wenn länger keine echten Werte kamen als:
@@ -1394,7 +1395,7 @@
       // Vergleichsmodus (beide Standorte übereinander, Außentemp. ausgeblendet)
       let datasets;
       if (appState.compareMode && appState.compareData) {
-        const other = LOCATIONS.find(l => l.id !== appState.activeLocId);
+        const other = LOCATIONS.find(l => l.id === appState.compareLocId) || LOCATIONS.find(l => l.id !== appState.activeLocId);
         const activeName = getLocationName(appState.activeLocId).replace('Schlafzimmer ', '');
         const otherName = getLocationName(other.id).replace('Schlafzimmer ', '');
         const otherFiltered = filterForTimeframe(appState.compareData, timeframeHours);
@@ -1542,7 +1543,7 @@
     // Legt die Messreihe des jeweils anderen Standorts als Overlay über den
     // Chart. Nutzt den Rohdaten-Cache; lädt sonst einmalig per fetchFeeds.
     async function loadCompareData() {
-      const other = LOCATIONS.find(l => l.id !== appState.activeLocId);
+      const other = LOCATIONS.find(l => l.id === appState.compareLocId) || LOCATIONS.find(l => l.id !== appState.activeLocId);
       const cache = appState.feedCache[other.id];
       let rawFeeds = cache && cache.rawFeeds;
       if (!rawFeeds || rawFeeds.length === 0) {
@@ -1565,6 +1566,19 @@
 
     async function toggleCompareMode() {
       if (!appState.compareMode) {
+        // Bei 3+ Standorten fragen, mit welchem verglichen werden soll (Punkt 5)
+        const others = LOCATIONS.filter(l => l.id !== appState.activeLocId);
+        if (others.length === 0) { showNotification('Kein zweiter Standort vorhanden.', 'error'); return; }
+        if (others.length === 1) {
+          appState.compareLocId = others[0].id;
+        } else {
+          const vals = await modalPrompt({
+            title: 'Standort vergleichen',
+            fields: [{ key: 'loc', label: 'Vergleichen mit', type: 'select', value: appState.compareLocId || others[0].id, options: others.map(l => ({ value: l.id, label: getLocationName(l.id) })) }]
+          });
+          if (!vals) return;
+          appState.compareLocId = vals.loc;
+        }
         try {
           const data = await loadCompareData();
           if (!data || data.length === 0) throw new Error('keine Daten');
@@ -3075,9 +3089,21 @@
       window.addEventListener('hashchange', handleRoute);
       handleRoute();
 
+      // Einstellungs-Sync auch während der Sitzung (Punkt 6): Änderungen vom
+      // anderen Gerät kommen ohne Reload an — periodisch + bei Tab-Fokus.
+      window.addEventListener('store-updated', () => {
+        updateProfileBadge();
+        applyWidgetLayout();
+        handleRoute();
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && window.Store) Store.pull();
+      });
+
       // Auto-refresh every 5 minutes: still im Hintergrund (kein Lade-Overlay),
       // im Klima-Dashboard inkl. Wetter, auf dem Hub nur die Kachel-Vorschau
       setInterval(() => {
+        if (window.Store) Store.pull();
         const climateView = document.getElementById('view-climate');
         const homeView = document.getElementById('view-home');
         if (appState.climateLoaded && climateView && !climateView.classList.contains('hidden')) {

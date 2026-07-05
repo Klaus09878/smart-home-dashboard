@@ -310,16 +310,19 @@ async function syncWithCloud() {
 // ============ Backup: Export/Import als JSON-Datei ============
 async function exportBackup() {
   const activities = await dbGetAll();
+  // Einstellungen des aktiven Profils als LOGISCHE Schlüssel sichern (kein
+  // p_<profil>_-Präfix, keine Meta) — beim Restore laufen sie über Store und
+  // werden mit-synchronisiert (Punkt 3).
   const settings = {};
+  const prefix = `p_${Store.profile}_`;
   Object.keys(localStorage).forEach(k => {
-    // Alle Profil-Einstellungen (p_<profil>_…) und Alt-Schlüssel sichern
-    if (/^p_/.test(k) || /^(loc_name_|loc_weather_|loc_thresholds_|selected_location|ntfy_topic|gpx_goals|hub_|ical_url)/.test(k)) {
-      settings[k] = localStorage.getItem(k);
+    if (k.startsWith(prefix) && !k.endsWith('__ts') && !k.endsWith('___migrated')) {
+      settings[k.slice(prefix.length)] = localStorage.getItem(k);
     }
   });
   const backup = {
     format: 'smarthub-backup',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     settings,
     activities
@@ -354,7 +357,13 @@ async function handleRestoreInput(event) {
       restored++;
     }
     if (backup.settings) {
-      Object.entries(backup.settings).forEach(([k, v]) => localStorage.setItem(k, v));
+      // Über Store einspielen → landet in der D1-Sync-Queue (Punkt 3).
+      // Alt-Backups (v1) trugen physische p_<profil>_-Schlüssel → auf den
+      // logischen Teil reduzieren.
+      Object.entries(backup.settings).forEach(([k, v]) => {
+        const logical = k.startsWith('p_') ? k.replace(/^p_[^_]*_/, '') : k;
+        if (logical && !logical.endsWith('__ts') && !logical.endsWith('__migrated')) Store.set(logical, v);
+      });
     }
     await refreshActivities();
     if (state.activities.length > 0 && state.selectedId === null) selectActivity(state.activities[0].id);

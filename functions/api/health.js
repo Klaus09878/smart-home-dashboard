@@ -43,10 +43,16 @@ export async function onRequestGet(context) {
       if (hb) out.lastCron = hb.last_sent;
     } catch (e) { /* Tabelle evtl. noch nicht angelegt */ }
 
+    // To-dos ohne Tombstones zählen (deleted=0)
+    let todoCount = null;
+    try {
+      const r = await env.DB.prepare('SELECT COUNT(*) AS n FROM todos WHERE deleted = 0').first();
+      todoCount = r ? r.n : 0;
+    } catch (e) { /* Tabelle evtl. noch nicht da */ }
     out.counts = {
       climate_daily: await tableCount(env.DB, 'climate_daily'),
       gpx: await tableCount(env.DB, 'gpx_activities'),
-      todos: await tableCount(env.DB, 'todos')
+      todos: todoCount
     };
 
     try {

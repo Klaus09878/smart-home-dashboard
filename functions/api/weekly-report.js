@@ -20,17 +20,47 @@ const CHANNELS = {
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
 
-// Komfort-Score (vereinfachte Server-Variante der getesteten Funktion in
-// lib/core.js — Standard-Schwellwerte, ohne Schimmel-Abzug, da die
-// Nutzer-Schwellwerte nur clientseitig in localStorage liegen).
-function comfortScore(temp, rh) {
+// Komfort-Score (Server-Variante von lib/core.js, ohne Schimmel-Abzug).
+// Schwellwerte (th) kommen jetzt aus den Nutzer-Einstellungen in D1 (Punkt 7),
+// Defaults 19–24 °C / 40–60 % wie im Frontend.
+function comfortScore(temp, rh, th = {}) {
   if ([temp, rh].some(v => v === null || v === undefined || isNaN(v))) return null;
+  const tempMin = th.tempMin ?? 19, tempMax = th.tempMax ?? 24;
+  const humMin = th.humMin ?? 40, humMax = th.humMax ?? 60;
   let score = 100;
-  const tDev = temp < 19 ? 19 - temp : temp > 24 ? temp - 24 : 0;
+  const tDev = temp < tempMin ? tempMin - temp : temp > tempMax ? temp - tempMax : 0;
   score -= Math.min(40, tDev * 8);
-  const hDev = rh < 40 ? 40 - rh : rh > 60 ? rh - 60 : 0;
+  const hDev = rh < humMin ? humMin - rh : rh > humMax ? rh - humMax : 0;
   score -= Math.min(30, hDev * 1.5);
   return Math.max(0, Math.round(score));
+}
+
+// Nutzer-Schwellwerte eines Standorts aus D1 (user_settings). Nimmt den ersten
+// Treffer über alle Profile (typischerweise nur eines/Paar setzt sie).
+async function loadThresholds(db, locId) {
+  if (!db) return {};
+  try {
+    const row = await db.prepare("SELECT value FROM user_settings WHERE key = ? LIMIT 1").bind(`loc_thresholds_${locId}`).first();
+    if (!row) return {};
+    const v = JSON.parse(row.value);
+    return (v && typeof v === 'object') ? v : {};
+  } catch (e) { return {}; }
+}
+
+// Fest verdrahtete + D1-Standorte zusammenführen (Punkt 4).
+async function loadChannels(env) {
+  const out = {};
+  for (const [id, loc] of Object.entries(CHANNELS)) {
+    out[id] = { channel: loc.channel, apiKey: env[loc.envKey], label: loc.label };
+  }
+  if (env.DB) {
+    try {
+      await env.DB.exec("CREATE TABLE IF NOT EXISTS locations (id TEXT PRIMARY KEY, name TEXT, channel TEXT, read_key TEXT, lat REAL, lon REAL, fields TEXT, created_by TEXT, created_at INTEGER)");
+      const { results } = await env.DB.prepare('SELECT id, name, channel, read_key FROM locations').all();
+      (results || []).forEach(r => { out[r.id] = { channel: r.channel, apiKey: r.read_key, label: r.name || r.id }; });
+    } catch (e) { /* nur fest verdrahtete */ }
+  }
+  return out;
 }
 
 const fmt = (v, d = 1) =>
@@ -45,7 +75,7 @@ function fmtDay(day) {
 }
 
 // Tageszeilen ({day, t_min, t_max, t_avg, h_avg}) zu einer Wochenstatistik verdichten
-function aggregateRows(rows) {
+function aggregateRows(rows, th = {}) {
   const valid = (rows || []).filter(r => r.t_avg !== null && r.t_avg !== undefined);
   if (valid.length === 0) return null;
 
@@ -59,7 +89,7 @@ function aggregateRows(rows) {
   let best = null, worst = null;
   const scores = [];
   valid.forEach(r => {
-    const s = comfortScore(r.t_avg, r.h_avg);
+    const s = comfortScore(r.t_avg, r.h_avg, th);
     if (s === null) return;
     scores.push(s);
     if (!best || s > best.score) best = { day: r.day, score: s };
@@ -135,16 +165,18 @@ export async function onRequestGet(context) {
 
   const report = { generatedAt: new Date().toISOString(), recipients: recipients.map(r => r.profile), locations: {}, sent: false };
   const lines = [];
+  const channels = await loadChannels(env);
 
-  for (const [locId, loc] of Object.entries(CHANNELS)) {
+  for (const [locId, loc] of Object.entries(channels)) {
     let agg = null, prevAgg = null, source = null;
+    const th = await loadThresholds(env.DB, locId);
 
     // Bevorzugt: D1-Archiv (inkl. Vorwochen-Trend)
     if (env.DB) {
       try {
         const { rows, prevRows } = await loadWeekFromD1(env.DB, locId);
-        agg = aggregateRows(rows);
-        prevAgg = aggregateRows(prevRows);
+        agg = aggregateRows(rows, th);
+        prevAgg = aggregateRows(prevRows, th);
         if (agg) source = 'd1';
       } catch (err) {
         report.locations[locId] = { d1Error: err.message };
@@ -152,9 +184,9 @@ export async function onRequestGet(context) {
     }
 
     // Fallback: direkt aus ThingSpeak aggregieren
-    if (!agg && env[loc.envKey]) {
+    if (!agg && loc.apiKey) {
       try {
-        agg = aggregateRows(await loadWeekFromThingSpeak(env[loc.envKey], loc.channel));
+        agg = aggregateRows(await loadWeekFromThingSpeak(loc.apiKey, loc.channel), th);
         if (agg) source = 'thingspeak';
       } catch (err) {
         report.locations[locId] = { ...(report.locations[locId] || {}), tsError: err.message };
