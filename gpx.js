@@ -312,7 +312,10 @@ async function exportBackup() {
   const activities = await dbGetAll();
   const settings = {};
   Object.keys(localStorage).forEach(k => {
-    if (/^(loc_name_|loc_weather_|loc_thresholds_|selected_location|ntfy_topic|gpx_goals|hub_|ical_url)/.test(k)) settings[k] = localStorage.getItem(k);
+    // Alle Profil-Einstellungen (p_<profil>_…) und Alt-Schlüssel sichern
+    if (/^p_/.test(k) || /^(loc_name_|loc_weather_|loc_thresholds_|selected_location|ntfy_topic|gpx_goals|hub_|ical_url)/.test(k)) {
+      settings[k] = localStorage.getItem(k);
+    }
   });
   const backup = {
     format: 'smarthub-backup',
@@ -396,10 +399,8 @@ async function refreshActivities() {
 
 // ============ Jahres-/Wochenziele (localStorage) ============
 function getGoals() {
-  try {
-    const g = JSON.parse(localStorage.getItem('gpx_goals') || 'null');
-    if (g && typeof g === 'object') return { yearKm: g.yearKm || 0, weekKm: g.weekKm || 0 };
-  } catch (e) { /* defekte Daten → keine Ziele */ }
+  const g = Store.getJSON('gpx_goals', null);
+  if (g && typeof g === 'object') return { yearKm: g.yearKm || 0, weekKm: g.weekKm || 0 };
   return { yearKm: 0, weekKm: 0 };
 }
 
@@ -411,7 +412,7 @@ function editGoals() {
   if (weekStr === null) return;
   const yearKm = Math.max(0, parseFloat(yearStr.toString().replace(',', '.')) || 0);
   const weekKm = Math.max(0, parseFloat(weekStr.toString().replace(',', '.')) || 0);
-  localStorage.setItem('gpx_goals', JSON.stringify({ yearKm, weekKm }));
+  Store.setJSON('gpx_goals', { yearKm, weekKm });
   renderSummary();
   showToast('Ziele gespeichert.');
 }
@@ -1002,6 +1003,8 @@ async function deleteActivity() {
 
 // ============ Init ============
 async function init() {
+  // Profil + Einstellungen laden, bevor Ziele/Notizen gelesen werden
+  await Store.init();
   updateIcons();
   await refreshActivities();
   if (state.activities.length > 0) selectActivity(state.activities[0].id);

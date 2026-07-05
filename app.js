@@ -28,7 +28,7 @@
 
     // Global State
     const appState = {
-      activeLocId: localStorage.getItem('selected_location') || 'gillian',
+      activeLocId: 'gillian', // wird in initConfigs aus dem aktiven Profil gesetzt
       isDemoMode: false,
       insideData: [],
       outsideData: {},
@@ -60,16 +60,17 @@
       return await apiFetch(`/api/feeds/${loc.id}?${q.toString()}`);
     }
 
-    // Load custom names and weather configs from localStorage
+    // Load custom names and weather configs (profilbezogen über Store)
     function initConfigs() {
+      appState.activeLocId = Store.get('selected_location') || 'gillian';
       // Safety check for selected location
       if (!LOCATIONS.some(l => l.id === appState.activeLocId)) {
         appState.activeLocId = 'gillian';
-        localStorage.setItem('selected_location', 'gillian');
+        Store.set('selected_location', 'gillian');
       }
 
       // Restore weather configs
-      const savedWeather = localStorage.getItem(`loc_weather_${appState.activeLocId}`);
+      const savedWeather = Store.get(`loc_weather_${appState.activeLocId}`);
       if (savedWeather) {
         appState.weatherConfig = JSON.parse(savedWeather);
       } else {
@@ -84,7 +85,7 @@
 
     function getLocationName(locId) {
       const loc = LOCATIONS.find(l => l.id === locId);
-      return localStorage.getItem(`loc_name_${locId}`) || (loc ? loc.defaultName : '');
+      return Store.get(`loc_name_${locId}`) || (loc ? loc.defaultName : '');
     }
 
     function renameActiveLocation() {
@@ -93,7 +94,7 @@
       const newName = prompt(`Neuen Namen für diesen Standort eingeben:`, currentName);
       
       if (newName !== null && newName.trim() !== '') {
-        localStorage.setItem(`loc_name_${locId}`, newName.trim());
+        Store.set(`loc_name_${locId}`, newName.trim());
         document.getElementById('detail-loc-title').innerText = newName.trim();
         updateTabLabels();
         showNotification('Name erfolgreich geändert!');
@@ -107,7 +108,7 @@
 
     function getThresholds(locId = appState.activeLocId) {
       try {
-        const saved = JSON.parse(localStorage.getItem(`loc_thresholds_${locId}`) || 'null');
+        const saved = Store.getJSON(`loc_thresholds_${locId}`, null);
         if (saved && typeof saved === 'object') return { ...THRESHOLD_DEFAULTS, ...saved };
       } catch (e) { /* defekte gespeicherte Daten → Defaults */ }
       return { ...THRESHOLD_DEFAULTS };
@@ -129,7 +130,7 @@
     }
 
     function resetThresholdSettings() {
-      localStorage.removeItem(`loc_thresholds_${appState.activeLocId}`);
+      Store.remove(`loc_thresholds_${appState.activeLocId}`);
       openThresholdSettings(); // Felder mit Defaults neu befüllen
       showNotification('Schwellwerte auf Standard zurückgesetzt.');
       renderActiveView();
@@ -153,7 +154,7 @@
         showNotification('Feuchte-Werte müssen zwischen 0 und 100 % liegen.', 'error');
         return;
       }
-      localStorage.setItem(`loc_thresholds_${appState.activeLocId}`, JSON.stringify(th));
+      Store.setJSON(`loc_thresholds_${appState.activeLocId}`, th);
       closeThresholdSettings();
       showNotification('Schwellwerte gespeichert.');
       renderActiveView();
@@ -288,7 +289,7 @@
     function setWeatherCoords(lat, lon, name) {
       const weatherObj = { lat, lon, name };
       appState.weatherConfig = weatherObj;
-      localStorage.setItem(`loc_weather_${appState.activeLocId}`, JSON.stringify(weatherObj));
+      Store.setJSON(`loc_weather_${appState.activeLocId}`, weatherObj);
 
       // Koordinaten auch serverseitig hinterlegen (D1 app_config), damit
       // check-alerts/weekly-report mit demselben Ort rechnen (best effort)
@@ -582,9 +583,9 @@
       if (appState.activeLocId === locId) return;
 
       appState.activeLocId = locId;
-      localStorage.setItem('selected_location', locId);
-      
-      const savedWeather = localStorage.getItem(`loc_weather_${locId}`);
+      Store.set('selected_location', locId);
+
+      const savedWeather = Store.get(`loc_weather_${locId}`);
       if (savedWeather) {
         appState.weatherConfig = JSON.parse(savedWeather);
       } else {
@@ -1746,10 +1747,10 @@
       );
       if (topic === null) return;
       if (topic.trim() === '') {
-        localStorage.removeItem('ntfy_topic');
+        Store.remove('ntfy_topic');
         showNotification('Push-Benachrichtigungen deaktiviert.');
       } else {
-        localStorage.setItem('ntfy_topic', topic.trim());
+        Store.set('ntfy_topic', topic.trim());
         showNotification('Push aktiviert – Test-Nachricht gesendet.');
         sendPush('Smart Home Hub', 'Push-Benachrichtigungen sind eingerichtet ✔', 'tada');
       }
@@ -1861,7 +1862,7 @@
 
             // Wochenziel-Fortschritt (gpx_goals aus dem GPX-Viewer)
             try {
-              const goals = JSON.parse(localStorage.getItem('gpx_goals') || 'null');
+              const goals = Store.getJSON('gpx_goals', null);
               const wrap = document.getElementById('hub-gpx-goal-wrap');
               if (wrap && goals && goals.weekKm > 0) {
                 const pct = Math.min(100, (weekKm / goals.weekKm) * 100);
@@ -1889,8 +1890,8 @@
     };
 
     function getWidgetOrder() {
-      let order = [];
-      try { order = JSON.parse(localStorage.getItem('hub_widget_order') || '[]'); } catch (e) { /* Defaults */ }
+      let order = Store.getJSON('hub_widget_order', []);
+      if (!Array.isArray(order)) order = [];
       const known = Object.keys(HUB_WIDGET_META);
       order = order.filter(id => known.includes(id));
       known.forEach(id => { if (!order.includes(id)) order.push(id); });
@@ -1898,7 +1899,8 @@
     }
 
     function getHiddenWidgets() {
-      try { return JSON.parse(localStorage.getItem('hub_widget_hidden') || '[]'); } catch (e) { return []; }
+      const h = Store.getJSON('hub_widget_hidden', []);
+      return Array.isArray(h) ? h : [];
     }
 
     function applyWidgetLayout() {
@@ -1917,7 +1919,7 @@
       const container = document.getElementById('hub-widgets');
       if (!container) return;
       const order = [...container.querySelectorAll('[data-widget]')].map(el => el.dataset.widget);
-      localStorage.setItem('hub_widget_order', JSON.stringify(order));
+      Store.setJSON('hub_widget_order', order);
     }
 
     function initWidgetDrag() {
@@ -1975,7 +1977,7 @@
           cb.onchange = () => {
             const h = new Set(getHiddenWidgets());
             if (cb.checked) h.delete(id); else h.add(id);
-            localStorage.setItem('hub_widget_hidden', JSON.stringify([...h]));
+            Store.setJSON('hub_widget_hidden', [...h]);
             applyWidgetLayout();
           };
           row.appendChild(cb);
@@ -1988,12 +1990,13 @@
       }
     }
 
-    // ============ Hub-Widget: To-do-Liste (localStorage) ============
+    // ============ Hub-Widget: To-do-Liste (profilbezogen, D1-Sync in Phase 4) ============
     function getTodos() {
-      try { return JSON.parse(localStorage.getItem('hub_todos') || '[]'); } catch (e) { return []; }
+      const t = Store.getJSON('hub_todos', []);
+      return Array.isArray(t) ? t : [];
     }
     function saveTodos(list) {
-      localStorage.setItem('hub_todos', JSON.stringify(list));
+      Store.setJSON('hub_todos', list);
       renderTodos();
     }
 
@@ -2094,7 +2097,7 @@
 
     // ============ Hub-Widget: Kalender (.ics über /api/ical) ============
     function configureIcal() {
-      const current = localStorage.getItem('ical_url') || '';
+      const current = Store.get('ical_url') || '';
       const url = prompt(
         'URL eines Kalender-Feeds (.ics) — z. B. die „geheime Adresse im iCal-Format" ' +
         'eines Google Kalenders (Einstellungen → Kalender → Kalender integrieren).\n\n' +
@@ -2103,12 +2106,12 @@
       );
       if (url === null) return;
       if (url.trim() === '') {
-        localStorage.removeItem('ical_url');
+        Store.remove('ical_url');
       } else if (!/^https:\/\//i.test(url.trim())) {
         showNotification('Bitte eine https://-URL angeben.', 'error');
         return;
       } else {
-        localStorage.setItem('ical_url', url.trim());
+        Store.set('ical_url', url.trim());
       }
       loadHubCalendar(true);
     }
@@ -2116,7 +2119,7 @@
     async function loadHubCalendar(force = false) {
       const el = document.getElementById('hub-cal-list');
       if (!el) return;
-      const url = localStorage.getItem('ical_url');
+      const url = Store.get('ical_url');
       if (!url) {
         el.innerHTML = 'Kein Kalender verbunden — über das Zahnrad eine .ics-URL hinterlegen (z. B. Google Kalender „geheime Adresse").';
         return;
@@ -2239,8 +2242,27 @@
       if (greetEl) {
         const h = now.getHours();
         const greeting = h < 5 ? 'Gute Nacht' : h < 11 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend';
-        greetEl.innerText = `${greeting} 👋`;
+        const name = getProfileDisplayName();
+        greetEl.innerText = name ? `${greeting}, ${name} 👋` : `${greeting} 👋`;
       }
+    }
+
+    // Anzeigename des aktiven Profils (aus Store, „default" wird nicht angezeigt)
+    function getProfileDisplayName() {
+      const p = (window.Store && Store.profile) || 'default';
+      if (!p || p === 'default') return '';
+      return p.charAt(0).toUpperCase() + p.slice(1);
+    }
+
+    // Kleines Profil-Abzeichen im Hub-Header (Name + Abmelde-Hinweis)
+    function updateProfileBadge() {
+      const el = document.getElementById('profile-badge');
+      if (!el) return;
+      const name = getProfileDisplayName();
+      if (!name) { el.classList.add('hidden'); return; }
+      el.classList.remove('hidden');
+      const nameEl = document.getElementById('profile-badge-name');
+      if (nameEl) nameEl.innerText = name;
     }
 
     // Aktuelles Außenwetter für die Widget-Leiste auf dem Hub
@@ -2304,7 +2326,11 @@
     }
 
     // App Initialization
-    function init() {
+    async function init() {
+      // Profil + Einstellungen laden, bevor irgendetwas gelesen wird
+      await Store.init();
+      updateProfileBadge();
+
       updateIcons();
       initConfigs();
       updateNtfyButton();

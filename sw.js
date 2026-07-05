@@ -2,12 +2,13 @@
 // Strategie: Network-first für alles Eigene (damit Deployments sofort ankommen),
 // Cache als Offline-Fallback. API-Aufrufe (ThingSpeak, Open-Meteo, CDNs) gehen
 // immer direkt ans Netz und werden nicht gecacht.
-const CACHE_NAME = 'smarthub-v7';
+const CACHE_NAME = 'smarthub-v8';
 const APP_SHELL = [
   './',
   './gpx.html',
   './tailwind.css',
   './shared.js',
+  './settings-sync.js',
   './app.js',
   './gpx.js',
   './lib/core.js',

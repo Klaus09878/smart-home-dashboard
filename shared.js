@@ -168,6 +168,8 @@ window.addEventListener('unhandledrejection', e =>
 // ============ ntfy.sh Push-Benachrichtigungen ============
 // Topic wird in localStorage ('ntfy_topic') gespeichert; Konfiguration siehe README.
 function getNtfyTopic() {
+  // Profilbezogen über Store (falls verfügbar), sonst roher Fallback.
+  if (window.Store && window.Store.ready) return (window.Store.get('ntfy_topic') || '').trim();
   return (localStorage.getItem('ntfy_topic') || '').trim();
 }
 
