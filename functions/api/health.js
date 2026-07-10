@@ -22,7 +22,21 @@ async function tableCount(db, table) {
 }
 
 export async function onRequestGet(context) {
-  const { env } = context;
+  const { env, request } = context;
+
+  // Schneller Puls-Check (P2-1): nur der letzte Cron-Lauf aus D1, ohne die
+  // teuren ThingSpeak-/Wetter-Abrufe. Fuer den Cron-Totmannschalter im Briefing.
+  if (new URL(request.url).searchParams.get('quick')) {
+    let cronLastSeen = null;
+    if (env.DB) {
+      try {
+        const hb = await env.DB.prepare("SELECT last_sent FROM alert_state WHERE key = 'cron_heartbeat'").first();
+        if (hb) cronLastSeen = hb.last_sent;
+      } catch (e) { /* Tabelle evtl. noch nicht angelegt */ }
+    }
+    return json({ cronLastSeen });
+  }
+
   const out = {
     d1: !!env.DB,
     env: {

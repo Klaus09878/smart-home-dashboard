@@ -3692,6 +3692,20 @@
         if (overdue > 0) signals.push({ severity: 'info', text: `${overdue} überfällige Aufgabe${overdue === 1 ? '' : 'n'}`, target: null });
       } catch (e) { /* To-dos optional */ }
 
+      // Cron-Totmannschalter (P2-1): meldet sich der Warn-Cron laenger als 3 h
+      // nicht, ist das gesamte serverseitige Warnsystem still gestorben. Nur
+      // warnen, wenn er ueberhaupt schon einmal lief (cronLastSeen != null) —
+      // eine frische Installation ohne Cron soll nicht zugespammt werden.
+      try {
+        const puls = await apiFetch('/api/health?quick=1');
+        if (puls && puls.cronLastSeen) {
+          const ageH = (Date.now() - puls.cronLastSeen) / 3600000;
+          if (ageH > 3) {
+            signals.push({ severity: 'warn', text: `Warn-Cron meldet sich nicht mehr (letzter Lauf vor ${Math.round(ageH)} h)`, target: '#settings' });
+          }
+        }
+      } catch (e) { /* Health/D1 evtl. nicht verfuegbar */ }
+
       renderBriefing(signals);
     }
 
