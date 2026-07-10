@@ -557,6 +557,7 @@ function renderDetail(act) {
   document.getElementById('stat-ele').innerText = act.eleMin !== null ? `${Math.round(act.eleMin)}–${Math.round(act.eleMax)} m` : '–';
 
   renderNoteAndWeather(act);
+  renderPhotos(act);
   renderRouteMatches(act);
   updateCompareSelect();
   drawMap(act);
@@ -578,6 +579,107 @@ function renderNoteAndWeather(act) {
     weatherEl.classList.add('hidden');
     fetchStartWeather(act); // best effort, aktualisiert die Anzeige nachträglich
   }
+}
+
+// ============ Fotos pro Tour (P10b, R2) ============
+// Braucht Cloud-Sync (uid) + R2-Binding (/api/photos). Ohne beides bleibt die
+// Foto-UI ausgeblendet. Bilder werden vor dem Upload lokal auf WebP verkleinert.
+let _photosSupported = null;
+
+async function renderPhotos(act) {
+  const block = document.getElementById('photos-block');
+  const grid = document.getElementById('detail-photos');
+  const hint = document.getElementById('photo-hint');
+  const addBtn = document.getElementById('photo-add-btn');
+  if (!block || !grid) return;
+  if (!act.uid) { block.classList.add('hidden'); return; } // erst nach Cloud-Sync moeglich
+
+  let data;
+  try { data = await apiFetch(`/api/photos?uid=${encodeURIComponent(act.uid)}`); }
+  catch (e) { _photosSupported = false; block.classList.add('hidden'); return; }
+  _photosSupported = true;
+  block.classList.remove('hidden');
+
+  const photos = (data && data.photos) || [];
+  grid.dataset.usedN = JSON.stringify(photos.map(p => p.n));
+  grid.innerHTML = '';
+  photos.forEach(p => {
+    const cell = document.createElement('div');
+    cell.className = 'relative aspect-square rounded-lg overflow-hidden group/photo bg-slate-900';
+    cell.innerHTML = `<img src="${p.url}" alt="Tour-Foto" class="w-full h-full object-cover cursor-pointer" loading="lazy">
+      <button title="Foto löschen" class="absolute top-1 right-1 p-1 rounded bg-slate-950/70 text-slate-300 hover:text-red-400 opacity-0 group-hover/photo:opacity-100 transition-opacity"><i data-lucide="trash-2" class="w-3 h-3"></i></button>`;
+    cell.querySelector('img').addEventListener('click', () => openPhotoLightbox(p.url));
+    cell.querySelector('button').addEventListener('click', () => deleteTourPhoto(act, p.n));
+    grid.appendChild(cell);
+  });
+  if (addBtn) addBtn.classList.toggle('hidden', photos.length >= 5);
+  if (hint) hint.textContent = photos.length >= 5 ? 'Maximal 5 Fotos pro Tour.' : `${photos.length}/5 Fotos · max. 500 KB pro Bild.`;
+  updateIcons();
+}
+
+// Bild lokal auf max. Kantenlaenge verkleinern und als WebP-Blob liefern.
+function resizeImageToWebp(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let width = img.naturalWidth, height = img.naturalHeight;
+      if (Math.max(width, height) > maxDim) {
+        const s = maxDim / Math.max(width, height);
+        width = Math.round(width * s); height = Math.round(height * s);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(img.src);
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('Komprimierung fehlgeschlagen')), 'image/webp', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(img.src); reject(new Error('Bild konnte nicht gelesen werden')); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+async function uploadTourPhoto(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  const act = state.activities.find(a => a.id === state.selectedId);
+  if (!file || !act || !act.uid) return;
+  try {
+    let blob = await resizeImageToWebp(file, 1600, 0.8);
+    if (blob.size > 500 * 1024) blob = await resizeImageToWebp(file, 1200, 0.7); // zweiter Versuch
+    if (blob.size > 500 * 1024) { showToast('Foto ist auch komprimiert zu groß (max. 500 KB).', 'error'); return; }
+    const used = JSON.parse((document.getElementById('detail-photos').dataset.usedN) || '[]');
+    let n = 0; while (used.includes(n) && n < 5) n++;
+    if (n >= 5) { showToast('Maximal 5 Fotos pro Tour.', 'error'); return; }
+    const res = await fetch(`/api/photos?uid=${encodeURIComponent(act.uid)}&n=${n}`, {
+      method: 'PUT', headers: { 'Content-Type': 'image/webp' }, body: blob
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await renderPhotos(act);
+    showToast('Foto hinzugefügt.', 'success');
+  } catch (e) {
+    showToast('Foto-Upload fehlgeschlagen (nur online möglich).', 'error');
+  }
+}
+
+async function deleteTourPhoto(act, n) {
+  const ok = await modalConfirm({ title: 'Foto löschen?', message: 'Dieses Foto wird endgültig entfernt.', confirmLabel: 'Löschen', danger: true });
+  if (!ok) return;
+  try {
+    await apiFetch(`/api/photos?uid=${encodeURIComponent(act.uid)}&n=${n}`, { method: 'DELETE' });
+    await renderPhotos(act);
+  } catch (e) { showToast('Löschen fehlgeschlagen.', 'error'); }
+}
+
+function openPhotoLightbox(url) {
+  const lb = document.getElementById('photo-lightbox');
+  const img = document.getElementById('photo-lightbox-img');
+  if (!lb || !img) return;
+  img.src = url;
+  lb.classList.remove('hidden');
+}
+function closePhotoLightbox() {
+  const lb = document.getElementById('photo-lightbox');
+  if (lb) lb.classList.add('hidden');
 }
 
 async function saveNote(value) {
@@ -1084,6 +1186,8 @@ async function deleteActivity() {
     apiFetch(`/api/gpx?uid=${encodeURIComponent(act.uid)}`, { method: 'DELETE' })
       .then(() => removePendingDelete(act.uid))
       .catch(() => {});
+    // Fotos der Tour aus R2 entfernen (best effort; ohne R2-Binding No-op)
+    if (_photosSupported) apiFetch(`/api/photos?uid=${encodeURIComponent(act.uid)}`, { method: 'DELETE' }).catch(() => {});
   }
 
   if (state.compareId === act.id) state.compareId = null;

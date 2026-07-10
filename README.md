@@ -50,6 +50,10 @@ Nach der Einrichtung schalten sie sich automatisch scharf:
    Dann im Pages-Projekt → *Settings → Functions → D1 database bindings*:
    Variable name **`DB`** → Datenbank auswählen → neu deployen.
    (Tabellen legt der Code beim ersten Zugriff selbst an.)
+   *Optional:* Für **Foto-Anhänge pro GPX-Tour** zusätzlich einen R2-Bucket anlegen
+   (Cloudflare → R2 → *Create bucket*, z. B. `smarthub-media`) und im Pages-Projekt
+   unter *Settings → Functions → R2 bucket bindings* als **`MEDIA`** binden. Ohne
+   dieses Binding bleibt die Foto-Funktion im GPX-Viewer einfach ausgeblendet.
 2. **ThingSpeak-Proxy** (Keys aus dem Frontend verstecken):
    Pages → *Settings → Environment variables*:
    `TS_KEY_GILLIAN` = Read-Key Kanal 3417815, `TS_KEY_SEAN` = Read-Key Kanal 3417935.
