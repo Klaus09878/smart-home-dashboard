@@ -2,7 +2,7 @@
 // Strategie: Network-first für alles Eigene (damit Deployments sofort ankommen),
 // Cache als Offline-Fallback. API-Aufrufe (ThingSpeak, Open-Meteo, CDNs) gehen
 // immer direkt ans Netz und werden nicht gecacht.
-const CACHE_NAME = 'smarthub-v11';
+const CACHE_NAME = 'smarthub-v12';
 const APP_SHELL = [
   './',
   './gpx.html',
@@ -15,7 +15,14 @@ const APP_SHELL = [
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/apple-touch-icon.png'
+  './icons/apple-touch-icon.png',
+  // Vendor-Bibliotheken lokal gepinnt (offline-fähig, siehe vendor/)
+  './vendor/chart.umd.js',
+  './vendor/hammer.min.js',
+  './vendor/chartjs-plugin-zoom.min.js',
+  './vendor/lucide.min.js',
+  './vendor/leaflet/leaflet.js',
+  './vendor/leaflet/leaflet.css'
 ];
 
 self.addEventListener('install', event => {

@@ -1,0 +1,2 @@
+# Vendor-Bibliotheken unveraendert lassen (keine EOL-Konvertierung)
+vendor/** -text
