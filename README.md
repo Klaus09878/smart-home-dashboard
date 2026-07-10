@@ -1,7 +1,9 @@
 # Smart Home Hub (ClimateFlow)
 
+![CI](https://github.com/Klaus09878/smart-home-dashboard/actions/workflows/ci.yml/badge.svg)
+
 Multi-Projekt-Plattform auf Cloudflare Pages: Homescreen-Hub mit Klimadashboard
-(**ClimateFlow**) für zwei Standorte und Platzhalter für den kommenden **GPX-Viewer**.
+(**ClimateFlow**) für zwei Standorte und einem **GPX-Viewer** für Touren.
 
 ## Architektur
 
@@ -136,7 +138,7 @@ Der Forward-Fill im Dashboard bleibt als Fallback aktiv, alte Daten funktioniere
 
 - **Uhr/Begrüßung/Wetter jetzt**, **3-Tage-Wettervorschau**, **To-do-Liste** (lokal) und **Kalender** (nächste Termine)
 - **Anpassbar**: Reihenfolge per Drag & Drop am Griff-Symbol (erscheint beim Überfahren), Ein-/Ausblenden über „Widgets anpassen" — beides bleibt gespeichert
-- **Kalender verbinden**: Zahnrad im Termine-Widget → .ics-URL eintragen (Google Kalender: Einstellungen → [Kalender] → „Geheime Adresse im iCal-Format"). Braucht den deployten `/api/ical`-Proxy ☁️. Grenze: Serientermine erscheinen nur mit ihrem ersten Datum (↻-Markierung).
+- **Kalender verbinden**: Zahnrad im Termine-Widget → .ics-URL eintragen (Google Kalender: Einstellungen → [Kalender] → „Geheime Adresse im iCal-Format"). Braucht den deployten `/api/ical`-Proxy ☁️. Serientermine (RRULE) werden expandiert und mit ↻ markiert.
 - **Fehler-Reporting**: unbehandelte JS-Fehler auf jedem Gerät werden als ntfy-Push gemeldet (max. 3/Sitzung, Topic muss eingerichtet sein)
 
 ## Cloudflare Access statt Basic Auth (optional, vorbereitet)
@@ -147,13 +149,33 @@ Login per E-Mail-Code statt Benutzer/Passwort — angenehmer auf dem iPhone (PWA
 3. Im Pages-Projekt die Env-Var **`AUTH_MODE`** = `access` setzen und neu deployen.
 Die Middleware lässt dann nur noch Anfragen mit Access-JWT durch; Basic Auth ist abgeschaltet. Rückweg: `AUTH_MODE` löschen → Basic Auth gilt wieder.
 
+## Entwicklung
+
+```bash
+npm test          # Kernlogik (lib/core.js) + Smoke-Test (Seiten-Konsistenz)
+npm run test:e2e  # Playwright-Browsertests (einmalig: npm ci && npx playwright install chromium)
+npm run build:css # Tailwind neu bauen — nach jeder Klassen-Änderung in HTML/JS nötig
+npm run build     # test + build:css (das führt auch der Cloudflare-Build aus)
+```
+
+Bei jedem Push/PR läuft die [CI](.github/workflows/ci.yml): Unit-/Smoke-Tests,
+E2E-Tests und eine Prüfung, dass das committete `tailwind.css` aktuell ist.
+
 ## Roadmap / weitere Ideen
 
-1. Serientermine (RRULE) im Kalender-Widget expandieren
-2. GPX: Foto-Anhänge pro Tour, Segment-Detailvergleich (Teilstrecken)
-3. To-do-Widget optional in D1 syncen (geräteübergreifend)
+Fundament & Sicherheit:
+1. Web Push (Push API) als ntfy-Alternative — native System-Benachrichtigungen ohne Extra-App (iOS ab 16.4 in der installierten PWA)
+
+Übersicht & UX:
+2. Status-Briefing-Karte auf dem Hub: „Ist alles okay?" in einer Zeile, verlinkt zur betroffenen Karte
+3. ClimateFlow entrümpeln: einklappbare Karten-Gruppen + Kompakt-Modus (Informationsdichte umschaltbar)
+
+Neue Substanz:
+4. CO₂ als vollwertiger Messwert (Chart-Serie, Lüftungsberater-Kopplung, eigene Warnregel) — Infrastruktur via `extra`-Sensoren vorbereitet
+5. Klima-Archiv: Jahres-Heatmap + Saison-/Vorjahresvergleich
+6. Komplett-Backup (Einstellungen + To-dos + Klima-Archiv, nicht nur GPX) und Foto-Anhänge pro GPX-Tour (R2)
 
 ## Deployment
 
 Push auf `main` → Cloudflare Pages deployt automatisch.
-Bei Service-Worker-Änderungen `CACHE_NAME` in `sw.js` hochzählen (aktuell `smarthub-v3`).
+Bei Service-Worker-Änderungen `CACHE_NAME` in `sw.js` hochzählen (aktuelle Version steht dort als `CACHE_NAME`).
