@@ -104,6 +104,34 @@ const Store = (function () {
 
     setJSON(key, obj, opts) { this.set(key, JSON.stringify(obj), opts); },
 
+    // Alle profilbezogenen Einstellungen als { key: {value, updatedAt} } — fuers
+    // Komplett-Backup (P10). Meta-/interne Schluessel werden ausgelassen.
+    exportAll() {
+      const prefix = `p_${state.profile}_`;
+      const out = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const rk = localStorage.key(i);
+        if (!rk || rk.indexOf(prefix) !== 0) continue;
+        const logical = rk.slice(prefix.length);
+        if (logical.endsWith('__ts') || logical.indexOf('__') === 0) continue; // Meta/intern
+        out[logical] = { value: localStorage.getItem(rk), updatedAt: localTs(logical) };
+      }
+      return out;
+    },
+
+    // Einstellungen aus einem Backup einspielen (Last-Write-Wins ueber updatedAt).
+    importAll(settings) {
+      let n = 0;
+      Object.entries(settings || {}).forEach(([key, entry]) => {
+        if (!entry || typeof entry.value !== 'string') return;
+        const ts = Number(entry.updatedAt) || Date.now();
+        if (ts <= localTs(key)) return; // vorhandenen neueren Stand nicht ueberschreiben
+        this.set(key, entry.value, { updatedAt: ts });
+        n++;
+      });
+      return n;
+    },
+
     flush: flushSync,
 
     // Lokaler Profil-Wechsel (nur ohne Server-Login sinnvoll — bei Basic Auth

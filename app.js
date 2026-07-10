@@ -3283,6 +3283,80 @@
       showNotification('Widget-Layout zurückgesetzt.');
     }
 
+    // ============ Komplett-Backup (Plan-Punkt 10a) ============
+    // Ein-Datei-Sicherung aller profilbezogenen Daten: Einstellungen (Store),
+    // To-dos und das Klima-Archiv (D1). GPX-Touren haben ihre eigene Sicherung im
+    // GPX-Viewer. Restore fuehrt ueber die getesteten Sync-Pfade zusammen (LWW).
+    async function exportFullBackup() {
+      showNotification('Backup wird erstellt…');
+      let climate = [];
+      try { climate = await apiFetch('/api/climate'); } catch (e) { /* D1 evtl. aus → ohne Archiv */ }
+      const backup = {
+        format: 'smarthub-full-backup', version: 1, profile: Store.profile,
+        exportedAt: new Date().toISOString(),
+        settings: Store.exportAll(),
+        todos: getTodos().filter(t => !t.deleted),
+        climate: Array.isArray(climate) ? climate : []
+      };
+      const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `smarthub-full-backup-${Store.profile}-${new Date().toISOString().substring(0, 10)}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      showNotification(`Backup gesichert: ${Object.keys(backup.settings).length} Einstellungen, ${backup.todos.length} To-dos, ${backup.climate.length} Archiv-Tage.`);
+    }
+
+    async function importFullBackup(event) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      let data;
+      try { data = JSON.parse(await file.text()); } catch (e) { showNotification('Datei ist kein gültiges JSON.', 'error'); return; }
+      if (data.format !== 'smarthub-full-backup') { showNotification('Kein gültiges Komplett-Backup.', 'error'); return; }
+      const ok = await modalConfirm({
+        title: 'Backup einspielen?',
+        message: `Einstellungen (${Object.keys(data.settings || {}).length}), To-dos (${(data.todos || []).length}) und Klima-Archiv (${(data.climate || []).length} Tage) werden zusammengeführt. Neuere lokale Werte bleiben erhalten.`,
+        confirmLabel: 'Einspielen'
+      });
+      if (!ok) return;
+      try {
+        // 1. Einstellungen (Last-Write-Wins)
+        const nSet = Store.importAll(data.settings || {});
+        // 2. To-dos zusammenführen (LWW über updatedAt)
+        if (Array.isArray(data.todos) && data.todos.length) {
+          const byId = {};
+          getTodos().forEach(t => { byId[t.id] = t; });
+          data.todos.forEach(t => {
+            if (!t || !t.id) return;
+            const ex = byId[t.id];
+            if (!ex || (t.updatedAt || 0) > (ex.updatedAt || 0)) byId[t.id] = t;
+          });
+          saveTodos(Object.values(byId)); // rendert + synct nach D1
+        }
+        // 3. Klima-Archiv je Standort zurückspielen
+        if (Array.isArray(data.climate) && data.climate.length) {
+          const byLoc = {};
+          data.climate.forEach(r => {
+            if (!r || !r.loc || !r.day) return;
+            (byLoc[r.loc] = byLoc[r.loc] || []).push({
+              day: r.day, tMin: r.t_min, tMax: r.t_max, tAvg: r.t_avg,
+              hMin: r.h_min, hMax: r.h_max, hAvg: r.h_avg, samples: r.samples,
+              co2Avg: r.co2_avg, co2Max: r.co2_max
+            });
+          });
+          for (const [loc, days] of Object.entries(byLoc)) {
+            try { await apiFetch('/api/climate', { method: 'POST', body: JSON.stringify({ loc, days }) }); } catch (e) { /* D1 evtl. aus */ }
+          }
+        }
+        await Store.flush();
+        showNotification(`Backup eingespielt (${nSet} Einstellungen). Lade neu…`);
+        setTimeout(() => location.reload(), 900);
+      } catch (err) {
+        showNotification(`Import fehlgeschlagen: ${err.message}`, 'error');
+      }
+    }
+
     async function clearLocalData() {
       const ok = await modalConfirm({
         title: 'Lokale Daten löschen?',
