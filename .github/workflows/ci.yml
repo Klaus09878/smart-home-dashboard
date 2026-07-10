@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Unit- & Smoke-Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Kernlogik + Konsistenz pruefen
+        run: npm test
+
+  css-check:
+    name: tailwind.css ist aktuell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: CSS neu bauen und mit committetem Stand vergleichen
+        run: |
+          npm run build:css
+          git diff --exit-code -- tailwind.css \
+            || (echo "::error::tailwind.css ist veraltet — 'npm run build:css' ausfuehren und committen"; exit 1)
+
+  e2e:
+    name: Browser-E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Abhaengigkeiten + Chromium installieren
+        run: npm ci && npx playwright install chromium --with-deps
+      - name: E2E-Tests
+        run: npm run test:e2e

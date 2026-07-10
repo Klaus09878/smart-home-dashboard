@@ -42,6 +42,8 @@ test('GPX-Viewer lädt ohne Fehler', async ({ page }) => {
   page.on('pageerror', e => errors.push(e.message));
   await page.goto('/gpx.html');
   await waitReady(page);
-  await expect(page.locator('#cal-grid > div').first()).toBeVisible();
+  // Ohne Touren (leeres IndexedDB im Test) bleibt #main-area mit dem Kalender
+  // versteckt; die Dropzone ist der immer sichtbare Leerzustand.
+  await expect(page.locator('#dropzone')).toBeVisible();
   expect(errors, errors.join('\n')).toHaveLength(0);
 });

@@ -6,5 +6,8 @@
     "test": "node tests/core.test.js && node tests/smoke.test.js",
     "test:e2e": "playwright test",
     "build": "npm run test && npm run build:css"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }
