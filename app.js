@@ -1670,12 +1670,47 @@
       showNotification('Chart als Bild gespeichert.');
     }
 
-    function toggleTableCollapse() {
-      const container = document.getElementById('table-container');
-      const arrow = document.getElementById('table-arrow');
-      container.classList.toggle('hidden');
-      arrow.style.transform = container.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+    // ClimateFlow-Detailkarten einklappen (Plan-Punkt 6). Zustand profilbezogen
+    // im Store (cf_collapsed); die Kernkarten (Messwerte, Analyse) bleiben immer
+    // sichtbar. Kompakt-Modus klappt alle Detailkarten auf einmal ein.
+    const CF_COLLAPSIBLE = {
+      'cf-chart':   { body: 'chart-collapse-body', arrow: 'chart-arrow' },
+      'cf-archive': { body: 'archive-container',   arrow: 'archive-arrow', onOpen: () => loadArchiveView() },
+      'cf-table':   { body: 'table-container',     arrow: 'table-arrow' }
+    };
+    const CF_COLLAPSED_DEFAULT = ['cf-archive', 'cf-table']; // wie bisher: Archiv/Tabelle zu
+    function getCfCollapsed() {
+      const c = Store.getJSON('cf_collapsed', null);
+      return Array.isArray(c) ? c : CF_COLLAPSED_DEFAULT.slice();
     }
+    function applyCfCollapse() {
+      const collapsed = new Set(getCfCollapsed());
+      Object.entries(CF_COLLAPSIBLE).forEach(([id, cfg]) => {
+        const body = document.getElementById(cfg.body);
+        if (!body) return;
+        const isCollapsed = collapsed.has(id);
+        body.classList.toggle('hidden', isCollapsed);
+        const arrow = document.getElementById(cfg.arrow);
+        if (arrow) arrow.style.transform = isCollapsed ? 'rotate(0deg)' : 'rotate(180deg)';
+        if (!isCollapsed && cfg.onOpen) cfg.onOpen();
+      });
+      const dt = document.getElementById('cf-density-toggle');
+      if (dt) dt.checked = Store.get('cf_density') === 'compact';
+    }
+    function toggleCfCard(id) {
+      const set = new Set(getCfCollapsed());
+      if (set.has(id)) set.delete(id); else set.add(id);
+      Store.setJSON('cf_collapsed', [...set]);
+      applyCfCollapse();
+    }
+    function toggleCfCompact() {
+      const compact = Store.get('cf_density') !== 'compact';
+      Store.set('cf_density', compact ? 'compact' : 'full');
+      Store.setJSON('cf_collapsed', compact ? Object.keys(CF_COLLAPSIBLE) : CF_COLLAPSED_DEFAULT.slice());
+      applyCfCollapse();
+    }
+    // Header-Buttons in index.html rufen weiterhin diese Namen auf
+    function toggleTableCollapse() { toggleCfCard('cf-table'); }
 
     // Populate data table (Extra-Felder aus dem Kanal-Schema erscheinen als eigene Spalten)
     function populateTable(feeds) {
@@ -1835,13 +1870,7 @@
     }
 
     // ============ Langzeit-Archiv-Ansicht (liest /api/climate) ============
-    function toggleArchiveCollapse() {
-      const container = document.getElementById('archive-container');
-      const arrow = document.getElementById('archive-arrow');
-      container.classList.toggle('hidden');
-      arrow.style.transform = container.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
-      if (!container.classList.contains('hidden')) loadArchiveView();
-    }
+    function toggleArchiveCollapse() { toggleCfCard('cf-archive'); }
 
     async function loadArchiveView(force = false) {
       const container = document.getElementById('archive-container');
@@ -3184,6 +3213,7 @@
       // Klimadaten erst beim ersten Öffnen des Dashboards laden (Performance)
       if (view === 'climate') {
         applyClimateLayout(); // gespeicherte Karten-Reihenfolge/-Sichtbarkeit
+        applyCfCollapse();    // gespeicherter Einklapp-/Kompakt-Zustand
         if (!appState.climateLoaded) {
           appState.climateLoaded = true;
           reloadData();
