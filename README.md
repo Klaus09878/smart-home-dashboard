@@ -166,19 +166,16 @@ npm run build     # test + build:css (das führt auch der Cloudflare-Build aus)
 Bei jedem Push/PR läuft die [CI](.github/workflows/ci.yml): Unit-/Smoke-Tests,
 E2E-Tests und eine Prüfung, dass das committete `tailwind.css` aktuell ist.
 
-## Roadmap / weitere Ideen
+## Roadmap
 
-Fundament & Sicherheit:
-1. Web Push (Push API) als ntfy-Alternative — native System-Benachrichtigungen ohne Extra-App (iOS ab 16.4 in der installierten PWA)
+Runde 1 (Web Push, Status-Briefing, ClimateFlow-Kompaktmodus, CO₂, Jahres-Heatmap,
+Komplett-Backup, GPX-Fotos) ist vollständig umgesetzt.
 
-Übersicht & UX:
-2. Status-Briefing-Karte auf dem Hub: „Ist alles okay?" in einer Zeile, verlinkt zur betroffenen Karte
-3. ClimateFlow entrümpeln: einklappbare Karten-Gruppen + Kompakt-Modus (Informationsdichte umschaltbar)
+**Runde 2 (19 Punkte):** detaillierter Umsetzungsplan in [PLAN2.md](PLAN2.md), drei Phasen:
 
-Neue Substanz:
-4. CO₂ als vollwertiger Messwert (Chart-Serie, Lüftungsberater-Kopplung, eigene Warnregel) — Infrastruktur via `extra`-Sensoren vorbereitet
-5. Klima-Archiv: Jahres-Heatmap + Saison-/Vorjahresvergleich
-6. Komplett-Backup (Einstellungen + To-dos + Klima-Archiv, nicht nur GPX) und Foto-Anhänge pro GPX-Tour (R2)
+- **A — Datensicherheit:** Cron-Totmannschalter, automatisches D1-Backup nach R2, ThingSpeak-Backfill, Fotos im GPX-Backup, Login-Brute-Force-Schutz
+- **B — Qualität:** Server-API-Tests, E2E für ClimateFlow, CSP ohne `unsafe-inline`, app.js-Modularisierung, ESLint
+- **C — Features:** DWD-Unwetterwarnungen, Briefing-Ausbau, GPX-Live-Aufzeichnung, Share-Target, Foto-Geotags, Nutzerverwaltung in D1, Heizkosten-Schätzung, Archiv-CSV-Export, Vendor-Lazy-Loading
 
 ## Deployment
 
