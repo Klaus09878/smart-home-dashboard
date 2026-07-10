@@ -2,7 +2,7 @@
 // Strategie: Network-first für alles Eigene (damit Deployments sofort ankommen),
 // Cache als Offline-Fallback. API-Aufrufe (ThingSpeak, Open-Meteo, CDNs) gehen
 // immer direkt ans Netz und werden nicht gecacht.
-const CACHE_NAME = 'smarthub-v14';
+const CACHE_NAME = 'smarthub-v15';
 const APP_SHELL = [
   './',
   './gpx.html',
@@ -35,6 +35,33 @@ self.addEventListener('install', event => {
 
 self.addEventListener('message', event => {
   if (event.data === 'skipWaiting') self.skipWaiting();
+});
+
+// Web-Push: Serverseitige Warnungen (functions/_notify.js) als System-Notification.
+self.addEventListener('push', event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data && event.data.text() }; }
+  const title = data.title || 'Smart Home Hub';
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || '',
+    icon: './icons/icon-192.png',
+    badge: './icons/icon-192.png',
+    tag: data.tag || title,
+    data: { url: data.url || './' }
+  }));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || './';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      for (const c of clients) {
+        if ('focus' in c) { c.focus(); if (c.navigate && target !== './') c.navigate(target); return; }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target);
+    })
+  );
 });
 
 self.addEventListener('activate', event => {

@@ -43,9 +43,11 @@ export function isQuietNow(rules, now = new Date()) {
                     : (berlinHour >= from || berlinHour < to);
 }
 
-// Empfänger aus D1 laden: [{ profile, topic, rules }]. Fallback: globales Topic.
+// Empfänger aus D1 laden: [{ profile, topic, rules, subs }]. Ein Profil kann per
+// ntfy-Topic UND/ODER per Web-Push (subs) benachrichtigt werden. Fallback ohne
+// Profile: globales Topic.
 export async function loadRecipients(env) {
-  const recipients = [];
+  const byProfile = {};
   const db = env.DB;
   if (db) {
     try {
@@ -53,21 +55,29 @@ export async function loadRecipients(env) {
       const { results } = await db
         .prepare("SELECT profile, key, value FROM user_settings WHERE key IN ('ntfy_topic','notify_rules')")
         .all();
-      const byProfile = {};
+      const settings = {};
       for (const r of results) {
-        (byProfile[r.profile] = byProfile[r.profile] || {})[r.key] = r.value;
+        (settings[r.profile] = settings[r.profile] || {})[r.key] = r.value;
       }
-      for (const [profile, s] of Object.entries(byProfile)) {
-        const topic = (s.ntfy_topic || '').trim();
-        if (!topic) continue;
+      for (const [profile, s] of Object.entries(settings)) {
         let rules = {};
         try { rules = s.notify_rules ? JSON.parse(s.notify_rules) : {}; } catch (e) { /* Defaults */ }
-        recipients.push({ profile, topic, rules });
+        byProfile[profile] = { profile, topic: (s.ntfy_topic || '').trim(), rules, subs: [] };
+      }
+
+      // Web-Push-Subscriptions je Profil (Tabelle ggf. erst anlegen)
+      await db.exec("CREATE TABLE IF NOT EXISTS push_subscriptions (profile TEXT, endpoint TEXT PRIMARY KEY, p256dh TEXT, auth TEXT, created_at INTEGER)");
+      const subsRes = await db.prepare("SELECT profile, endpoint, p256dh, auth FROM push_subscriptions").all();
+      for (const row of (subsRes.results || [])) {
+        const rec = byProfile[row.profile] || (byProfile[row.profile] = { profile: row.profile, topic: '', rules: {}, subs: [] });
+        rec.subs.push({ endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } });
       }
     } catch (e) { /* D1-Fehler → Fallback unten */ }
   }
+
+  const recipients = Object.values(byProfile).filter(r => r.topic || (r.subs && r.subs.length));
   if (recipients.length === 0 && env.NTFY_TOPIC) {
-    recipients.push({ profile: '_global', topic: env.NTFY_TOPIC, rules: {} });
+    recipients.push({ profile: '_global', topic: env.NTFY_TOPIC, rules: {}, subs: [] });
   }
   return recipients;
 }
@@ -89,6 +99,30 @@ export async function pushTo(topic, { title, body, tags = 'warning', priority = 
   });
 }
 
+// VAPID-Konfiguration aus den Env-Vars lesen (oder null, wenn nicht eingerichtet).
+export function vapidFromEnv(env) {
+  if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY) return null;
+  return { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY, subject: env.VAPID_SUBJECT || 'mailto:admin@smarthub' };
+}
+
+// Web-Push an alle Subscriptions eines Profils. Abgelaufene (404/410) werden aus
+// D1 entfernt. Braucht die VAPID-Konfiguration; ohne sie passiert nichts.
+export async function pushToSubs(db, subs, msg, vapid) {
+  if (!vapid || !subs || !subs.length) return;
+  const wp = await import('./_webpush.js');
+  const sendWebPush = wp.sendWebPush || (wp.default && wp.default.sendWebPush);
+  if (!sendWebPush) return;
+  const payload = { title: msg.title, body: msg.body, tag: msg.tag || msg.title, url: msg.url || '/' };
+  for (const sub of subs) {
+    try {
+      const res = await sendWebPush(sub, payload, vapid);
+      if ((res.status === 404 || res.status === 410) && db) {
+        await db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').bind(sub.endpoint).run();
+      }
+    } catch (e) { /* einzelnen Push-Fehler ignorieren */ }
+  }
+}
+
 // Eine Warnung an alle passenden Profile verteilen.
 //   type       – Regel-Typ (sensor/mold/frost/heat/weekly/…)
 //   dedupeSlug – zusätzlicher Schlüsselteil (z. B. Standort) für die Entprellung
@@ -96,6 +130,7 @@ export async function pushTo(topic, { title, body, tags = 'warning', priority = 
 // Rückgabe: Liste der tatsächlich benachrichtigten "profil:typ:slug".
 export async function dispatch(env, recipients, type, dedupeSlug, build) {
   const notified = [];
+  const vapid = vapidFromEnv(env);
   for (const rec of recipients) {
     const cfg = typeCfg(rec.rules, type);
     if (!cfg.on) continue;
@@ -105,10 +140,14 @@ export async function dispatch(env, recipients, type, dedupeSlug, build) {
     const dedupeMs = (cfg.dedupeH ?? 6) * 60 * 60 * 1000;
     const key = `${rec.profile}:${type}:${dedupeSlug}`;
     if (!(await shouldSend(env.DB, key, dedupeMs))) continue;
-    try {
-      await pushTo(rec.topic, msg);
-      notified.push(key);
-    } catch (e) { /* einzelnen Push-Fehler ignorieren */ }
+    let sent = false;
+    if (rec.topic) {
+      try { await pushTo(rec.topic, msg); sent = true; } catch (e) { /* ntfy-Fehler ignorieren */ }
+    }
+    if (rec.subs && rec.subs.length) {
+      try { await pushToSubs(env.DB, rec.subs, msg, vapid); sent = true; } catch (e) { /* Web-Push-Fehler ignorieren */ }
+    }
+    if (sent) notified.push(key);
   }
   return notified;
 }

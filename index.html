@@ -307,7 +307,11 @@
             <button onclick="sendTestPush()" class="px-3 py-1.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-200 hover:bg-teal-500/25 text-xs font-semibold transition-colors flex items-center gap-1.5">
               <i data-lucide="send" class="w-3.5 h-3.5"></i> Test-Push
             </button>
+            <button onclick="toggleWebPush()" id="webpush-btn" class="hidden px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors flex items-center gap-1.5">
+              <i data-lucide="bell-ring" class="w-3.5 h-3.5"></i> <span id="webpush-btn-label">Web-Push auf diesem Gerät</span>
+            </button>
           </div>
+          <p id="webpush-hint" class="hidden text-[11px] text-slate-500 -mt-2 mb-3"></p>
           <div id="notify-rules" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
           <!-- Ruhezeiten -->
           <div class="mt-4 pt-4 border-t border-slate-800/60 flex flex-wrap items-center gap-3">

@@ -2072,6 +2072,87 @@
       if (btn) btn.classList.toggle('text-teal-400', !!getNtfyTopic());
     }
 
+    // ============ Web Push (Push API, Plan-Punkt 7) ============
+    // Native System-Benachrichtigungen ohne ntfy-App. Der oeffentliche VAPID-
+    // Schluessel kommt vom Server (/api/push); pro Geraet wird eine Subscription
+    // angelegt und in D1 gespeichert. Serverseitig verteilt _notify.js an ntfy
+    // UND Web-Push. Ohne VAPID-Env-Vars bleibt der Button ausgeblendet.
+    const _webpush = { configured: false, vapidKey: null };
+
+    function urlB64ToUint8Array(b64) {
+      const pad = '='.repeat((4 - b64.length % 4) % 4);
+      const base64 = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+      const raw = atob(base64);
+      const arr = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+      return arr;
+    }
+
+    async function currentPushSub() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+      const reg = await navigator.serviceWorker.getRegistration();
+      return reg ? reg.pushManager.getSubscription() : null;
+    }
+
+    function updateWebPushButton(active) {
+      const btn = document.getElementById('webpush-btn');
+      const label = document.getElementById('webpush-btn-label');
+      if (btn) btn.classList.toggle('text-teal-400', active);
+      if (label) label.textContent = active ? 'Web-Push aktiv (deaktivieren)' : 'Web-Push auf diesem Gerät';
+    }
+
+    async function initWebPushUI() {
+      const btn = document.getElementById('webpush-btn');
+      const hint = document.getElementById('webpush-hint');
+      if (!btn) return;
+      let data = null;
+      try { data = await apiFetch('/api/push'); } catch (e) { data = null; }
+      _webpush.configured = !!(data && data.configured);
+      _webpush.vapidKey = data && data.vapidPublicKey;
+
+      const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+      if (!_webpush.configured || !supported) {
+        btn.classList.add('hidden');
+        if (hint) hint.classList.add('hidden');
+        // iOS: Push nur in der installierten PWA moeglich
+        if (hint && _webpush.configured && /iP(hone|ad|od)/.test(navigator.userAgent) &&
+            !window.matchMedia('(display-mode: standalone)').matches) {
+          hint.textContent = 'Web-Push auf dem iPhone: zuerst über „Teilen → Zum Home-Bildschirm" installieren.';
+          hint.classList.remove('hidden');
+        }
+        return;
+      }
+      btn.classList.remove('hidden');
+      if (hint) hint.classList.add('hidden');
+      updateWebPushButton(!!(await currentPushSub()));
+    }
+
+    async function toggleWebPush() {
+      try {
+        const existing = await currentPushSub();
+        if (existing) {
+          try { await apiFetch('/api/push', { method: 'DELETE', body: JSON.stringify({ endpoint: existing.endpoint }) }); } catch (e) { /* Server ggf. offline */ }
+          await existing.unsubscribe();
+          updateWebPushButton(false);
+          showNotification('Web-Push auf diesem Gerät deaktiviert.');
+          return;
+        }
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { showNotification('Benachrichtigungen wurden nicht erlaubt.', 'error'); return; }
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8Array(_webpush.vapidKey)
+        });
+        await apiFetch('/api/push', { method: 'POST', body: JSON.stringify({ subscription: sub.toJSON() }) });
+        updateWebPushButton(true);
+        showNotification('Web-Push auf diesem Gerät aktiviert ✔');
+      } catch (err) {
+        console.warn('Web-Push fehlgeschlagen:', err);
+        showNotification('Web-Push konnte nicht aktiviert werden.', 'error');
+      }
+    }
+
     // ============ CSV-Export der aktuellen Messreihe ============
     // Exportiert die abgeglichenen Innen-Messwerte (appState.insideData) des aktiven
     // Standorts als CSV. Deutsch-/Excel-freundlich: Semikolon als Trenner,
@@ -2753,6 +2834,7 @@
       if (tEl) tEl.innerText = topic || 'nicht gesetzt';
 
       renderNotifyRules();
+      initWebPushUI(); // Web-Push-Button je nach Server-/Geraete-Faehigkeit
 
       // Standorte
       const locEl = document.getElementById('settings-locations');
