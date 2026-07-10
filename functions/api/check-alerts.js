@@ -32,7 +32,8 @@ async function loadChannels(env) {
       const { results } = await env.DB.prepare('SELECT id, name, channel, read_key, lat, lon, fields FROM locations').all();
       (results || []).forEach(r => {
         let f = {}; try { f = r.fields ? JSON.parse(r.fields) : {}; } catch (e) { /* Defaults */ }
-        out[r.id] = { channel: r.channel, apiKey: r.read_key, label: r.name || r.id, lat: r.lat, lon: r.lon, tempField: f.temp || 'field1', humField: f.humidity || 'field2' };
+        const co2Extra = (Array.isArray(f.extra) ? f.extra : []).find(e => e && e.key === 'co2');
+        out[r.id] = { channel: r.channel, apiKey: r.read_key, label: r.name || r.id, lat: r.lat, lon: r.lon, tempField: f.temp || 'field1', humField: f.humidity || 'field2', co2Field: co2Extra ? co2Extra.field : null };
       });
     } catch (e) { /* nur fest verdrahtete Standorte */ }
   }
@@ -208,6 +209,23 @@ export async function onRequestGet(context) {
             tags: 'warning,droplet'
           };
         }));
+      }
+
+      // ---- CO₂ (P8): nur wenn der Standort einen co2-Sensor konfiguriert hat ----
+      if (loc.co2Field) {
+        const c = lastRealValue(feeds, loc.co2Field);
+        if (c && now - c.ms <= FRESH_MS) {
+          R.co2 = Math.round(c.value);
+          report.notified.push(...await dispatch(env, recipients, 'co2', locId, rec => {
+            const th = typeCfg(rec.rules, 'co2').threshold ?? 1200;
+            if (c.value < th) return null;
+            return {
+              title: 'ClimateFlow CO₂-Warnung',
+              body: `Hohe CO₂-Konzentration bei ${loc.label}: ${Math.round(c.value)} ppm (Grenze ${th} ppm). Stoßlüften für frische Luft.`,
+              tags: 'wind'
+            };
+          }));
+        }
       }
 
       // Lüftungsfenster-Push (Punkt 16): nur morgens (Berlin 6–10 Uhr) und wenn

@@ -13,6 +13,7 @@ export const DEFAULT_RULES = {
     mold:    { on: true, dedupeH: 12, threshold: 80 },
     frost:   { on: true, dedupeH: 18, threshold: 0 },
     heat:    { on: true, dedupeH: 18, threshold: 30 },
+    co2:     { on: false, dedupeH: 6, threshold: 1200 }, // opt-in (braucht CO₂-Sensor)
     vent:    { on: false, dedupeH: 20 }, // Lüftungsfenster-Morgen-Push (opt-in)
     errors:  { on: true, dedupeH: 6 },
     weekly:  { on: true, dedupeH: 120 },  // max. 1 Wochenbericht / 5 Tage

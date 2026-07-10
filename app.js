@@ -128,7 +128,7 @@
     // ============ Konfigurierbare Ziel-/Schwellwerte pro Standort ============
     // Bestimmen die Comfort-Bewertungen (KPI-Karten), den Komfort-Score und die
     // Feuchte-Schwelle des Lüftungsberaters. Gespeichert in localStorage.
-    const THRESHOLD_DEFAULTS = { tempMin: 19, tempMax: 24, humMin: 40, humMax: 60 };
+    const THRESHOLD_DEFAULTS = { tempMin: 19, tempMax: 24, humMin: 40, humMax: 60, co2Max: 1000 };
 
     function getThresholds(locId = appState.activeLocId) {
       try {
@@ -781,7 +781,7 @@
 
         // 3. Ventilation Advice
         try {
-          computeVentilationAdvisor(curTempIn, curHumIn, curTempOut, curHumOut);
+          computeVentilationAdvisor(curTempIn, curHumIn, curTempOut, curHumOut, latest.co2 ?? null, getThresholds().co2Max);
         } catch (e) {
           console.error('Fehler beim Lüftungsberater:', e);
         }
@@ -908,7 +908,7 @@
     }
 
     // Ventilation recommendation advisor
-    function computeVentilationAdvisor(inTemp, inRh, outTemp, outRh) {
+    function computeVentilationAdvisor(inTemp, inRh, outTemp, outRh, co2 = null, co2Max = null) {
       const ahIn = getAbsoluteHumidity(inTemp, inRh);
       const ahOut = getAbsoluteHumidity(outTemp, outRh);
       const diff = ahIn - ahOut;
@@ -987,6 +987,12 @@
       const aq = appState.airQuality;
       if (aq && aq.european_aqi !== null && aq.european_aqi !== undefined && aq.european_aqi > 60) {
         tip.innerText += ` ⚠ Außenluft aktuell belastet (AQI ${Math.round(aq.european_aqi)}, ${classifyAqi(aq.european_aqi).label}) – nur kurz stoßlüften.`;
+      }
+
+      // CO₂-Kopplung (P8): ist ein CO₂-Sensor konfiguriert und der Wert hoch,
+      // ist Lüften unabhängig vom Feuchtevergleich zum Luftaustausch ratsam.
+      if (co2 != null && co2Max && co2 > co2Max) {
+        tip.innerText += ` 🫁 CO₂ erhöht (${Math.round(co2)} ppm) – zum Luftaustausch kurz stoßlüften.`;
       }
     }
 
@@ -1413,6 +1419,12 @@
       const insideTemp = filtered.map(f => ({ x: f.time.getTime(), y: f.temp }));
       const insideHum = filtered.map(f => ({ x: f.time.getTime(), y: f.humidity }));
 
+      // CO₂-Serie (P8): nur wenn der aktive Standort einen co2-Extra-Sensor hat
+      // und tatsächlich Werte liefert — sonst bleibt der Chart unveraendert.
+      const hasCo2 = (getLocationFields(appState.activeLocId).extra || []).some(e => e.key === 'co2');
+      const co2Data = hasCo2 ? filtered.map(f => ({ x: f.time.getTime(), y: f.co2 != null ? f.co2 : null })) : [];
+      const hasCo2Data = co2Data.some(p => p.y != null);
+
       // Outdoor weather alignment (zeitzonen-sicher über absolute Zeitstempel).
       // Pro Innen-Messpunkt wird die zeitlich nächste Open-Meteo-Stunde gesucht;
       // liegt keine Stunde nah genug (>45 Min), bleibt der Punkt leer (Lücke im Chart)
@@ -1504,6 +1516,13 @@
             yAxisID: 'yHum'
           }
         ];
+        if (hasCo2Data) {
+          datasets.push({
+            label: 'CO₂ (ppm)', data: co2Data, borderColor: '#eab308', borderWidth: 2,
+            backgroundColor: 'transparent', fill: false, tension: 0.35,
+            pointRadius: 0, pointHoverRadius: 5, spanGaps: true, yAxisID: 'yCo2'
+          });
+        }
       }
 
       const config = {
@@ -1582,6 +1601,16 @@
           }
         }
       };
+
+      // CO₂-Achse nur ergaenzen, wenn eine CO₂-Serie vorhanden ist
+      if (hasCo2Data) {
+        config.options.scales.yCo2 = {
+          type: 'linear', position: 'right',
+          title: { display: true, text: 'CO₂ (ppm)', color: '#a16207', font: { size: 10, weight: 'bold' } },
+          grid: { drawOnChartArea: false },
+          ticks: { color: '#eab308', callback: val => Math.round(val) }
+        };
+      }
 
       if (appState.chartInstance) appState.chartInstance.destroy();
       appState.chartInstance = new Chart(ctx, config);
@@ -1852,12 +1881,19 @@
           const temps = list.map(f => f.temp);
           const hums = list.map(f => f.humidity);
           const avg = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
-          return {
+          const entry = {
             day,
             tMin: Math.min(...temps), tMax: Math.max(...temps), tAvg: parseFloat(avg(temps).toFixed(2)),
             hMin: Math.min(...hums), hMax: Math.max(...hums), hAvg: parseFloat(avg(hums).toFixed(2)),
             samples: list.length
           };
+          // CO₂-Aggregate nur, wenn an dem Tag ueberhaupt CO₂-Werte vorliegen
+          const co2s = list.map(f => f.co2).filter(v => v != null && !isNaN(v));
+          if (co2s.length) {
+            entry.co2Avg = parseFloat(avg(co2s).toFixed(1));
+            entry.co2Max = Math.max(...co2s);
+          }
+          return entry;
         });
         if (days.length === 0) return;
 
@@ -2909,15 +2945,18 @@
 
     async function editLocationThresholds(locId) {
       const th = getThresholds(locId);
+      const hasCo2 = (getLocationFields(locId).extra || []).some(e => e.key === 'co2');
+      const fields = [
+        { key: 'tempMin', label: 'Temperatur Minimum (°C)', type: 'number', value: th.tempMin },
+        { key: 'tempMax', label: 'Temperatur Maximum (°C)', type: 'number', value: th.tempMax },
+        { key: 'humMin', label: 'Feuchte Minimum (%)', type: 'number', value: th.humMin },
+        { key: 'humMax', label: 'Feuchte Maximum (%)', type: 'number', value: th.humMax }
+      ];
+      if (hasCo2) fields.push({ key: 'co2Max', label: 'CO₂ Maximum (ppm)', type: 'number', value: th.co2Max });
       const vals = await modalPrompt({
         title: 'Wohlfühlband bearbeiten',
         description: `Für ${getLocationName(locId)}. Steuert Komfort-Bewertung, Score und Warnschwellen.`,
-        fields: [
-          { key: 'tempMin', label: 'Temperatur Minimum (°C)', type: 'number', value: th.tempMin },
-          { key: 'tempMax', label: 'Temperatur Maximum (°C)', type: 'number', value: th.tempMax },
-          { key: 'humMin', label: 'Feuchte Minimum (%)', type: 'number', value: th.humMin },
-          { key: 'humMax', label: 'Feuchte Maximum (%)', type: 'number', value: th.humMax }
-        ]
+        fields
       });
       if (!vals) return;
       const n = v => parseFloat(String(v).replace(',', '.'));
@@ -2926,7 +2965,14 @@
         showNotification('Ungültige Werte (Min < Max, Feuchte 0–100).', 'error');
         return;
       }
-      Store.setJSON(`loc_thresholds_${locId}`, { tempMin, tempMax, humMin, humMax });
+      const saved = { tempMin, tempMax, humMin, humMax };
+      if (hasCo2) {
+        const co2Max = n(vals.co2Max);
+        if (!isNaN(co2Max) && co2Max > 0) saved.co2Max = co2Max;
+      } else if (th.co2Max !== THRESHOLD_DEFAULTS.co2Max) {
+        saved.co2Max = th.co2Max; // vorhandenen Wert nicht verlieren
+      }
+      Store.setJSON(`loc_thresholds_${locId}`, saved);
       renderSettings();
       if (typeof renderActiveView === 'function') renderActiveView();
       showNotification('Schwellwerte gespeichert.');
@@ -2997,6 +3043,7 @@
       { key: 'mold',    label: 'Schimmelrisiko',      icon: 'droplet',   thLabel: 'Grenze %',  thDef: 80 },
       { key: 'frost',   label: 'Frost',               icon: 'snowflake', thLabel: 'Grenze °C', thDef: 0 },
       { key: 'heat',    label: 'Hitze',               icon: 'flame',     thLabel: 'Grenze °C', thDef: 30 },
+      { key: 'co2',     label: 'CO₂ zu hoch',         icon: 'wind',      thLabel: 'Grenze ppm', thDef: 1200 },
       { key: 'vent',    label: 'Lüftungsfenster (morgens)', icon: 'wind' },
       { key: 'errors',  label: 'App-Fehler',          icon: 'bug' },
       { key: 'weekly',  label: 'Klima-Wochenbericht', icon: 'bar-chart-3' },
@@ -3006,8 +3053,8 @@
     const NOTIFY_DEFAULTS = {
       types: {
         sensor: { on: true }, mold: { on: true, threshold: 80 }, frost: { on: true, threshold: 0 },
-        heat: { on: true, threshold: 30 }, vent: { on: false }, errors: { on: true }, weekly: { on: true },
-        monthly: { on: true }, todo: { on: true }
+        heat: { on: true, threshold: 30 }, co2: { on: false, threshold: 1200 }, vent: { on: false },
+        errors: { on: true }, weekly: { on: true }, monthly: { on: true }, todo: { on: true }
       },
       quiet: { on: false, from: 22, to: 7 }
     };
