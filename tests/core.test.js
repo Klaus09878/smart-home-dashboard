@@ -522,4 +522,48 @@ test('buildBriefing: ignoriert kaputte Signale', () => {
   assert.strictEqual(r.items[0].text, 'echt');
 });
 
+console.log('\nlib/core.js – Archiv (Jahr/Saison)');
+
+const archiveRows = [
+  { day: '2025-07-01', t_avg: 20, t_min: 16, t_max: 25, h_avg: 55 },
+  { day: '2025-07-15', t_avg: 22, t_min: 18, t_max: 28, h_avg: 60 },
+  { day: '2026-07-01', t_avg: 24, t_min: 19, t_max: 30, h_avg: 50 },
+  { day: '2026-07-10', t_avg: 26, t_min: 21, t_max: 33, h_avg: 52 },
+  { day: '2026-01-05', t_avg: 5,  t_min: 2,  t_max: 9,  h_avg: 70 }
+];
+
+test('yearHeatmap: filtert aufs Jahr, liefert min/max', () => {
+  const h = core.yearHeatmap(archiveRows, 2026);
+  assert.strictEqual(h.year, 2026);
+  assert.strictEqual(h.days.length, 3); // zwei Juli-Tage + ein Januar-Tag
+  assert.strictEqual(h.min, 5);
+  assert.strictEqual(h.max, 26);
+  // leeres/fremdes Jahr → keine Tage, min/max null
+  const empty = core.yearHeatmap(archiveRows, 2020);
+  assert.strictEqual(empty.days.length, 0);
+  assert.strictEqual(empty.min, null);
+});
+
+test('periodCompare: Juli 2026 vs. Juli 2025 (Delta)', () => {
+  const r = core.periodCompare(archiveRows,
+    { from: '2026-07-01', to: '2026-07-31' },
+    { from: '2025-07-01', to: '2025-07-31' });
+  assert.strictEqual(r.a.days, 2);
+  assert.strictEqual(r.b.days, 2);
+  assert.strictEqual(r.a.tAvg, 25); // (24+26)/2
+  assert.strictEqual(r.b.tAvg, 21); // (20+22)/2
+  assert.strictEqual(r.deltaT, 4);
+  assert.strictEqual(r.a.tMax, 33);
+  assert.ok(Math.abs(r.deltaH - (51 - 57.5)) < 1e-9);
+});
+
+test('periodCompare: leerer Zeitraum → null-Seite, kein Delta', () => {
+  const r = core.periodCompare(archiveRows,
+    { from: '2026-07-01', to: '2026-07-31' },
+    { from: '2024-07-01', to: '2024-07-31' });
+  assert.ok(r.a);
+  assert.strictEqual(r.b, null);
+  assert.strictEqual(r.deltaT, null);
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);

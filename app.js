@@ -1993,6 +1993,107 @@
           cmpEl.classList.add('hidden');
         }
       }
+
+      renderArchiveYear(rows);
+    }
+
+    // Jahres-Heatmap + Saisonvergleich (P9). Nutzt yearHeatmap/periodCompare aus
+    // lib/core.js. Farbe = Tagesmittel-Temperatur (blau kalt → rot warm).
+    function tempToColor(t, min, max) {
+      if (t == null || min == null || max == null || max === min) return 'rgba(100,116,139,0.22)';
+      const f = Math.max(0, Math.min(1, (t - min) / (max - min)));
+      const r = Math.round(59 + f * (239 - 59));
+      const g = Math.round(130 - f * (130 - 68));
+      const b = Math.round(246 - f * (246 - 68));
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function renderArchiveYear(rows) {
+      const wrap = document.getElementById('archive-year');
+      if (!wrap) return;
+      const years = [...new Set((rows || []).filter(r => r.t_avg != null).map(r => r.day.slice(0, 4)))].sort();
+      if (years.length === 0) { wrap.classList.add('hidden'); return; }
+      if (!appState.archiveYear || !years.includes(String(appState.archiveYear))) {
+        appState.archiveYear = Number(years[years.length - 1]);
+      }
+      const year = appState.archiveYear;
+      const hm = yearHeatmap(rows, year);
+      const byDay = {}; hm.days.forEach(d => { byDay[d.day] = d; });
+      const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+      // Jahr-Umschalter
+      const yearBtns = years.map(y =>
+        `<button data-year="${y}" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${Number(y) === year ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'text-slate-400 hover:text-white border border-slate-800'}">${y}</button>`
+      ).join('');
+
+      // Heatmap: 12 Monatszeilen à max. 31 Tageszellen
+      let grid = '';
+      for (let m = 0; m < 12; m++) {
+        const mm = String(m + 1).padStart(2, '0');
+        const daysInMonth = new Date(year, m + 1, 0).getDate();
+        let cells = '';
+        for (let d = 1; d <= 31; d++) {
+          if (d > daysInMonth) { cells += '<div></div>'; continue; }
+          const dayKey = `${year}-${mm}-${String(d).padStart(2, '0')}`;
+          const rec = byDay[dayKey];
+          const color = rec ? tempToColor(rec.tAvg, hm.min, hm.max) : 'rgba(100,116,139,0.12)';
+          const title = rec ? `${dayKey}: Ø ${rec.tAvg.toFixed(1)} °C${rec.hAvg != null ? `, ${rec.hAvg.toFixed(0)} %` : ''}` : `${dayKey}: keine Daten`;
+          cells += `<div data-day="${dayKey}" title="${title}" class="aspect-square rounded-[3px] ${rec ? 'cursor-pointer hover:ring-1 hover:ring-white/40' : ''}" style="background:${color}"></div>`;
+        }
+        grid += `<div class="flex items-center gap-1.5">
+          <span class="w-7 shrink-0 text-[10px] text-slate-500 text-right">${MONTHS[m]}</span>
+          <div class="grid gap-[2px] flex-1" style="grid-template-columns:repeat(31,minmax(0,1fr))">${cells}</div>
+        </div>`;
+      }
+
+      // Saisonvergleich: aktueller Monat vs. gleicher Monat im Vorjahr + Heizperiode
+      const now = new Date();
+      const curM = String(now.getMonth() + 1).padStart(2, '0');
+      const lastDayCur = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const monthName = now.toLocaleDateString('de-DE', { month: 'long' });
+      const cmpMonth = periodCompare(rows,
+        { from: `${now.getFullYear()}-${curM}-01`, to: `${now.getFullYear()}-${curM}-${String(lastDayCur).padStart(2, '0')}` },
+        { from: `${now.getFullYear() - 1}-${curM}-01`, to: `${now.getFullYear() - 1}-${curM}-31` });
+      // Heizperiode Okt–Mär (aktuell laufende vs. Vorjahres-Periode)
+      const heatStartYear = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+      const heatP = y => ({ from: `${y}-10-01`, to: `${y + 1}-03-31` });
+      const cmpHeat = periodCompare(rows, heatP(heatStartYear), heatP(heatStartYear - 1));
+
+      const deltaSpan = (d, unit, digits = 1) => {
+        if (d == null) return '<span class="text-slate-500">–</span>';
+        const cls = d > 0.1 ? 'text-orange-300' : d < -0.1 ? 'text-blue-300' : 'text-slate-400';
+        const arrow = d > 0.1 ? '↑' : d < -0.1 ? '↓' : '→';
+        return `<span class="${cls} font-semibold">${arrow} ${d >= 0 ? '+' : ''}${d.toFixed(digits)}${unit}</span>`;
+      };
+      const cmpRow = (label, r) => (r.a && r.b)
+        ? `<div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"><span class="text-slate-300 font-semibold">${label}:</span> <span>Ø ${r.a.tAvg.toFixed(1)} °C vs. ${r.b.tAvg.toFixed(1)} °C ${deltaSpan(r.deltaT, ' °C')}</span>${r.deltaH != null ? `<span class="text-slate-500">·</span> <span>Feuchte ${deltaSpan(r.deltaH, ' %', 0)}</span>` : ''}</div>`
+        : `<div class="text-slate-500">${label}: noch keine Vergleichsdaten</div>`;
+
+      wrap.innerHTML = `
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <h3 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5"><i data-lucide="calendar-range" class="w-3.5 h-3.5 text-teal-400"></i> Jahr & Saison</h3>
+          <div class="flex gap-1" id="archive-year-btns">${yearBtns}</div>
+        </div>
+        <div class="flex flex-col gap-1">${grid}</div>
+        <div class="flex items-center gap-2 mt-2 text-[10px] text-slate-500">
+          <span>kühler</span>
+          <span class="h-2 flex-1 rounded-full max-w-[120px]" style="background:linear-gradient(to right,rgb(59,130,246),rgb(239,68,68))"></span>
+          <span>wärmer</span>
+        </div>
+        <div class="mt-4 space-y-1.5 text-xs text-slate-400 bg-slate-900/50 border border-slate-800/60 rounded-xl p-3">
+          ${cmpRow(`${monthName} vs. Vorjahr`, cmpMonth)}
+          ${cmpRow('Heizperiode vs. Vorjahr', cmpHeat)}
+        </div>`;
+      wrap.classList.remove('hidden');
+
+      wrap.querySelectorAll('#archive-year-btns [data-year]').forEach(btn =>
+        btn.addEventListener('click', () => { appState.archiveYear = Number(btn.dataset.year); renderArchiveYear(rows); }));
+      wrap.querySelectorAll('[data-day]').forEach(cell =>
+        cell.addEventListener('click', () => {
+          const idx = (appState.archiveRows || []).findIndex(x => x.day === cell.dataset.day);
+          if (idx >= 0) showArchiveDayDetail(idx);
+        }));
+      updateIcons();
     }
 
     function drawArchiveChart(rows) {
