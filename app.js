@@ -128,7 +128,7 @@
     // ============ Konfigurierbare Ziel-/Schwellwerte pro Standort ============
     // Bestimmen die Comfort-Bewertungen (KPI-Karten), den Komfort-Score und die
     // Feuchte-Schwelle des Lüftungsberaters. Gespeichert in localStorage.
-    const THRESHOLD_DEFAULTS = { tempMin: 19, tempMax: 24, humMin: 40, humMax: 60 };
+    const THRESHOLD_DEFAULTS = { tempMin: 19, tempMax: 24, humMin: 40, humMax: 60, co2Max: 1000 };
 
     function getThresholds(locId = appState.activeLocId) {
       try {
@@ -781,7 +781,7 @@
 
         // 3. Ventilation Advice
         try {
-          computeVentilationAdvisor(curTempIn, curHumIn, curTempOut, curHumOut);
+          computeVentilationAdvisor(curTempIn, curHumIn, curTempOut, curHumOut, latest.co2 ?? null, getThresholds().co2Max);
         } catch (e) {
           console.error('Fehler beim Lüftungsberater:', e);
         }
@@ -908,7 +908,7 @@
     }
 
     // Ventilation recommendation advisor
-    function computeVentilationAdvisor(inTemp, inRh, outTemp, outRh) {
+    function computeVentilationAdvisor(inTemp, inRh, outTemp, outRh, co2 = null, co2Max = null) {
       const ahIn = getAbsoluteHumidity(inTemp, inRh);
       const ahOut = getAbsoluteHumidity(outTemp, outRh);
       const diff = ahIn - ahOut;
@@ -987,6 +987,12 @@
       const aq = appState.airQuality;
       if (aq && aq.european_aqi !== null && aq.european_aqi !== undefined && aq.european_aqi > 60) {
         tip.innerText += ` ⚠ Außenluft aktuell belastet (AQI ${Math.round(aq.european_aqi)}, ${classifyAqi(aq.european_aqi).label}) – nur kurz stoßlüften.`;
+      }
+
+      // CO₂-Kopplung (P8): ist ein CO₂-Sensor konfiguriert und der Wert hoch,
+      // ist Lüften unabhängig vom Feuchtevergleich zum Luftaustausch ratsam.
+      if (co2 != null && co2Max && co2 > co2Max) {
+        tip.innerText += ` 🫁 CO₂ erhöht (${Math.round(co2)} ppm) – zum Luftaustausch kurz stoßlüften.`;
       }
     }
 
@@ -1413,6 +1419,12 @@
       const insideTemp = filtered.map(f => ({ x: f.time.getTime(), y: f.temp }));
       const insideHum = filtered.map(f => ({ x: f.time.getTime(), y: f.humidity }));
 
+      // CO₂-Serie (P8): nur wenn der aktive Standort einen co2-Extra-Sensor hat
+      // und tatsächlich Werte liefert — sonst bleibt der Chart unveraendert.
+      const hasCo2 = (getLocationFields(appState.activeLocId).extra || []).some(e => e.key === 'co2');
+      const co2Data = hasCo2 ? filtered.map(f => ({ x: f.time.getTime(), y: f.co2 != null ? f.co2 : null })) : [];
+      const hasCo2Data = co2Data.some(p => p.y != null);
+
       // Outdoor weather alignment (zeitzonen-sicher über absolute Zeitstempel).
       // Pro Innen-Messpunkt wird die zeitlich nächste Open-Meteo-Stunde gesucht;
       // liegt keine Stunde nah genug (>45 Min), bleibt der Punkt leer (Lücke im Chart)
@@ -1504,6 +1516,13 @@
             yAxisID: 'yHum'
           }
         ];
+        if (hasCo2Data) {
+          datasets.push({
+            label: 'CO₂ (ppm)', data: co2Data, borderColor: '#eab308', borderWidth: 2,
+            backgroundColor: 'transparent', fill: false, tension: 0.35,
+            pointRadius: 0, pointHoverRadius: 5, spanGaps: true, yAxisID: 'yCo2'
+          });
+        }
       }
 
       const config = {
@@ -1582,6 +1601,16 @@
           }
         }
       };
+
+      // CO₂-Achse nur ergaenzen, wenn eine CO₂-Serie vorhanden ist
+      if (hasCo2Data) {
+        config.options.scales.yCo2 = {
+          type: 'linear', position: 'right',
+          title: { display: true, text: 'CO₂ (ppm)', color: '#a16207', font: { size: 10, weight: 'bold' } },
+          grid: { drawOnChartArea: false },
+          ticks: { color: '#eab308', callback: val => Math.round(val) }
+        };
+      }
 
       if (appState.chartInstance) appState.chartInstance.destroy();
       appState.chartInstance = new Chart(ctx, config);
@@ -1670,12 +1699,47 @@
       showNotification('Chart als Bild gespeichert.');
     }
 
-    function toggleTableCollapse() {
-      const container = document.getElementById('table-container');
-      const arrow = document.getElementById('table-arrow');
-      container.classList.toggle('hidden');
-      arrow.style.transform = container.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
+    // ClimateFlow-Detailkarten einklappen (Plan-Punkt 6). Zustand profilbezogen
+    // im Store (cf_collapsed); die Kernkarten (Messwerte, Analyse) bleiben immer
+    // sichtbar. Kompakt-Modus klappt alle Detailkarten auf einmal ein.
+    const CF_COLLAPSIBLE = {
+      'cf-chart':   { body: 'chart-collapse-body', arrow: 'chart-arrow' },
+      'cf-archive': { body: 'archive-container',   arrow: 'archive-arrow', onOpen: () => loadArchiveView() },
+      'cf-table':   { body: 'table-container',     arrow: 'table-arrow' }
+    };
+    const CF_COLLAPSED_DEFAULT = ['cf-archive', 'cf-table']; // wie bisher: Archiv/Tabelle zu
+    function getCfCollapsed() {
+      const c = Store.getJSON('cf_collapsed', null);
+      return Array.isArray(c) ? c : CF_COLLAPSED_DEFAULT.slice();
     }
+    function applyCfCollapse() {
+      const collapsed = new Set(getCfCollapsed());
+      Object.entries(CF_COLLAPSIBLE).forEach(([id, cfg]) => {
+        const body = document.getElementById(cfg.body);
+        if (!body) return;
+        const isCollapsed = collapsed.has(id);
+        body.classList.toggle('hidden', isCollapsed);
+        const arrow = document.getElementById(cfg.arrow);
+        if (arrow) arrow.style.transform = isCollapsed ? 'rotate(0deg)' : 'rotate(180deg)';
+        if (!isCollapsed && cfg.onOpen) cfg.onOpen();
+      });
+      const dt = document.getElementById('cf-density-toggle');
+      if (dt) dt.checked = Store.get('cf_density') === 'compact';
+    }
+    function toggleCfCard(id) {
+      const set = new Set(getCfCollapsed());
+      if (set.has(id)) set.delete(id); else set.add(id);
+      Store.setJSON('cf_collapsed', [...set]);
+      applyCfCollapse();
+    }
+    function toggleCfCompact() {
+      const compact = Store.get('cf_density') !== 'compact';
+      Store.set('cf_density', compact ? 'compact' : 'full');
+      Store.setJSON('cf_collapsed', compact ? Object.keys(CF_COLLAPSIBLE) : CF_COLLAPSED_DEFAULT.slice());
+      applyCfCollapse();
+    }
+    // Header-Buttons in index.html rufen weiterhin diese Namen auf
+    function toggleTableCollapse() { toggleCfCard('cf-table'); }
 
     // Populate data table (Extra-Felder aus dem Kanal-Schema erscheinen als eigene Spalten)
     function populateTable(feeds) {
@@ -1817,12 +1881,19 @@
           const temps = list.map(f => f.temp);
           const hums = list.map(f => f.humidity);
           const avg = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
-          return {
+          const entry = {
             day,
             tMin: Math.min(...temps), tMax: Math.max(...temps), tAvg: parseFloat(avg(temps).toFixed(2)),
             hMin: Math.min(...hums), hMax: Math.max(...hums), hAvg: parseFloat(avg(hums).toFixed(2)),
             samples: list.length
           };
+          // CO₂-Aggregate nur, wenn an dem Tag ueberhaupt CO₂-Werte vorliegen
+          const co2s = list.map(f => f.co2).filter(v => v != null && !isNaN(v));
+          if (co2s.length) {
+            entry.co2Avg = parseFloat(avg(co2s).toFixed(1));
+            entry.co2Max = Math.max(...co2s);
+          }
+          return entry;
         });
         if (days.length === 0) return;
 
@@ -1835,13 +1906,7 @@
     }
 
     // ============ Langzeit-Archiv-Ansicht (liest /api/climate) ============
-    function toggleArchiveCollapse() {
-      const container = document.getElementById('archive-container');
-      const arrow = document.getElementById('archive-arrow');
-      container.classList.toggle('hidden');
-      arrow.style.transform = container.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(180deg)';
-      if (!container.classList.contains('hidden')) loadArchiveView();
-    }
+    function toggleArchiveCollapse() { toggleCfCard('cf-archive'); }
 
     async function loadArchiveView(force = false) {
       const container = document.getElementById('archive-container');
@@ -1928,6 +1993,107 @@
           cmpEl.classList.add('hidden');
         }
       }
+
+      renderArchiveYear(rows);
+    }
+
+    // Jahres-Heatmap + Saisonvergleich (P9). Nutzt yearHeatmap/periodCompare aus
+    // lib/core.js. Farbe = Tagesmittel-Temperatur (blau kalt → rot warm).
+    function tempToColor(t, min, max) {
+      if (t == null || min == null || max == null || max === min) return 'rgba(100,116,139,0.22)';
+      const f = Math.max(0, Math.min(1, (t - min) / (max - min)));
+      const r = Math.round(59 + f * (239 - 59));
+      const g = Math.round(130 - f * (130 - 68));
+      const b = Math.round(246 - f * (246 - 68));
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function renderArchiveYear(rows) {
+      const wrap = document.getElementById('archive-year');
+      if (!wrap) return;
+      const years = [...new Set((rows || []).filter(r => r.t_avg != null).map(r => r.day.slice(0, 4)))].sort();
+      if (years.length === 0) { wrap.classList.add('hidden'); return; }
+      if (!appState.archiveYear || !years.includes(String(appState.archiveYear))) {
+        appState.archiveYear = Number(years[years.length - 1]);
+      }
+      const year = appState.archiveYear;
+      const hm = yearHeatmap(rows, year);
+      const byDay = {}; hm.days.forEach(d => { byDay[d.day] = d; });
+      const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+      // Jahr-Umschalter
+      const yearBtns = years.map(y =>
+        `<button data-year="${y}" class="px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${Number(y) === year ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'text-slate-400 hover:text-white border border-slate-800'}">${y}</button>`
+      ).join('');
+
+      // Heatmap: 12 Monatszeilen à max. 31 Tageszellen
+      let grid = '';
+      for (let m = 0; m < 12; m++) {
+        const mm = String(m + 1).padStart(2, '0');
+        const daysInMonth = new Date(year, m + 1, 0).getDate();
+        let cells = '';
+        for (let d = 1; d <= 31; d++) {
+          if (d > daysInMonth) { cells += '<div></div>'; continue; }
+          const dayKey = `${year}-${mm}-${String(d).padStart(2, '0')}`;
+          const rec = byDay[dayKey];
+          const color = rec ? tempToColor(rec.tAvg, hm.min, hm.max) : 'rgba(100,116,139,0.12)';
+          const title = rec ? `${dayKey}: Ø ${rec.tAvg.toFixed(1)} °C${rec.hAvg != null ? `, ${rec.hAvg.toFixed(0)} %` : ''}` : `${dayKey}: keine Daten`;
+          cells += `<div data-day="${dayKey}" title="${title}" class="aspect-square rounded-[3px] ${rec ? 'cursor-pointer hover:ring-1 hover:ring-white/40' : ''}" style="background:${color}"></div>`;
+        }
+        grid += `<div class="flex items-center gap-1.5">
+          <span class="w-7 shrink-0 text-[10px] text-slate-500 text-right">${MONTHS[m]}</span>
+          <div class="grid gap-[2px] flex-1" style="grid-template-columns:repeat(31,minmax(0,1fr))">${cells}</div>
+        </div>`;
+      }
+
+      // Saisonvergleich: aktueller Monat vs. gleicher Monat im Vorjahr + Heizperiode
+      const now = new Date();
+      const curM = String(now.getMonth() + 1).padStart(2, '0');
+      const lastDayCur = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const monthName = now.toLocaleDateString('de-DE', { month: 'long' });
+      const cmpMonth = periodCompare(rows,
+        { from: `${now.getFullYear()}-${curM}-01`, to: `${now.getFullYear()}-${curM}-${String(lastDayCur).padStart(2, '0')}` },
+        { from: `${now.getFullYear() - 1}-${curM}-01`, to: `${now.getFullYear() - 1}-${curM}-31` });
+      // Heizperiode Okt–Mär (aktuell laufende vs. Vorjahres-Periode)
+      const heatStartYear = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+      const heatP = y => ({ from: `${y}-10-01`, to: `${y + 1}-03-31` });
+      const cmpHeat = periodCompare(rows, heatP(heatStartYear), heatP(heatStartYear - 1));
+
+      const deltaSpan = (d, unit, digits = 1) => {
+        if (d == null) return '<span class="text-slate-500">–</span>';
+        const cls = d > 0.1 ? 'text-orange-300' : d < -0.1 ? 'text-blue-300' : 'text-slate-400';
+        const arrow = d > 0.1 ? '↑' : d < -0.1 ? '↓' : '→';
+        return `<span class="${cls} font-semibold">${arrow} ${d >= 0 ? '+' : ''}${d.toFixed(digits)}${unit}</span>`;
+      };
+      const cmpRow = (label, r) => (r.a && r.b)
+        ? `<div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5"><span class="text-slate-300 font-semibold">${label}:</span> <span>Ø ${r.a.tAvg.toFixed(1)} °C vs. ${r.b.tAvg.toFixed(1)} °C ${deltaSpan(r.deltaT, ' °C')}</span>${r.deltaH != null ? `<span class="text-slate-500">·</span> <span>Feuchte ${deltaSpan(r.deltaH, ' %', 0)}</span>` : ''}</div>`
+        : `<div class="text-slate-500">${label}: noch keine Vergleichsdaten</div>`;
+
+      wrap.innerHTML = `
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <h3 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5"><i data-lucide="calendar-range" class="w-3.5 h-3.5 text-teal-400"></i> Jahr & Saison</h3>
+          <div class="flex gap-1" id="archive-year-btns">${yearBtns}</div>
+        </div>
+        <div class="flex flex-col gap-1">${grid}</div>
+        <div class="flex items-center gap-2 mt-2 text-[10px] text-slate-500">
+          <span>kühler</span>
+          <span class="h-2 flex-1 rounded-full max-w-[120px]" style="background:linear-gradient(to right,rgb(59,130,246),rgb(239,68,68))"></span>
+          <span>wärmer</span>
+        </div>
+        <div class="mt-4 space-y-1.5 text-xs text-slate-400 bg-slate-900/50 border border-slate-800/60 rounded-xl p-3">
+          ${cmpRow(`${monthName} vs. Vorjahr`, cmpMonth)}
+          ${cmpRow('Heizperiode vs. Vorjahr', cmpHeat)}
+        </div>`;
+      wrap.classList.remove('hidden');
+
+      wrap.querySelectorAll('#archive-year-btns [data-year]').forEach(btn =>
+        btn.addEventListener('click', () => { appState.archiveYear = Number(btn.dataset.year); renderArchiveYear(rows); }));
+      wrap.querySelectorAll('[data-day]').forEach(cell =>
+        cell.addEventListener('click', () => {
+          const idx = (appState.archiveRows || []).findIndex(x => x.day === cell.dataset.day);
+          if (idx >= 0) showArchiveDayDetail(idx);
+        }));
+      updateIcons();
     }
 
     function drawArchiveChart(rows) {
@@ -2041,6 +2207,87 @@
     function updateNtfyButton() {
       const btn = document.getElementById('ntfy-btn');
       if (btn) btn.classList.toggle('text-teal-400', !!getNtfyTopic());
+    }
+
+    // ============ Web Push (Push API, Plan-Punkt 7) ============
+    // Native System-Benachrichtigungen ohne ntfy-App. Der oeffentliche VAPID-
+    // Schluessel kommt vom Server (/api/push); pro Geraet wird eine Subscription
+    // angelegt und in D1 gespeichert. Serverseitig verteilt _notify.js an ntfy
+    // UND Web-Push. Ohne VAPID-Env-Vars bleibt der Button ausgeblendet.
+    const _webpush = { configured: false, vapidKey: null };
+
+    function urlB64ToUint8Array(b64) {
+      const pad = '='.repeat((4 - b64.length % 4) % 4);
+      const base64 = (b64 + pad).replace(/-/g, '+').replace(/_/g, '/');
+      const raw = atob(base64);
+      const arr = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+      return arr;
+    }
+
+    async function currentPushSub() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+      const reg = await navigator.serviceWorker.getRegistration();
+      return reg ? reg.pushManager.getSubscription() : null;
+    }
+
+    function updateWebPushButton(active) {
+      const btn = document.getElementById('webpush-btn');
+      const label = document.getElementById('webpush-btn-label');
+      if (btn) btn.classList.toggle('text-teal-400', active);
+      if (label) label.textContent = active ? 'Web-Push aktiv (deaktivieren)' : 'Web-Push auf diesem Gerät';
+    }
+
+    async function initWebPushUI() {
+      const btn = document.getElementById('webpush-btn');
+      const hint = document.getElementById('webpush-hint');
+      if (!btn) return;
+      let data = null;
+      try { data = await apiFetch('/api/push'); } catch (e) { data = null; }
+      _webpush.configured = !!(data && data.configured);
+      _webpush.vapidKey = data && data.vapidPublicKey;
+
+      const supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+      if (!_webpush.configured || !supported) {
+        btn.classList.add('hidden');
+        if (hint) hint.classList.add('hidden');
+        // iOS: Push nur in der installierten PWA moeglich
+        if (hint && _webpush.configured && /iP(hone|ad|od)/.test(navigator.userAgent) &&
+            !window.matchMedia('(display-mode: standalone)').matches) {
+          hint.textContent = 'Web-Push auf dem iPhone: zuerst über „Teilen → Zum Home-Bildschirm" installieren.';
+          hint.classList.remove('hidden');
+        }
+        return;
+      }
+      btn.classList.remove('hidden');
+      if (hint) hint.classList.add('hidden');
+      updateWebPushButton(!!(await currentPushSub()));
+    }
+
+    async function toggleWebPush() {
+      try {
+        const existing = await currentPushSub();
+        if (existing) {
+          try { await apiFetch('/api/push', { method: 'DELETE', body: JSON.stringify({ endpoint: existing.endpoint }) }); } catch (e) { /* Server ggf. offline */ }
+          await existing.unsubscribe();
+          updateWebPushButton(false);
+          showNotification('Web-Push auf diesem Gerät deaktiviert.');
+          return;
+        }
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') { showNotification('Benachrichtigungen wurden nicht erlaubt.', 'error'); return; }
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlB64ToUint8Array(_webpush.vapidKey)
+        });
+        await apiFetch('/api/push', { method: 'POST', body: JSON.stringify({ subscription: sub.toJSON() }) });
+        updateWebPushButton(true);
+        showNotification('Web-Push auf diesem Gerät aktiviert ✔');
+      } catch (err) {
+        console.warn('Web-Push fehlgeschlagen:', err);
+        showNotification('Web-Push konnte nicht aktiviert werden.', 'error');
+      }
     }
 
     // ============ CSV-Export der aktuellen Messreihe ============
@@ -2165,6 +2412,7 @@
     // 'hub_widget_hidden'. Gezogen wird am Griff-Symbol (erscheint beim Hover).
     const HUB_WIDGET_META = {
       clock: 'Uhr & Wetter jetzt',
+      briefing: 'Status-Briefing',
       forecast: 'Wetter (3 Tage)',
       todo: 'To-do-Liste',
       calendar: 'Nächste Termine'
@@ -2723,6 +2971,7 @@
       if (tEl) tEl.innerText = topic || 'nicht gesetzt';
 
       renderNotifyRules();
+      initWebPushUI(); // Web-Push-Button je nach Server-/Geraete-Faehigkeit
 
       // Standorte
       const locEl = document.getElementById('settings-locations');
@@ -2797,15 +3046,18 @@
 
     async function editLocationThresholds(locId) {
       const th = getThresholds(locId);
+      const hasCo2 = (getLocationFields(locId).extra || []).some(e => e.key === 'co2');
+      const fields = [
+        { key: 'tempMin', label: 'Temperatur Minimum (°C)', type: 'number', value: th.tempMin },
+        { key: 'tempMax', label: 'Temperatur Maximum (°C)', type: 'number', value: th.tempMax },
+        { key: 'humMin', label: 'Feuchte Minimum (%)', type: 'number', value: th.humMin },
+        { key: 'humMax', label: 'Feuchte Maximum (%)', type: 'number', value: th.humMax }
+      ];
+      if (hasCo2) fields.push({ key: 'co2Max', label: 'CO₂ Maximum (ppm)', type: 'number', value: th.co2Max });
       const vals = await modalPrompt({
         title: 'Wohlfühlband bearbeiten',
         description: `Für ${getLocationName(locId)}. Steuert Komfort-Bewertung, Score und Warnschwellen.`,
-        fields: [
-          { key: 'tempMin', label: 'Temperatur Minimum (°C)', type: 'number', value: th.tempMin },
-          { key: 'tempMax', label: 'Temperatur Maximum (°C)', type: 'number', value: th.tempMax },
-          { key: 'humMin', label: 'Feuchte Minimum (%)', type: 'number', value: th.humMin },
-          { key: 'humMax', label: 'Feuchte Maximum (%)', type: 'number', value: th.humMax }
-        ]
+        fields
       });
       if (!vals) return;
       const n = v => parseFloat(String(v).replace(',', '.'));
@@ -2814,7 +3066,14 @@
         showNotification('Ungültige Werte (Min < Max, Feuchte 0–100).', 'error');
         return;
       }
-      Store.setJSON(`loc_thresholds_${locId}`, { tempMin, tempMax, humMin, humMax });
+      const saved = { tempMin, tempMax, humMin, humMax };
+      if (hasCo2) {
+        const co2Max = n(vals.co2Max);
+        if (!isNaN(co2Max) && co2Max > 0) saved.co2Max = co2Max;
+      } else if (th.co2Max !== THRESHOLD_DEFAULTS.co2Max) {
+        saved.co2Max = th.co2Max; // vorhandenen Wert nicht verlieren
+      }
+      Store.setJSON(`loc_thresholds_${locId}`, saved);
       renderSettings();
       if (typeof renderActiveView === 'function') renderActiveView();
       showNotification('Schwellwerte gespeichert.');
@@ -2885,6 +3144,7 @@
       { key: 'mold',    label: 'Schimmelrisiko',      icon: 'droplet',   thLabel: 'Grenze %',  thDef: 80 },
       { key: 'frost',   label: 'Frost',               icon: 'snowflake', thLabel: 'Grenze °C', thDef: 0 },
       { key: 'heat',    label: 'Hitze',               icon: 'flame',     thLabel: 'Grenze °C', thDef: 30 },
+      { key: 'co2',     label: 'CO₂ zu hoch',         icon: 'wind',      thLabel: 'Grenze ppm', thDef: 1200 },
       { key: 'vent',    label: 'Lüftungsfenster (morgens)', icon: 'wind' },
       { key: 'errors',  label: 'App-Fehler',          icon: 'bug' },
       { key: 'weekly',  label: 'Klima-Wochenbericht', icon: 'bar-chart-3' },
@@ -2894,8 +3154,8 @@
     const NOTIFY_DEFAULTS = {
       types: {
         sensor: { on: true }, mold: { on: true, threshold: 80 }, frost: { on: true, threshold: 0 },
-        heat: { on: true, threshold: 30 }, vent: { on: false }, errors: { on: true }, weekly: { on: true },
-        monthly: { on: true }, todo: { on: true }
+        heat: { on: true, threshold: 30 }, co2: { on: false, threshold: 1200 }, vent: { on: false },
+        errors: { on: true }, weekly: { on: true }, monthly: { on: true }, todo: { on: true }
       },
       quiet: { on: false, from: 22, to: 7 }
     };
@@ -3021,6 +3281,80 @@
       Store.remove('hub_widget_hidden');
       applyWidgetLayout();
       showNotification('Widget-Layout zurückgesetzt.');
+    }
+
+    // ============ Komplett-Backup (Plan-Punkt 10a) ============
+    // Ein-Datei-Sicherung aller profilbezogenen Daten: Einstellungen (Store),
+    // To-dos und das Klima-Archiv (D1). GPX-Touren haben ihre eigene Sicherung im
+    // GPX-Viewer. Restore fuehrt ueber die getesteten Sync-Pfade zusammen (LWW).
+    async function exportFullBackup() {
+      showNotification('Backup wird erstellt…');
+      let climate = [];
+      try { climate = await apiFetch('/api/climate'); } catch (e) { /* D1 evtl. aus → ohne Archiv */ }
+      const backup = {
+        format: 'smarthub-full-backup', version: 1, profile: Store.profile,
+        exportedAt: new Date().toISOString(),
+        settings: Store.exportAll(),
+        todos: getTodos().filter(t => !t.deleted),
+        climate: Array.isArray(climate) ? climate : []
+      };
+      const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `smarthub-full-backup-${Store.profile}-${new Date().toISOString().substring(0, 10)}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      showNotification(`Backup gesichert: ${Object.keys(backup.settings).length} Einstellungen, ${backup.todos.length} To-dos, ${backup.climate.length} Archiv-Tage.`);
+    }
+
+    async function importFullBackup(event) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      let data;
+      try { data = JSON.parse(await file.text()); } catch (e) { showNotification('Datei ist kein gültiges JSON.', 'error'); return; }
+      if (data.format !== 'smarthub-full-backup') { showNotification('Kein gültiges Komplett-Backup.', 'error'); return; }
+      const ok = await modalConfirm({
+        title: 'Backup einspielen?',
+        message: `Einstellungen (${Object.keys(data.settings || {}).length}), To-dos (${(data.todos || []).length}) und Klima-Archiv (${(data.climate || []).length} Tage) werden zusammengeführt. Neuere lokale Werte bleiben erhalten.`,
+        confirmLabel: 'Einspielen'
+      });
+      if (!ok) return;
+      try {
+        // 1. Einstellungen (Last-Write-Wins)
+        const nSet = Store.importAll(data.settings || {});
+        // 2. To-dos zusammenführen (LWW über updatedAt)
+        if (Array.isArray(data.todos) && data.todos.length) {
+          const byId = {};
+          getTodos().forEach(t => { byId[t.id] = t; });
+          data.todos.forEach(t => {
+            if (!t || !t.id) return;
+            const ex = byId[t.id];
+            if (!ex || (t.updatedAt || 0) > (ex.updatedAt || 0)) byId[t.id] = t;
+          });
+          saveTodos(Object.values(byId)); // rendert + synct nach D1
+        }
+        // 3. Klima-Archiv je Standort zurückspielen
+        if (Array.isArray(data.climate) && data.climate.length) {
+          const byLoc = {};
+          data.climate.forEach(r => {
+            if (!r || !r.loc || !r.day) return;
+            (byLoc[r.loc] = byLoc[r.loc] || []).push({
+              day: r.day, tMin: r.t_min, tMax: r.t_max, tAvg: r.t_avg,
+              hMin: r.h_min, hMax: r.h_max, hAvg: r.h_avg, samples: r.samples,
+              co2Avg: r.co2_avg, co2Max: r.co2_max
+            });
+          });
+          for (const [loc, days] of Object.entries(byLoc)) {
+            try { await apiFetch('/api/climate', { method: 'POST', body: JSON.stringify({ loc, days }) }); } catch (e) { /* D1 evtl. aus */ }
+          }
+        }
+        await Store.flush();
+        showNotification(`Backup eingespielt (${nSet} Einstellungen). Lade neu…`);
+        setTimeout(() => location.reload(), 900);
+      } catch (err) {
+        showNotification(`Import fehlgeschlagen: ${err.message}`, 'error');
+      }
     }
 
     async function clearLocalData() {
@@ -3183,6 +3517,7 @@
       // Klimadaten erst beim ersten Öffnen des Dashboards laden (Performance)
       if (view === 'climate') {
         applyClimateLayout(); // gespeicherte Karten-Reihenfolge/-Sichtbarkeit
+        applyCfCollapse();    // gespeicherter Einklapp-/Kompakt-Zustand
         if (!appState.climateLoaded) {
           appState.climateLoaded = true;
           reloadData();
@@ -3292,29 +3627,54 @@
 
       loadHubWeather();
 
+      // Signale fuers Status-Briefing sammeln (pro Standort), am Ende gebuendelt
+      // an renderBriefing. Rohe Werte kommen aus der ohnehin geladenen Vorschau.
+      const signals = [];
+
       await Promise.all(LOCATIONS.map(async loc => {
         const el = suffix => document.getElementById(`hub-prev-${loc.id}-${suffix}`);
+        const shortName = getLocationName(loc.id).replace('Schlafzimmer ', '');
         const nameEl = el('name');
-        if (nameEl) nameEl.innerText = getLocationName(loc.id).replace('Schlafzimmer ', '');
+        if (nameEl) nameEl.innerText = shortName;
 
         try {
           const data = await fetchFeeds(loc, { results: 400 });
           const processed = processRawFeeds((data && data.feeds) || [], loc.fields);
 
           // Sensor-Status-Punkt: grün wenn beide Felder frisch, sonst rot
+          const fresh = t => t instanceof Date && (Date.now() - t.getTime()) < SENSOR_STALE_MS;
+          const ok = fresh(processed.lastTempTime) && fresh(processed.lastHumTime);
           const dot = el('dot');
           if (dot) {
-            const fresh = t => t instanceof Date && (Date.now() - t.getTime()) < SENSOR_STALE_MS;
-            const ok = fresh(processed.lastTempTime) && fresh(processed.lastHumTime);
             dot.className = `w-1.5 h-1.5 rounded-full inline-block ${ok ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`;
             dot.title = ok ? 'Beide Sensoren liefern Daten' : 'Mindestens ein Sensor liefert keine aktuellen Daten';
           }
+          if (!ok) signals.push({ severity: 'warn', text: `Sensor ${shortName} liefert keine aktuellen Daten`, target: '#climate' });
 
           if (processed.aligned.length > 0) {
             const last = processed.aligned[processed.aligned.length - 1];
             el('temp').innerText = `${last.temp.toFixed(1)} °C`;
             el('hum').innerText = `${last.humidity.toFixed(0)} %`;
             el('time').innerText = formatRelativeTime(last.time);
+
+            // Schimmelrisiko braucht die Aussentemperatur → leichter Extra-Abruf.
+            // Kritisch ab 80 % Wandfeuchte (wie in der ClimateFlow-Detailkarte).
+            const th = getThresholds(loc.id);
+            let outTemp = null;
+            try {
+              const w = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.defaultWeather.lat}&longitude=${loc.defaultWeather.lon}&current=temperature_2m&timezone=auto`);
+              if (w.ok) outTemp = (await w.json()).current.temperature_2m;
+            } catch (e) { /* Aussentemperatur optional */ }
+            if (outTemp != null) {
+              const { surfaceRhRaw, surfaceRh } = surfaceHumidity(last.temp, last.humidity, outTemp);
+              if (surfaceRhRaw >= 80) {
+                signals.push({ severity: 'warn', text: `Schimmelrisiko ${shortName} (Wandfeuchte ~${surfaceRh.toFixed(0)} %)`, target: '#climate' });
+              } else if (last.humidity > th.humMax) {
+                signals.push({ severity: 'info', text: `Hohe Luftfeuchte ${shortName} (${last.humidity.toFixed(0)} %) – lüften`, target: '#climate' });
+              }
+            } else if (last.humidity > th.humMax) {
+              signals.push({ severity: 'info', text: `Hohe Luftfeuchte ${shortName} (${last.humidity.toFixed(0)} %) – lüften`, target: '#climate' });
+            }
           } else {
             el('temp').innerText = '–';
             el('time').innerText = 'keine Daten';
@@ -3325,6 +3685,61 @@
           if (el('time')) el('time').innerText = 'offline';
         }
       }));
+
+      // Ueberfaellige Aufgaben (gleiche Logik wie im To-do-Widget)
+      try {
+        const overdue = getTodos().filter(t => !t.deleted && !t.done && t.dueMs && t.dueMs < Date.now()).length;
+        if (overdue > 0) signals.push({ severity: 'info', text: `${overdue} überfällige Aufgabe${overdue === 1 ? '' : 'n'}`, target: null });
+      } catch (e) { /* To-dos optional */ }
+
+      renderBriefing(signals);
+    }
+
+    // ============ Hub-Widget: Status-Briefing (Plan-Punkt 5) ============
+    // Verdichtet die wichtigsten Alltagsfragen ("Sensor stumm? Schimmelrisiko?
+    // ueberfaellige Aufgaben?") zu einer kurzen, verlinkten Liste. Priorisierung
+    // und Begrenzung uebernimmt core.buildBriefing; Signale liefert loadHubPreviews.
+    const BRIEF_ICON = { warn: 'alert-triangle', info: 'info', ok: 'check-circle-2' };
+    const BRIEF_COLOR = { warn: 'text-red-300', info: 'text-amber-300', ok: 'text-emerald-300' };
+
+    function renderBriefing(signals) {
+      const list = document.getElementById('briefing-list');
+      const badge = document.getElementById('briefing-badge');
+      if (!list) return;
+      const { status, allClear, items, overflow } = buildBriefing(signals, { max: 5 });
+
+      if (badge) {
+        const map = {
+          warn: ['Handlungsbedarf', 'bg-red-500/15 text-red-300'],
+          info: ['Hinweise', 'bg-amber-500/15 text-amber-300'],
+          ok: ['Alles ok', 'bg-emerald-500/15 text-emerald-300']
+        };
+        const [label, cls] = map[status] || map.ok;
+        badge.className = `ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full ${cls}`;
+        badge.innerText = label;
+      }
+
+      list.innerHTML = '';
+      items.forEach(it => {
+        const row = document.createElement(it.target ? 'a' : 'div');
+        if (it.target) { row.href = it.target; }
+        row.className = `flex items-center gap-2 text-sm rounded-lg px-2 py-1.5 -mx-1 ${it.target ? 'hover:bg-slate-800/50 transition-colors' : ''}`;
+        const icon = document.createElement('i');
+        icon.setAttribute('data-lucide', BRIEF_ICON[it.severity] || 'circle');
+        icon.className = `w-4 h-4 shrink-0 ${BRIEF_COLOR[it.severity] || 'text-slate-400'}`;
+        const span = document.createElement('span');
+        span.className = allClear ? 'text-slate-400' : 'text-slate-200';
+        span.innerText = it.text;
+        row.append(icon, span);
+        list.appendChild(row);
+      });
+      if (overflow > 0) {
+        const more = document.createElement('p');
+        more.className = 'text-[11px] text-slate-500 px-2 pt-0.5';
+        more.innerText = `+${overflow} weitere`;
+        list.appendChild(more);
+      }
+      updateIcons();
     }
 
     // App Initialization

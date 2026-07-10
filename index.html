@@ -26,12 +26,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Chart.js CDN + Zoom/Pan-Plugin (Punkt 12) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
-  <!-- Lucide Icons CDN -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js + Zoom/Pan-Plugin (lokal gepinnt, siehe vendor/) -->
+  <script src="vendor/chart.umd.js"></script>
+  <script src="vendor/hammer.min.js"></script>
+  <script src="vendor/chartjs-plugin-zoom.min.js"></script>
+  <!-- Lucide Icons (lokal gepinnt) -->
+  <script src="vendor/lucide.min.js"></script>
 
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
@@ -100,6 +100,21 @@
                 <i data-lucide="cloud-sun" class="w-3.5 h-3.5 text-teal-400"></i>
                 <span id="hub-weather-text">Wetter wird geladen...</span>
               </p>
+            </div>
+          </div>
+
+          <!-- Widget: Status-Briefing ("Ist alles okay?") -->
+          <div data-widget="briefing" class="glass-panel rounded-2xl p-5 shadow-lg md:col-span-3 relative group/widget">
+            <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
+              <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
+            </button>
+            <div class="flex items-center gap-2 mb-3">
+              <i data-lucide="activity" class="w-4 h-4 text-teal-400"></i>
+              <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider text-[11px]">Status</h3>
+              <span id="briefing-badge" class="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">wird geprüft…</span>
+            </div>
+            <div id="briefing-list" class="flex flex-col gap-1.5">
+              <div class="h-4 w-2/3 rounded bg-slate-800/70 animate-pulse"></div>
             </div>
           </div>
 
@@ -292,7 +307,11 @@
             <button onclick="sendTestPush()" class="px-3 py-1.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-200 hover:bg-teal-500/25 text-xs font-semibold transition-colors flex items-center gap-1.5">
               <i data-lucide="send" class="w-3.5 h-3.5"></i> Test-Push
             </button>
+            <button onclick="toggleWebPush()" id="webpush-btn" class="hidden px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors flex items-center gap-1.5">
+              <i data-lucide="bell-ring" class="w-3.5 h-3.5"></i> <span id="webpush-btn-label">Web-Push auf diesem Gerät</span>
+            </button>
           </div>
+          <p id="webpush-hint" class="hidden text-[11px] text-slate-500 -mt-2 mb-3"></p>
           <div id="notify-rules" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
           <!-- Ruhezeiten -->
           <div class="mt-4 pt-4 border-t border-slate-800/60 flex flex-wrap items-center gap-3">
@@ -357,7 +376,14 @@
             <button onclick="resetHubLayout()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors">Widget-Layout zurücksetzen</button>
             <button onclick="clearLocalData()" class="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 text-xs transition-colors">Lokale Daten löschen</button>
           </div>
+          <div class="mt-2 pt-2 border-t border-slate-800/60 flex flex-wrap gap-2 items-center">
+            <span class="text-[10px] text-slate-500 uppercase font-semibold w-full">Komplett-Backup (Einstellungen + To-dos + Klima-Archiv)</span>
+            <button onclick="exportFullBackup()" class="px-3 py-1.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-200 hover:bg-teal-500/25 text-xs font-semibold transition-colors flex items-center gap-1.5"><i data-lucide="hard-drive-download" class="w-3.5 h-3.5"></i> Alles sichern</button>
+            <button onclick="document.getElementById('full-backup-input').click()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors flex items-center gap-1.5"><i data-lucide="hard-drive-upload" class="w-3.5 h-3.5"></i> Backup einspielen</button>
+            <span class="text-[10px] text-slate-500 w-full">GPX-Touren separat über den GPX-Viewer sichern.</span>
+          </div>
           <input type="file" id="settings-import-input" accept=".json,application/json" class="hidden" onchange="importSettingsJson(event)">
+          <input type="file" id="full-backup-input" accept=".json,application/json" class="hidden" onchange="importFullBackup(event)">
         </section>
 
       </div>
@@ -484,6 +510,10 @@
             <i data-lucide="layout-grid" class="w-4.5 h-4.5"></i>
           </button>
           <div id="cf-settings" class="hidden absolute right-0 top-full mt-2 z-[500] glass-panel border border-slate-800 rounded-xl p-3 shadow-2xl w-64">
+            <label class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-800 cursor-pointer text-xs text-slate-300 hover:text-white transition-colors">
+              <input type="checkbox" id="cf-density-toggle" onchange="toggleCfCompact()" class="accent-teal-500 shrink-0">
+              <span>Kompakt-Modus <span class="text-slate-500">(Detailkarten einklappen)</span></span>
+            </label>
             <p class="text-[10px] text-slate-500 uppercase font-semibold mb-2">Karten ein-/ausblenden &amp; ordnen</p>
             <div id="cf-settings-list" class="flex flex-col gap-1.5 text-xs text-slate-300"></div>
           </div>
@@ -871,25 +901,30 @@
             <button onclick="exportChartImage()" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all" title="Chart als Bild speichern">
               <i data-lucide="image-down" class="w-4 h-4"></i>
             </button>
+            <button onclick="toggleCfCard('cf-chart')" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all" title="Klimaverlauf ein-/ausklappen">
+              <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-300" id="chart-arrow"></i>
+            </button>
           </div>
         </div>
 
-        <div class="w-full relative h-[320px] md:h-[400px]">
-          <canvas id="climateChart"></canvas>
-        </div>
+        <div id="chart-collapse-body">
+          <div class="w-full relative h-[320px] md:h-[400px]">
+            <canvas id="climateChart"></canvas>
+          </div>
 
-        <div id="chart-legend-static" class="mt-4 pt-4 border-t border-slate-800/60 flex flex-wrap justify-center gap-6 text-xs text-slate-400">
-          <div class="flex items-center gap-2">
-            <span class="w-3 h-0.5 bg-gradient-to-r from-orange-400 to-orange-500 rounded"></span>
-            <span>Innentemperatur (°C)</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="w-3 h-0.5 bg-teal-400 rounded"></span>
-            <span>Außentemperatur (°C)</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="w-3 h-1 border-t border-dashed border-indigo-400"></span>
-            <span>Innenluftfeuchtigkeit (%)</span>
+          <div id="chart-legend-static" class="mt-4 pt-4 border-t border-slate-800/60 flex flex-wrap justify-center gap-6 text-xs text-slate-400">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-0.5 bg-gradient-to-r from-orange-400 to-orange-500 rounded"></span>
+              <span>Innentemperatur (°C)</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-0.5 bg-teal-400 rounded"></span>
+              <span>Außentemperatur (°C)</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-1 border-t border-dashed border-indigo-400"></span>
+              <span>Innenluftfeuchtigkeit (%)</span>
+            </div>
           </div>
         </div>
       </section>
@@ -917,6 +952,8 @@
           <!-- Rekorde & Monatsvergleich (P6) -->
           <div id="archive-records" class="hidden mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2"></div>
           <div id="archive-month-compare" class="hidden mt-3 text-xs text-slate-400 bg-slate-900/50 border border-slate-800/60 rounded-xl p-3"></div>
+          <!-- Jahres-Heatmap + Saisonvergleich (P9) -->
+          <div id="archive-year" class="hidden mt-4 pt-4 border-t border-slate-800/60"></div>
           <div id="archive-empty" class="hidden text-sm text-slate-400 bg-slate-900/50 border border-slate-800/60 rounded-xl p-4"></div>
         </div>
       </section>

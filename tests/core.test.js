@@ -478,4 +478,92 @@ test('buildGpxXml: gültiges GPX mit Punkten, Höhe, Zeit und escaptem Namen', (
   assert.ok(xml.includes('<trkpt lat="48.2" lon="9.3"></trkpt>'));
 });
 
+console.log('\nlib/core.js – Status-Briefing');
+
+test('buildBriefing: leere/keine Signale → allClear', () => {
+  const r = core.buildBriefing([]);
+  assert.strictEqual(r.allClear, true);
+  assert.strictEqual(r.status, 'ok');
+  assert.strictEqual(r.items.length, 1);
+  assert.strictEqual(r.items[0].severity, 'ok');
+  // Auch bei nur 'ok'-Signalen (Bereiche geprueft, alles gut)
+  const r2 = core.buildBriefing([{ severity: 'ok', text: 'Sensoren frisch' }]);
+  assert.strictEqual(r2.allClear, true);
+});
+
+test('buildBriefing: warn vor info, status folgt der schwersten', () => {
+  const r = core.buildBriefing([
+    { severity: 'info', text: 'Hohe Luftfeuchte' },
+    { severity: 'warn', text: 'Sensor stumm' }
+  ]);
+  assert.strictEqual(r.status, 'warn');
+  assert.strictEqual(r.allClear, false);
+  assert.strictEqual(r.items[0].text, 'Sensor stumm');
+  assert.strictEqual(r.items[1].text, 'Hohe Luftfeuchte');
+  // nur Hinweise → status info
+  assert.strictEqual(core.buildBriefing([{ severity: 'info', text: 'x' }]).status, 'info');
+});
+
+test('buildBriefing: begrenzt auf max und meldet overflow', () => {
+  const many = Array.from({ length: 7 }, (_, i) => ({ severity: 'warn', text: `W${i}` }));
+  const r = core.buildBriefing(many, { max: 5 });
+  assert.strictEqual(r.items.length, 5);
+  assert.strictEqual(r.overflow, 2);
+});
+
+test('buildBriefing: ignoriert kaputte Signale', () => {
+  const r = core.buildBriefing([
+    null,
+    { severity: 'warn' },            // kein text
+    { severity: 'schlimm', text: 'x' }, // unbekannte severity
+    { severity: 'warn', text: 'echt' }
+  ]);
+  assert.strictEqual(r.items.length, 1);
+  assert.strictEqual(r.items[0].text, 'echt');
+});
+
+console.log('\nlib/core.js – Archiv (Jahr/Saison)');
+
+const archiveRows = [
+  { day: '2025-07-01', t_avg: 20, t_min: 16, t_max: 25, h_avg: 55 },
+  { day: '2025-07-15', t_avg: 22, t_min: 18, t_max: 28, h_avg: 60 },
+  { day: '2026-07-01', t_avg: 24, t_min: 19, t_max: 30, h_avg: 50 },
+  { day: '2026-07-10', t_avg: 26, t_min: 21, t_max: 33, h_avg: 52 },
+  { day: '2026-01-05', t_avg: 5,  t_min: 2,  t_max: 9,  h_avg: 70 }
+];
+
+test('yearHeatmap: filtert aufs Jahr, liefert min/max', () => {
+  const h = core.yearHeatmap(archiveRows, 2026);
+  assert.strictEqual(h.year, 2026);
+  assert.strictEqual(h.days.length, 3); // zwei Juli-Tage + ein Januar-Tag
+  assert.strictEqual(h.min, 5);
+  assert.strictEqual(h.max, 26);
+  // leeres/fremdes Jahr → keine Tage, min/max null
+  const empty = core.yearHeatmap(archiveRows, 2020);
+  assert.strictEqual(empty.days.length, 0);
+  assert.strictEqual(empty.min, null);
+});
+
+test('periodCompare: Juli 2026 vs. Juli 2025 (Delta)', () => {
+  const r = core.periodCompare(archiveRows,
+    { from: '2026-07-01', to: '2026-07-31' },
+    { from: '2025-07-01', to: '2025-07-31' });
+  assert.strictEqual(r.a.days, 2);
+  assert.strictEqual(r.b.days, 2);
+  assert.strictEqual(r.a.tAvg, 25); // (24+26)/2
+  assert.strictEqual(r.b.tAvg, 21); // (20+22)/2
+  assert.strictEqual(r.deltaT, 4);
+  assert.strictEqual(r.a.tMax, 33);
+  assert.ok(Math.abs(r.deltaH - (51 - 57.5)) < 1e-9);
+});
+
+test('periodCompare: leerer Zeitraum → null-Seite, kein Delta', () => {
+  const r = core.periodCompare(archiveRows,
+    { from: '2026-07-01', to: '2026-07-31' },
+    { from: '2024-07-01', to: '2024-07-31' });
+  assert.ok(r.a);
+  assert.strictEqual(r.b, null);
+  assert.strictEqual(r.deltaT, null);
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);

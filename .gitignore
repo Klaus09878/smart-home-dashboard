@@ -1,4 +1,8 @@
 node_modules/
 
+# Playwright-E2E-Artefakte
+test-results/
+playwright-report/
+
 # Lokale Claude-Code-Konfiguration (Dev-Server für Preview)
 .claude/

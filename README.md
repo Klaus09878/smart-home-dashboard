@@ -1,7 +1,9 @@
 # Smart Home Hub (ClimateFlow)
 
+![CI](https://github.com/Klaus09878/smart-home-dashboard/actions/workflows/ci.yml/badge.svg)
+
 Multi-Projekt-Plattform auf Cloudflare Pages: Homescreen-Hub mit Klimadashboard
-(**ClimateFlow**) für zwei Standorte und Platzhalter für den kommenden **GPX-Viewer**.
+(**ClimateFlow**) für zwei Standorte und einem **GPX-Viewer** für Touren.
 
 ## Architektur
 
@@ -48,6 +50,10 @@ Nach der Einrichtung schalten sie sich automatisch scharf:
    Dann im Pages-Projekt → *Settings → Functions → D1 database bindings*:
    Variable name **`DB`** → Datenbank auswählen → neu deployen.
    (Tabellen legt der Code beim ersten Zugriff selbst an.)
+   *Optional:* Für **Foto-Anhänge pro GPX-Tour** zusätzlich einen R2-Bucket anlegen
+   (Cloudflare → R2 → *Create bucket*, z. B. `smarthub-media`) und im Pages-Projekt
+   unter *Settings → Functions → R2 bucket bindings* als **`MEDIA`** binden. Ohne
+   dieses Binding bleibt die Foto-Funktion im GPX-Viewer einfach ausgeblendet.
 2. **ThingSpeak-Proxy** (Keys aus dem Frontend verstecken):
    Pages → *Settings → Environment variables*:
    `TS_KEY_GILLIAN` = Read-Key Kanal 3417815, `TS_KEY_SEAN` = Read-Key Kanal 3417935.
@@ -58,6 +64,7 @@ Nach der Einrichtung schalten sie sich automatisch scharf:
    - **Wochenbericht**: zusätzlich einen zweiten Cron-Job anlegen, der 1×/Woche (z. B. sonntags 19:00) `GET https://<domain>/api/weekly-report` aufruft — verschickt eine Wochen-Zusammenfassung (Ø/Min/Max, Komfort-Score, Vorwochen-Trend) als Push. Beide Jobs brauchen die Basic-Auth-Zugangsdaten (bei cron-job.org unter „Authentication" hinterlegen).
    - **GPX-Monatsbericht** (optional): dritter Cron-Job 1×/Monat (z. B. am 1. um 18:00) auf `GET https://<domain>/api/monthly-report` — km, Touren, Höhenmeter, längste Serie des Vormonats.
    - **Pro-Profil:** Sind mehrere Login-Profile eingerichtet (siehe Schritt 4), schickt der Server jede Warnung an das ntfy-Topic **jedes** Profils, das den Typ aktiviert hat — mit dessen eigenen Schwellen und Ruhezeiten (Benachrichtigungs-Center in den Einstellungen). Ohne Profile gilt weiter das globale `NTFY_TOPIC`.
+   - **Web-Push (Push API, ohne ntfy-App):** native System-Benachrichtigungen direkt auf iPhone (installierte PWA, ab iOS 16.4), Android und Desktop — parallel zu ntfy. Einmalig ein VAPID-Schlüsselpaar erzeugen (`npx web-push generate-vapid-keys`) und als Env-Vars setzen: **`VAPID_PUBLIC_KEY`**, **`VAPID_PRIVATE_KEY`** und optional **`VAPID_SUBJECT`** (`mailto:deine@mail.de`). Danach erscheint in *Einstellungen → Benachrichtigungen* der Button „Web-Push auf diesem Gerät" (pro Gerät einmal aktivieren). Der Server verteilt jede Warnung an ntfy **und** alle Web-Push-Geräte des Profils; abgelaufene Abos werden automatisch entfernt. Ohne die VAPID-Vars bleibt der Button ausgeblendet und alles läuft wie bisher über ntfy.
 4. **Mehrbenutzer-Profile** (optional): Jedes Login-Passwort ist ein eigener, personalisierter Bereich (eigene Widgets, To-dos, ntfy-Topic, Ziele, Schwellwerte — geräteübergreifend über D1 synchronisiert). Pages → *Settings → Environment variables* → **`AUTH_USERS`** = `gillian:passwortG;sean:passwortS` (Namen/Passwörter ohne `:` und `;`). Das bestehende `AUTH_USER`/`AUTH_PASS` bleibt das Admin-Konto (darf Standorte anlegen). Ohne `AUTH_USERS` gibt es nur das eine Konto.
 5. **Build automatisieren (empfohlen):** Pages → *Settings → Builds & deployments*:
    Build command = `npm run build` (führt Tests aus und baut das CSS), Build output directory = `/`.
@@ -136,7 +143,7 @@ Der Forward-Fill im Dashboard bleibt als Fallback aktiv, alte Daten funktioniere
 
 - **Uhr/Begrüßung/Wetter jetzt**, **3-Tage-Wettervorschau**, **To-do-Liste** (lokal) und **Kalender** (nächste Termine)
 - **Anpassbar**: Reihenfolge per Drag & Drop am Griff-Symbol (erscheint beim Überfahren), Ein-/Ausblenden über „Widgets anpassen" — beides bleibt gespeichert
-- **Kalender verbinden**: Zahnrad im Termine-Widget → .ics-URL eintragen (Google Kalender: Einstellungen → [Kalender] → „Geheime Adresse im iCal-Format"). Braucht den deployten `/api/ical`-Proxy ☁️. Grenze: Serientermine erscheinen nur mit ihrem ersten Datum (↻-Markierung).
+- **Kalender verbinden**: Zahnrad im Termine-Widget → .ics-URL eintragen (Google Kalender: Einstellungen → [Kalender] → „Geheime Adresse im iCal-Format"). Braucht den deployten `/api/ical`-Proxy ☁️. Serientermine (RRULE) werden expandiert und mit ↻ markiert.
 - **Fehler-Reporting**: unbehandelte JS-Fehler auf jedem Gerät werden als ntfy-Push gemeldet (max. 3/Sitzung, Topic muss eingerichtet sein)
 
 ## Cloudflare Access statt Basic Auth (optional, vorbereitet)
@@ -147,13 +154,33 @@ Login per E-Mail-Code statt Benutzer/Passwort — angenehmer auf dem iPhone (PWA
 3. Im Pages-Projekt die Env-Var **`AUTH_MODE`** = `access` setzen und neu deployen.
 Die Middleware lässt dann nur noch Anfragen mit Access-JWT durch; Basic Auth ist abgeschaltet. Rückweg: `AUTH_MODE` löschen → Basic Auth gilt wieder.
 
+## Entwicklung
+
+```bash
+npm test          # Kernlogik (lib/core.js) + Smoke-Test (Seiten-Konsistenz)
+npm run test:e2e  # Playwright-Browsertests (einmalig: npm ci && npx playwright install chromium)
+npm run build:css # Tailwind neu bauen — nach jeder Klassen-Änderung in HTML/JS nötig
+npm run build     # test + build:css (das führt auch der Cloudflare-Build aus)
+```
+
+Bei jedem Push/PR läuft die [CI](.github/workflows/ci.yml): Unit-/Smoke-Tests,
+E2E-Tests und eine Prüfung, dass das committete `tailwind.css` aktuell ist.
+
 ## Roadmap / weitere Ideen
 
-1. Serientermine (RRULE) im Kalender-Widget expandieren
-2. GPX: Foto-Anhänge pro Tour, Segment-Detailvergleich (Teilstrecken)
-3. To-do-Widget optional in D1 syncen (geräteübergreifend)
+Fundament & Sicherheit:
+1. Web Push (Push API) als ntfy-Alternative — native System-Benachrichtigungen ohne Extra-App (iOS ab 16.4 in der installierten PWA)
+
+Übersicht & UX:
+2. Status-Briefing-Karte auf dem Hub: „Ist alles okay?" in einer Zeile, verlinkt zur betroffenen Karte
+3. ClimateFlow entrümpeln: einklappbare Karten-Gruppen + Kompakt-Modus (Informationsdichte umschaltbar)
+
+Neue Substanz:
+4. CO₂ als vollwertiger Messwert (Chart-Serie, Lüftungsberater-Kopplung, eigene Warnregel) — Infrastruktur via `extra`-Sensoren vorbereitet
+5. Klima-Archiv: Jahres-Heatmap + Saison-/Vorjahresvergleich
+6. Komplett-Backup (Einstellungen + To-dos + Klima-Archiv, nicht nur GPX) und Foto-Anhänge pro GPX-Tour (R2)
 
 ## Deployment
 
 Push auf `main` → Cloudflare Pages deployt automatisch.
-Bei Service-Worker-Änderungen `CACHE_NAME` in `sw.js` hochzählen (aktuell `smarthub-v3`).
+Bei Service-Worker-Änderungen `CACHE_NAME` in `sw.js` hochzählen (aktuelle Version steht dort als `CACHE_NAME`).
