@@ -103,4 +103,13 @@ test('sw.js: alle APP_SHELL-Dateien existieren', () => {
   });
 });
 
+test('_headers: existiert und enthaelt eine Content-Security-Policy', () => {
+  const p = path.join(root, '_headers');
+  assert.ok(fs.existsSync(p), '_headers-Datei fehlt');
+  const h = fs.readFileSync(p, 'utf8');
+  assert.ok(/Content-Security-Policy:/.test(h), 'CSP-Header fehlt in _headers');
+  assert.ok(/X-Content-Type-Options:\s*nosniff/.test(h), 'X-Content-Type-Options fehlt');
+  assert.ok(/Strict-Transport-Security:/.test(h), 'HSTS-Header fehlt');
+});
+
 console.log(process.exitCode === 1 ? '\nSmoke-Tests FEHLGESCHLAGEN' : `\nAlle ${passed} Smoke-Tests bestanden ✔`);
