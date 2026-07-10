@@ -478,4 +478,48 @@ test('buildGpxXml: gültiges GPX mit Punkten, Höhe, Zeit und escaptem Namen', (
   assert.ok(xml.includes('<trkpt lat="48.2" lon="9.3"></trkpt>'));
 });
 
+console.log('\nlib/core.js – Status-Briefing');
+
+test('buildBriefing: leere/keine Signale → allClear', () => {
+  const r = core.buildBriefing([]);
+  assert.strictEqual(r.allClear, true);
+  assert.strictEqual(r.status, 'ok');
+  assert.strictEqual(r.items.length, 1);
+  assert.strictEqual(r.items[0].severity, 'ok');
+  // Auch bei nur 'ok'-Signalen (Bereiche geprueft, alles gut)
+  const r2 = core.buildBriefing([{ severity: 'ok', text: 'Sensoren frisch' }]);
+  assert.strictEqual(r2.allClear, true);
+});
+
+test('buildBriefing: warn vor info, status folgt der schwersten', () => {
+  const r = core.buildBriefing([
+    { severity: 'info', text: 'Hohe Luftfeuchte' },
+    { severity: 'warn', text: 'Sensor stumm' }
+  ]);
+  assert.strictEqual(r.status, 'warn');
+  assert.strictEqual(r.allClear, false);
+  assert.strictEqual(r.items[0].text, 'Sensor stumm');
+  assert.strictEqual(r.items[1].text, 'Hohe Luftfeuchte');
+  // nur Hinweise → status info
+  assert.strictEqual(core.buildBriefing([{ severity: 'info', text: 'x' }]).status, 'info');
+});
+
+test('buildBriefing: begrenzt auf max und meldet overflow', () => {
+  const many = Array.from({ length: 7 }, (_, i) => ({ severity: 'warn', text: `W${i}` }));
+  const r = core.buildBriefing(many, { max: 5 });
+  assert.strictEqual(r.items.length, 5);
+  assert.strictEqual(r.overflow, 2);
+});
+
+test('buildBriefing: ignoriert kaputte Signale', () => {
+  const r = core.buildBriefing([
+    null,
+    { severity: 'warn' },            // kein text
+    { severity: 'schlimm', text: 'x' }, // unbekannte severity
+    { severity: 'warn', text: 'echt' }
+  ]);
+  assert.strictEqual(r.items.length, 1);
+  assert.strictEqual(r.items[0].text, 'echt');
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);

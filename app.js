@@ -2165,6 +2165,7 @@
     // 'hub_widget_hidden'. Gezogen wird am Griff-Symbol (erscheint beim Hover).
     const HUB_WIDGET_META = {
       clock: 'Uhr & Wetter jetzt',
+      briefing: 'Status-Briefing',
       forecast: 'Wetter (3 Tage)',
       todo: 'To-do-Liste',
       calendar: 'Nächste Termine'
@@ -3292,29 +3293,54 @@
 
       loadHubWeather();
 
+      // Signale fuers Status-Briefing sammeln (pro Standort), am Ende gebuendelt
+      // an renderBriefing. Rohe Werte kommen aus der ohnehin geladenen Vorschau.
+      const signals = [];
+
       await Promise.all(LOCATIONS.map(async loc => {
         const el = suffix => document.getElementById(`hub-prev-${loc.id}-${suffix}`);
+        const shortName = getLocationName(loc.id).replace('Schlafzimmer ', '');
         const nameEl = el('name');
-        if (nameEl) nameEl.innerText = getLocationName(loc.id).replace('Schlafzimmer ', '');
+        if (nameEl) nameEl.innerText = shortName;
 
         try {
           const data = await fetchFeeds(loc, { results: 400 });
           const processed = processRawFeeds((data && data.feeds) || [], loc.fields);
 
           // Sensor-Status-Punkt: grün wenn beide Felder frisch, sonst rot
+          const fresh = t => t instanceof Date && (Date.now() - t.getTime()) < SENSOR_STALE_MS;
+          const ok = fresh(processed.lastTempTime) && fresh(processed.lastHumTime);
           const dot = el('dot');
           if (dot) {
-            const fresh = t => t instanceof Date && (Date.now() - t.getTime()) < SENSOR_STALE_MS;
-            const ok = fresh(processed.lastTempTime) && fresh(processed.lastHumTime);
             dot.className = `w-1.5 h-1.5 rounded-full inline-block ${ok ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`;
             dot.title = ok ? 'Beide Sensoren liefern Daten' : 'Mindestens ein Sensor liefert keine aktuellen Daten';
           }
+          if (!ok) signals.push({ severity: 'warn', text: `Sensor ${shortName} liefert keine aktuellen Daten`, target: '#climate' });
 
           if (processed.aligned.length > 0) {
             const last = processed.aligned[processed.aligned.length - 1];
             el('temp').innerText = `${last.temp.toFixed(1)} °C`;
             el('hum').innerText = `${last.humidity.toFixed(0)} %`;
             el('time').innerText = formatRelativeTime(last.time);
+
+            // Schimmelrisiko braucht die Aussentemperatur → leichter Extra-Abruf.
+            // Kritisch ab 80 % Wandfeuchte (wie in der ClimateFlow-Detailkarte).
+            const th = getThresholds(loc.id);
+            let outTemp = null;
+            try {
+              const w = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.defaultWeather.lat}&longitude=${loc.defaultWeather.lon}&current=temperature_2m&timezone=auto`);
+              if (w.ok) outTemp = (await w.json()).current.temperature_2m;
+            } catch (e) { /* Aussentemperatur optional */ }
+            if (outTemp != null) {
+              const { surfaceRhRaw, surfaceRh } = surfaceHumidity(last.temp, last.humidity, outTemp);
+              if (surfaceRhRaw >= 80) {
+                signals.push({ severity: 'warn', text: `Schimmelrisiko ${shortName} (Wandfeuchte ~${surfaceRh.toFixed(0)} %)`, target: '#climate' });
+              } else if (last.humidity > th.humMax) {
+                signals.push({ severity: 'info', text: `Hohe Luftfeuchte ${shortName} (${last.humidity.toFixed(0)} %) – lüften`, target: '#climate' });
+              }
+            } else if (last.humidity > th.humMax) {
+              signals.push({ severity: 'info', text: `Hohe Luftfeuchte ${shortName} (${last.humidity.toFixed(0)} %) – lüften`, target: '#climate' });
+            }
           } else {
             el('temp').innerText = '–';
             el('time').innerText = 'keine Daten';
@@ -3325,6 +3351,61 @@
           if (el('time')) el('time').innerText = 'offline';
         }
       }));
+
+      // Ueberfaellige Aufgaben (gleiche Logik wie im To-do-Widget)
+      try {
+        const overdue = getTodos().filter(t => !t.deleted && !t.done && t.dueMs && t.dueMs < Date.now()).length;
+        if (overdue > 0) signals.push({ severity: 'info', text: `${overdue} überfällige Aufgabe${overdue === 1 ? '' : 'n'}`, target: null });
+      } catch (e) { /* To-dos optional */ }
+
+      renderBriefing(signals);
+    }
+
+    // ============ Hub-Widget: Status-Briefing (Plan-Punkt 5) ============
+    // Verdichtet die wichtigsten Alltagsfragen ("Sensor stumm? Schimmelrisiko?
+    // ueberfaellige Aufgaben?") zu einer kurzen, verlinkten Liste. Priorisierung
+    // und Begrenzung uebernimmt core.buildBriefing; Signale liefert loadHubPreviews.
+    const BRIEF_ICON = { warn: 'alert-triangle', info: 'info', ok: 'check-circle-2' };
+    const BRIEF_COLOR = { warn: 'text-red-300', info: 'text-amber-300', ok: 'text-emerald-300' };
+
+    function renderBriefing(signals) {
+      const list = document.getElementById('briefing-list');
+      const badge = document.getElementById('briefing-badge');
+      if (!list) return;
+      const { status, allClear, items, overflow } = buildBriefing(signals, { max: 5 });
+
+      if (badge) {
+        const map = {
+          warn: ['Handlungsbedarf', 'bg-red-500/15 text-red-300'],
+          info: ['Hinweise', 'bg-amber-500/15 text-amber-300'],
+          ok: ['Alles ok', 'bg-emerald-500/15 text-emerald-300']
+        };
+        const [label, cls] = map[status] || map.ok;
+        badge.className = `ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full ${cls}`;
+        badge.innerText = label;
+      }
+
+      list.innerHTML = '';
+      items.forEach(it => {
+        const row = document.createElement(it.target ? 'a' : 'div');
+        if (it.target) { row.href = it.target; }
+        row.className = `flex items-center gap-2 text-sm rounded-lg px-2 py-1.5 -mx-1 ${it.target ? 'hover:bg-slate-800/50 transition-colors' : ''}`;
+        const icon = document.createElement('i');
+        icon.setAttribute('data-lucide', BRIEF_ICON[it.severity] || 'circle');
+        icon.className = `w-4 h-4 shrink-0 ${BRIEF_COLOR[it.severity] || 'text-slate-400'}`;
+        const span = document.createElement('span');
+        span.className = allClear ? 'text-slate-400' : 'text-slate-200';
+        span.innerText = it.text;
+        row.append(icon, span);
+        list.appendChild(row);
+      });
+      if (overflow > 0) {
+        const more = document.createElement('p');
+        more.className = 'text-[11px] text-slate-500 px-2 pt-0.5';
+        more.innerText = `+${overflow} weitere`;
+        list.appendChild(more);
+      }
+      updateIcons();
     }
 
     // App Initialization

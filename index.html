@@ -103,6 +103,21 @@
             </div>
           </div>
 
+          <!-- Widget: Status-Briefing ("Ist alles okay?") -->
+          <div data-widget="briefing" class="glass-panel rounded-2xl p-5 shadow-lg md:col-span-3 relative group/widget">
+            <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
+              <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
+            </button>
+            <div class="flex items-center gap-2 mb-3">
+              <i data-lucide="activity" class="w-4 h-4 text-teal-400"></i>
+              <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider text-[11px]">Status</h3>
+              <span id="briefing-badge" class="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">wird geprüft…</span>
+            </div>
+            <div id="briefing-list" class="flex flex-col gap-1.5">
+              <div class="h-4 w-2/3 rounded bg-slate-800/70 animate-pulse"></div>
+            </div>
+          </div>
+
           <!-- Widget: 3-Tage-Wettervorschau -->
           <div data-widget="forecast" class="glass-panel rounded-2xl p-5 shadow-lg relative group/widget">
             <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
