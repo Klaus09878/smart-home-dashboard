@@ -170,14 +170,15 @@ E2E-Tests und eine Prüfung, dass das committete `tailwind.css` aktuell ist.
 
 ## Roadmap
 
-Runde 1 (Web Push, Status-Briefing, ClimateFlow-Kompaktmodus, CO₂, Jahres-Heatmap,
-Komplett-Backup, GPX-Fotos) ist vollständig umgesetzt.
+Runde 1 (Web Push, Briefing, CO₂, Jahres-Heatmap, Backup, GPX-Fotos …) und
+**Runde 2** ([PLAN2.md](PLAN2.md): Datensicherheit, CSP-Härtung, Modularisierung,
+DWD-Warnungen, Live-Aufzeichnung, Nutzerverwaltung u. v. m.) sind vollständig umgesetzt.
 
-**Runde 2 (19 Punkte):** detaillierter Umsetzungsplan in [PLAN2.md](PLAN2.md), drei Phasen:
+**Runde 3 (10 Punkte):** detaillierter Umsetzungsplan in [PLAN3.md](PLAN3.md), drei Phasen:
 
-- **A — Datensicherheit:** Cron-Totmannschalter, automatisches D1-Backup nach R2, ThingSpeak-Backfill, Fotos im GPX-Backup, Login-Brute-Force-Schutz
-- **B — Qualität:** Server-API-Tests, E2E für ClimateFlow, CSP ohne `unsafe-inline`, app.js-Modularisierung, ESLint
-- **C — Features:** DWD-Unwetterwarnungen, Briefing-Ausbau, GPX-Live-Aufzeichnung, Share-Target, Foto-Geotags, Nutzerverwaltung in D1, Heizkosten-Schätzung, Archiv-CSV-Export, Vendor-Lazy-Loading
+- **A — Vervollständigen:** R2-Backup-Restore, Warnungs-Protokoll (alert_log), Standorte bearbeiten/löschen
+- **B — Klima-Intelligenz:** Fenster-offen-Erkennung, Morgen-Digest-Push, Sensor-Kalibrierung, Tagesnotizen im Archiv
+- **C — Hub/GPX/PWA:** eigene Termine (D1-Kalender), Aufzeichnung 2.0 (Pause + Foto unterwegs), PWA-Shortcuts/App-Badge/Cache-Header
 
 ## Deployment
 

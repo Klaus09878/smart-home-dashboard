@@ -2,7 +2,7 @@
 
 Multi-Projekt-SPA auf Cloudflare Pages (statisch + Functions), Mehrbenutzer-Login via `functions/_middleware.js` (`AUTH_USER`/`AUTH_PASS` + `AUTH_USERS`) bzw. Cloudflare Access. Deploy: Push auf `main`. Alles Deutsch, Dark-Mode-Design (Tailwind, Glass-Panels).
 
-**Aktueller Umsetzungsplan:** `PLAN2.md` (Runde 2, 19 Punkte) — Punkte einzeln umsetzen, je ein Commit mit Prefix `Plan2-N:`, Arbeitsregeln am Anfang der Plandatei beachten.
+**Aktueller Umsetzungsplan:** `PLAN3.md` (Runde 3, 10 Punkte) — Punkte einzeln umsetzen, je ein Commit mit Prefix `Plan3-N:`, Arbeitsregeln am Anfang der Plandatei beachten. (Runde 1 und `PLAN2.md` sind vollständig umgesetzt.)
 
 ## Profile & Einstellungs-Sync (WICHTIG)
 - Jedes Login-Passwort = eigenes **Profil**. `settings-sync.js` stellt `Store` bereit: profilbezogene Schlüssel `p_<profil>_<key>` in localStorage + Spiegel nach D1 (`/api/settings`, Offline-Queue, `updatedAt`-Merge). `/api/whoami` liefert das aktive Profil.
