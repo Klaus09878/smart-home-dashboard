@@ -53,27 +53,33 @@ test('gpx.js: alle getElementById-IDs existieren in gpx.html', () => {
   assert.deepStrictEqual(missing, [], `fehlende IDs in gpx.html: ${missing.join(', ')}`);
 });
 
-// onclick/onchange/onsubmit-Handler im HTML müssen im Seiten-JS (oder in
-// shared.js/lib/core.js) als Funktion definiert sein
+// data-onclick/onchange/oninput/onsubmit/onbackdrop-Handler im HTML (Event-
+// Delegation, P2-8) muessen im Seiten-JS (oder shared.js/lib/core.js) als
+// Funktion definiert sein. Format: data-onX="fnName|arg1|arg2".
 function checkHandlers(htmlFile, jsFiles) {
   const html = files[htmlFile];
   const js = jsFiles.map(f => files[f] || read(f)).join('\n');
-  const calls = [...html.matchAll(/on(?:click|change|submit|input)="\s*([A-Za-z_$][\w$]*)\s*\(/g)].map(m => m[1]);
+  const calls = [...html.matchAll(/data-on(?:click|change|submit|input|backdrop)="\s*([A-Za-z_$][\w$]*)/g)].map(m => m[1]);
   const missing = [...new Set(calls)].filter(fn =>
     !new RegExp(`function\\s+${fn}\\s*\\(`).test(js) &&
-    !new RegExp(`(const|let|var)\\s+${fn}\\s*=`).test(js) &&
-    // JS-Schlüsselwörter/Globals in Inline-Handlern sind keine App-Funktionen
-    !['document', 'window', 'location', 'if', 'event'].includes(fn)
+    !new RegExp(`(const|let|var)\\s+${fn}\\s*=`).test(js)
   );
   assert.deepStrictEqual(missing, [], `nicht definierte Handler in ${htmlFile}: ${missing.join(', ')}`);
 }
 
-test('index.html: alle onclick-Handler sind in app.js/shared.js definiert', () => {
+test('index.html: alle data-on*-Handler sind in app.js/shared.js definiert', () => {
   checkHandlers('index.html', ['app.js', 'shared.js', 'lib/core.js']);
 });
 
-test('gpx.html: alle onclick-Handler sind in gpx.js/shared.js definiert', () => {
+test('gpx.html: alle data-on*-Handler sind in gpx.js/shared.js definiert', () => {
   checkHandlers('gpx.html', ['gpx.js', 'shared.js', 'lib/core.js']);
+});
+
+test('HTML: keine Inline-Event-Handler mehr (CSP ohne unsafe-inline)', () => {
+  ['index.html', 'gpx.html'].forEach(page => {
+    const bare = files[page].match(/[^-]on(?:click|change|submit|input)="/);
+    assert.strictEqual(bare, null, `${page}: Inline-Handler gefunden (muss data-on* sein): ${bare && bare[0]}`);
+  });
 });
 
 test('HTML: alle lokalen script-src/link-href-Dateien existieren', () => {

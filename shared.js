@@ -349,3 +349,46 @@ async function sendPush(title, message, tags = 'warning', dedupeKey = null, dedu
     return false;
   }
 }
+
+// ============ Event-Delegation statt Inline-Handler (P2-8) ============
+// Ermoeglicht eine CSP ohne script-src 'unsafe-inline'. Markup nutzt
+//   data-onclick / data-onchange / data-oninput / data-onsubmit = "fn|arg1|arg2"
+// Sonderwerte: $value=el.value, $checked=el.checked, $event=Event-Objekt;
+// numerische Argumente werden zu Number, true/false/null zu den Literalen.
+// data-onbackdrop="fn" feuert nur bei Klick direkt auf das Element (Overlays).
+function _delegatedArg(raw, el, event) {
+  switch (raw) {
+    case '$value': return el.value != null ? el.value : '';
+    case '$checked': return !!el.checked;
+    case '$event': return event;
+    case 'true': return true;
+    case 'false': return false;
+    case 'null': return null;
+    default: return /^-?\d+(\.\d+)?$/.test(raw) ? Number(raw) : raw;
+  }
+}
+
+['click', 'change', 'input', 'submit'].forEach(type => {
+  document.addEventListener(type, event => {
+    const target = event.target;
+    if (!target || !target.closest) return;
+    if (type === 'click') {
+      const bd = target.closest('[data-onbackdrop]');
+      if (bd && target === bd) {
+        const bf = window[bd.getAttribute('data-onbackdrop')];
+        if (typeof bf === 'function') bf(event);
+      }
+    }
+    const el = target.closest(`[data-on${type}]`);
+    if (!el) return;
+    const [name, ...rawArgs] = el.getAttribute(`data-on${type}`).split('|');
+    const fn = window[name];
+    if (typeof fn !== 'function') return;
+    if (type === 'submit') event.preventDefault();
+    fn(...rawArgs.map(a => _delegatedArg(a, el, event)));
+  });
+});
+
+// Ersetzt inline `document.getElementById(id).click()` fuer versteckte Datei-Inputs.
+function openPicker(id) { const el = document.getElementById(id); if (el) el.click(); }
+window.openPicker = openPicker;

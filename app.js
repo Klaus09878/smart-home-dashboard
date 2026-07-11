@@ -361,6 +361,15 @@
       showToast(msg, type === 'success' ? 'success' : 'error');
     }
 
+    // Wrapper fuer die Event-Delegation (P2-8): ersetzen fruehere Inline-Handler
+    // mit mehreren Anweisungen bzw. Ausdruecken (CSP ohne unsafe-inline).
+    function goToGpx() { location.href = 'gpx.html'; }
+    function refreshHubCalendar() { loadHubCalendar(true); showNotification('Kalender aktualisiert.'); }
+    function obConfigureNtfy() { configureNtfy(); setTimeout(renderOnboardingStep, 100); }
+    function obConfigureIcal() { configureIcal(); setTimeout(renderOnboardingStep, 100); }
+    function obEditGoals() { editHubGoals(); setTimeout(renderOnboardingStep, 100); }
+    function obEditThresholds(id) { editLocationThresholds(id); setTimeout(renderOnboardingStep, 100); }
+
     // Magnus-Formeln (satVaporPressure, getAbsoluteHumidity, getDewPoint)
     // und processRawFeeds kommen aus lib/core.js (getestet via npm test).
 
@@ -2963,10 +2972,10 @@
         const light = getTheme() === 'light';
         html += `<div class="mt-3 pt-3 border-t border-slate-800/60 flex items-center justify-between">
           <span class="text-sm text-slate-300 flex items-center gap-1.5"><i data-lucide="${light ? 'sun' : 'moon'}" class="w-4 h-4 text-amber-400"></i> Erscheinungsbild</span>
-          <button onclick="toggleTheme()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors">${light ? 'Heller Modus' : 'Dunkler Modus'} · umschalten</button>
+          <button data-onclick="toggleTheme" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors">${light ? 'Heller Modus' : 'Dunkler Modus'} · umschalten</button>
         </div>`;
         if (window.Store && Store.mode === 'server') {
-          html += `<div class="mt-2 flex justify-end"><button onclick="logout()" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-red-500/40 text-xs text-slate-400 hover:text-red-300 transition-colors flex items-center gap-1.5"><i data-lucide="log-out" class="w-3.5 h-3.5"></i> Abmelden</button></div>`;
+          html += `<div class="mt-2 flex justify-end"><button data-onclick="logout" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-red-500/40 text-xs text-slate-400 hover:text-red-300 transition-colors flex items-center gap-1.5"><i data-lucide="log-out" class="w-3.5 h-3.5"></i> Abmelden</button></div>`;
         }
         pEl.innerHTML = html;
       }
@@ -3186,11 +3195,11 @@
         row.className = 'flex items-center justify-between gap-2 bg-slate-900/50 border border-slate-800/60 rounded-xl px-3 py-2';
         const thHtml = t.thLabel
           ? `<span class="text-[11px] text-slate-400 flex items-center gap-1">${t.thLabel}
-               <input type="number" id="nr-th-${t.key}" value="${cfg.threshold ?? t.thDef}" class="w-16 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200" onchange="saveNotifyRulesFromUI()"></span>`
+               <input type="number" id="nr-th-${t.key}" value="${cfg.threshold ?? t.thDef}" class="w-16 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200" data-onchange="saveNotifyRulesFromUI"></span>`
           : '';
         row.innerHTML = `
           <label class="flex items-center gap-2 text-sm text-slate-200 cursor-pointer min-w-0">
-            <input type="checkbox" id="nr-on-${t.key}" class="accent-teal-500 shrink-0" ${cfg.on ? 'checked' : ''} onchange="saveNotifyRulesFromUI()">
+            <input type="checkbox" id="nr-on-${t.key}" class="accent-teal-500 shrink-0" ${cfg.on ? 'checked' : ''} data-onchange="saveNotifyRulesFromUI">
             <i data-lucide="${t.icon}" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
             <span class="truncate">${t.label}</span>
           </label>
@@ -3464,17 +3473,17 @@
         ntfy: `<p class="font-semibold text-white mb-1">1 · Push-Benachrichtigungen</p>
           <p class="text-slate-400 mb-3">Lade die kostenlose <strong>ntfy</strong>-App und abonniere ein geheimes Topic. Trag denselben Namen hier ein.</p>
           <p class="text-xs mb-2">Aktuell: <span class="font-mono text-teal-300">${topic ? escapeHtml(topic) : 'nicht gesetzt'}</span></p>
-          <div class="flex gap-2"><button onclick="configureNtfy(); setTimeout(renderOnboardingStep, 100)" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200">Topic setzen</button>
-          <button onclick="sendTestPush()" class="px-3 py-1.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-200 text-xs">Test-Push</button></div>`,
+          <div class="flex gap-2"><button data-onclick="obConfigureNtfy" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200">Topic setzen</button>
+          <button data-onclick="sendTestPush" class="px-3 py-1.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-200 text-xs">Test-Push</button></div>`,
         thresholds: `<p class="font-semibold text-white mb-1">2 · Wohlfühlband</p>
           <p class="text-slate-400 mb-3">Lege pro Standort den Temperatur- und Feuchtebereich fest — er steuert Komfort-Score und Warnungen.</p>
-          <div class="flex flex-wrap gap-2">${LOCATIONS.map(l => `<button onclick="editLocationThresholds('${l.id}'); setTimeout(renderOnboardingStep,100)" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200">${escapeHtml(getLocationName(l.id))}</button>`).join('')}</div>`,
+          <div class="flex flex-wrap gap-2">${LOCATIONS.map(l => `<button data-onclick="obEditThresholds|${l.id}" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200">${escapeHtml(getLocationName(l.id))}</button>`).join('')}</div>`,
         calendar: `<p class="font-semibold text-white mb-1">3 · Kalender (optional)</p>
           <p class="text-slate-400 mb-3">Verbinde einen .ics-Feed (z. B. Google Kalender „geheime Adresse"), um Termine auf dem Hub zu sehen.</p>
-          <button onclick="configureIcal(); setTimeout(renderOnboardingStep,100)" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200">Kalender verbinden</button>`,
+          <button data-onclick="obConfigureIcal" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200">Kalender verbinden</button>`,
         goals: `<p class="font-semibold text-white mb-1">4 · GPX-Ziele (optional)</p>
           <p class="text-slate-400 mb-3">Setze ein Wochen-/Jahresziel in km für den GPX-Viewer.</p>
-          <button onclick="editHubGoals(); setTimeout(renderOnboardingStep,100)" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200">Ziele setzen</button>`,
+          <button data-onclick="obEditGoals" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200">Ziele setzen</button>`,
         done: `<p class="font-semibold text-white mb-1">Fertig! 🎉</p>
           <p class="text-slate-400">Du kannst alles jederzeit in den Einstellungen anpassen. Viel Freude mit deinem Smart Home Hub!</p>`
       };
@@ -3779,10 +3788,10 @@
 
       // Einstellungs-Popover bei Klick außerhalb schließen (Hub + ClimateFlow)
       document.addEventListener('click', event => {
-        [['widget-settings', 'toggleWidgetSettings()'], ['cf-settings', 'toggleClimateSettings()']].forEach(([panelId, handler]) => {
+        [['widget-settings', 'toggleWidgetSettings'], ['cf-settings', 'toggleClimateSettings']].forEach(([panelId, handler]) => {
           const panel = document.getElementById(panelId);
           if (panel && !panel.classList.contains('hidden') &&
-              !panel.contains(event.target) && !event.target.closest(`button[onclick="${handler}"]`)) {
+              !panel.contains(event.target) && !event.target.closest(`button[data-onclick="${handler}"]`)) {
             panel.classList.add('hidden');
           }
         });

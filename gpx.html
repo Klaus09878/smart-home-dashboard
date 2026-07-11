@@ -50,26 +50,26 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <button id="btn-heatmap" onclick="toggleHeatmap()" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Heatmap: alle Routen übereinander auf der Karte">
+        <button id="btn-heatmap" data-onclick="toggleHeatmap" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Heatmap: alle Routen übereinander auf der Karte">
           <i data-lucide="flame" class="w-4.5 h-4.5"></i>
         </button>
-        <button onclick="exportBackup()" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Backup herunterladen (JSON, alle Aktivitäten + Einstellungen)">
+        <button data-onclick="exportBackup" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Backup herunterladen (JSON, alle Aktivitäten + Einstellungen)">
           <i data-lucide="hard-drive-download" class="w-4.5 h-4.5"></i>
         </button>
-        <button onclick="document.getElementById('restore-input').click()" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Backup wiederherstellen">
+        <button data-onclick="openPicker|restore-input" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Backup wiederherstellen">
           <i data-lucide="archive-restore" class="w-4.5 h-4.5"></i>
         </button>
-        <button onclick="document.getElementById('file-input').click()" class="px-4 py-2.5 rounded-xl bg-gradient-to-tr from-orange-500 to-rose-600 hover:opacity-90 text-sm font-semibold text-white flex items-center gap-2 transition-all shadow-md shadow-orange-500/20">
+        <button data-onclick="openPicker|file-input" class="px-4 py-2.5 rounded-xl bg-gradient-to-tr from-orange-500 to-rose-600 hover:opacity-90 text-sm font-semibold text-white flex items-center gap-2 transition-all shadow-md shadow-orange-500/20">
           <i data-lucide="upload" class="w-4 h-4"></i>
           GPX hochladen
         </button>
       </div>
-      <input type="file" id="file-input" accept=".gpx,application/gpx+xml" multiple class="hidden" onchange="handleFileInput(event)">
-      <input type="file" id="restore-input" accept=".json,application/json" class="hidden" onchange="handleRestoreInput(event)">
+      <input type="file" id="file-input" accept=".gpx,application/gpx+xml" multiple class="hidden" data-onchange="handleFileInput|$event">
+      <input type="file" id="restore-input" accept=".json,application/json" class="hidden" data-onchange="handleRestoreInput|$event">
     </header>
 
     <!-- Dropzone (auch Empty State) -->
-    <div id="dropzone" class="glass-panel rounded-2xl p-8 border-2 border-dashed border-slate-700/80 flex flex-col items-center justify-center text-center transition-all cursor-pointer" onclick="document.getElementById('file-input').click()">
+    <div id="dropzone" class="glass-panel rounded-2xl p-8 border-2 border-dashed border-slate-700/80 flex flex-col items-center justify-center text-center transition-all cursor-pointer" data-onclick="openPicker|file-input">
       <div class="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-3">
         <i data-lucide="route" class="w-7 h-7"></i>
       </div>
@@ -108,7 +108,7 @@
         <div class="px-1 mb-3">
           <div class="flex items-center justify-between mb-1.5">
             <p class="text-[10px] text-slate-500 uppercase font-semibold">Ziele</p>
-            <button onclick="editGoals()" class="p-1 rounded-lg text-slate-500 hover:text-white transition-colors" title="Jahres-/Wochenziel festlegen">
+            <button data-onclick="editGoals" class="p-1 rounded-lg text-slate-500 hover:text-white transition-colors" title="Jahres-/Wochenziel festlegen">
               <i data-lucide="target" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -136,11 +136,11 @@
         <!-- Aktivitäten-Kalender + Streak (renderCalendar) -->
         <div class="mx-1 mb-3 bg-slate-900/40 border border-slate-800/60 rounded-xl p-3">
           <div class="flex items-center justify-between mb-2">
-            <button onclick="changeCalMonth(-1)" class="p-1 rounded-lg text-slate-500 hover:text-white transition-colors" title="Voriger Monat">
+            <button data-onclick="changeCalMonth|-1" class="p-1 rounded-lg text-slate-500 hover:text-white transition-colors" title="Voriger Monat">
               <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
             </button>
             <p class="text-[11px] font-semibold text-slate-300" id="cal-title">–</p>
-            <button onclick="changeCalMonth(1)" class="p-1 rounded-lg text-slate-500 hover:text-white transition-colors" title="Nächster Monat">
+            <button data-onclick="changeCalMonth|1" class="p-1 rounded-lg text-slate-500 hover:text-white transition-colors" title="Nächster Monat">
               <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -166,22 +166,22 @@
             </div>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
-            <select id="compare-select" onchange="setCompare(this.value)" class="px-3 py-2 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 max-w-[180px]" title="Zweite Tour zum Vergleich einblenden">
+            <select id="compare-select" data-onchange="setCompare|$value" class="px-3 py-2 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 max-w-[180px]" title="Zweite Tour zum Vergleich einblenden">
               <option value="">Vergleich: aus</option>
             </select>
-            <select id="detail-type" onchange="changeActivityType(this.value)" class="px-3 py-2 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-teal-500">
+            <select id="detail-type" data-onchange="changeActivityType|$value" class="px-3 py-2 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-teal-500">
               <option value="walk">🚶 Spazieren/Wandern</option>
               <option value="run">🏃 Laufen</option>
               <option value="ride">🚴 Fahrrad</option>
               <option value="moto">🏍️ Motorrad</option>
             </select>
-            <button onclick="renameActivity()" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Umbenennen">
+            <button data-onclick="renameActivity" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Umbenennen">
               <i data-lucide="edit-2" class="w-4 h-4"></i>
             </button>
-            <button onclick="exportGpx()" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Als GPX-Datei herunterladen">
+            <button data-onclick="exportGpx" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Als GPX-Datei herunterladen">
               <i data-lucide="download" class="w-4 h-4"></i>
             </button>
-            <button onclick="deleteActivity()" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-all" title="Löschen">
+            <button data-onclick="deleteActivity" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-all" title="Löschen">
               <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
           </div>
@@ -189,7 +189,7 @@
 
         <!-- Karte -->
         <div class="glass-panel rounded-2xl p-2 shadow-lg overflow-hidden relative">
-          <button id="btn-speed-color" onclick="toggleSpeedColor()" class="absolute top-4 right-4 z-[1000] px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/90 border border-slate-800 text-slate-300 hover:border-slate-600 transition-all" title="Route nach Geschwindigkeit einfärben (blau = langsam, rot = schnell)">
+          <button id="btn-speed-color" data-onclick="toggleSpeedColor" class="absolute top-4 right-4 z-[1000] px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/90 border border-slate-800 text-slate-300 hover:border-slate-600 transition-all" title="Route nach Geschwindigkeit einfärben (blau = langsam, rot = schnell)">
             Tempo-Färbung
           </button>
           <div id="map" class="w-full h-[320px] md:h-[380px] rounded-xl z-0"></div>
@@ -230,7 +230,7 @@
             Notiz &amp; Bedingungen
           </h3>
           <p class="text-xs text-slate-400 mb-2 hidden" id="detail-weather"></p>
-          <textarea id="detail-note" rows="2" placeholder="Notiz zur Tour (Strecke, Gefühl, Begleitung, Ausrüstung) …" onchange="saveNote(this.value)"
+          <textarea id="detail-note" rows="2" placeholder="Notiz zur Tour (Strecke, Gefühl, Begleitung, Ausrüstung) …" data-onchange="saveNote|$value"
             class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-teal-500/50 focus:outline-none resize-y"></textarea>
           <p class="text-[10px] text-slate-500 mt-1.5">Wird automatisch gespeichert (und synchronisiert, sobald die Cloud-DB eingerichtet ist).</p>
 
@@ -238,16 +238,16 @@
           <div id="photos-block" class="hidden mt-3 pt-3 border-t border-slate-800/60">
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs font-semibold text-slate-300 flex items-center gap-1.5"><i data-lucide="image" class="w-3.5 h-3.5 text-teal-400"></i> Fotos</span>
-              <button id="photo-add-btn" onclick="document.getElementById('photo-input').click()" class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-200 transition-colors flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Hinzufügen</button>
+              <button id="photo-add-btn" data-onclick="openPicker|photo-input" class="px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-200 transition-colors flex items-center gap-1"><i data-lucide="plus" class="w-3 h-3"></i> Hinzufügen</button>
             </div>
             <div id="detail-photos" class="grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
             <p id="photo-hint" class="text-[10px] text-slate-500 mt-1.5"></p>
-            <input type="file" id="photo-input" accept="image/*" class="hidden" onchange="uploadTourPhoto(event)">
+            <input type="file" id="photo-input" accept="image/*" class="hidden" data-onchange="uploadTourPhoto|$event">
           </div>
         </div>
 
         <!-- Foto-Lightbox -->
-        <div id="photo-lightbox" class="hidden fixed inset-0 z-[1700] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4" onclick="closePhotoLightbox()">
+        <div id="photo-lightbox" class="hidden fixed inset-0 z-[1700] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4" data-onclick="closePhotoLightbox">
           <img id="photo-lightbox-img" src="" alt="Tour-Foto" class="max-w-full max-h-full rounded-xl shadow-2xl">
         </div>
 
@@ -260,7 +260,7 @@
           <p class="text-xs text-slate-400 mb-3" id="segments-sub">–</p>
           <div id="segments-list" class="flex flex-col gap-1.5"></div>
           <!-- Segmentvergleich mit der Bestzeit (P9) -->
-          <button id="segment-compare-btn" onclick="compareWithBest()" class="hidden mt-3 w-full px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/70 border border-slate-800 text-slate-200 hover:border-teal-500/40 transition-colors flex items-center justify-center gap-1.5">
+          <button id="segment-compare-btn" data-onclick="compareWithBest" class="hidden mt-3 w-full px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/70 border border-slate-800 text-slate-200 hover:border-teal-500/40 transition-colors flex items-center justify-center gap-1.5">
             <i data-lucide="git-compare" class="w-3.5 h-3.5"></i> Mit Bestzeit vergleichen (Karte färben)
           </button>
           <div id="segment-compare-result" class="hidden mt-2 text-xs text-slate-400"></div>
