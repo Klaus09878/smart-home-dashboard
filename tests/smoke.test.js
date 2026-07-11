@@ -59,7 +59,7 @@ test('gpx.js: alle getElementById-IDs existieren in gpx.html', () => {
 function checkHandlers(htmlFile, jsFiles) {
   const html = files[htmlFile];
   const js = jsFiles.map(f => files[f] || read(f)).join('\n');
-  const calls = [...html.matchAll(/data-on(?:click|change|submit|input|backdrop)="\s*([A-Za-z_$][\w$]*)/g)].map(m => m[1]);
+  const calls = [...html.matchAll(/data-on(?:click|change|submit|input|keyup|backdrop)="\s*([A-Za-z_$][\w$]*)/g)].map(m => m[1]);
   const missing = [...new Set(calls)].filter(fn =>
     !new RegExp(`function\\s+${fn}\\s*\\(`).test(js) &&
     !new RegExp(`(const|let|var)\\s+${fn}\\s*=`).test(js)
@@ -77,7 +77,8 @@ test('gpx.html: alle data-on*-Handler sind in gpx.js/shared.js definiert', () =>
 
 test('HTML: keine Inline-Event-Handler mehr (CSP ohne unsafe-inline)', () => {
   ['index.html', 'gpx.html'].forEach(page => {
-    const bare = files[page].match(/[^-]on(?:click|change|submit|input)="/);
+    // jedes Inline-on*-Attribut (mit fuehrendem Leerzeichen; data-on* hat '-')
+    const bare = files[page].match(/\son[a-z]+="/);
     assert.strictEqual(bare, null, `${page}: Inline-Handler gefunden (muss data-on* sein): ${bare && bare[0]}`);
   });
 });
@@ -116,6 +117,26 @@ test('_headers: existiert und enthaelt eine Content-Security-Policy', () => {
   assert.ok(/Content-Security-Policy:/.test(h), 'CSP-Header fehlt in _headers');
   assert.ok(/X-Content-Type-Options:\s*nosniff/.test(h), 'X-Content-Type-Options fehlt');
   assert.ok(/Strict-Transport-Security:/.test(h), 'HSTS-Header fehlt');
+});
+
+// CSP-Haerte (P2-8b): script-src ohne 'unsafe-inline', und der SHA-256-Hash des
+// Inline-Theme-Snippets muss zum tatsaechlichen Snippet in beiden Seiten passen.
+test('_headers: script-src ohne unsafe-inline, Theme-Snippet-Hash stimmt', () => {
+  const crypto = require('crypto');
+  const h = read('_headers');
+  // nur die echte CSP-Header-Zeile betrachten (nicht die Kommentare darueber)
+  const csp = (h.match(/Content-Security-Policy:\s*([^\n]+)/) || [])[1] || '';
+  const scriptSrc = (csp.match(/script-src ([^;]+)/) || [])[1] || '';
+  assert.ok(scriptSrc, 'script-src-Direktive fehlt in der CSP');
+  assert.ok(!/'unsafe-inline'/.test(scriptSrc), "script-src darf kein 'unsafe-inline' enthalten");
+
+  const snippet = (files['index.html'].match(/<script>([\s\S]*?)<\/script>/) || [])[1];
+  assert.ok(snippet, 'Inline-Theme-Snippet in index.html nicht gefunden');
+  const gpxSnippet = (files['gpx.html'].match(/<script>([\s\S]*?)<\/script>/) || [])[1];
+  assert.strictEqual(gpxSnippet, snippet, 'Theme-Snippet in index.html und gpx.html muss identisch sein');
+
+  const hash = 'sha256-' + crypto.createHash('sha256').update(snippet, 'utf8').digest('base64');
+  assert.ok(h.includes(hash), `CSP-Hash passt nicht zum Snippet — erwartet '${hash}' in _headers`);
 });
 
 console.log(process.exitCode === 1 ? '\nSmoke-Tests FEHLGESCHLAGEN' : `\nAlle ${passed} Smoke-Tests bestanden ✔`);

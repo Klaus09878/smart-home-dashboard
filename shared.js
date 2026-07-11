@@ -368,7 +368,7 @@ function _delegatedArg(raw, el, event) {
   }
 }
 
-['click', 'change', 'input', 'submit'].forEach(type => {
+['click', 'change', 'input', 'submit', 'keyup'].forEach(type => {
   document.addEventListener(type, event => {
     const target = event.target;
     if (!target || !target.closest) return;
