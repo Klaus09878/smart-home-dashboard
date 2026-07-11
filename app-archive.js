@@ -495,13 +495,14 @@
         }
         const th = getThresholds();
         const num = (v, d = 1) => (v === null || v === undefined || isNaN(v)) ? '' : v.toFixed(d).replace('.', ',');
-        const header = ['Tag', 'Temp Min (°C)', 'Temp Mittel (°C)', 'Temp Max (°C)', 'Feuchte Min (%)', 'Feuchte Mittel (%)', 'Feuchte Max (%)', 'Komfort-Score', 'Messwerte'];
+        const header = ['Tag', 'Temp Min (°C)', 'Temp Mittel (°C)', 'Temp Max (°C)', 'Feuchte Min (%)', 'Feuchte Mittel (%)', 'Feuchte Max (%)', 'Komfort-Score', 'Messwerte', 'CO2 Mittel (ppm)', 'CO2 Max (ppm)'];
         const lines = rows.map(r => [
           r.day,
           num(r.t_min), num(r.t_avg), num(r.t_max),
           num(r.h_min, 0), num(r.h_avg, 0), num(r.h_max, 0),
           comfortScore(r.t_avg, r.h_avg, null, th) ?? '',
-          r.samples ?? ''
+          r.samples ?? '',
+          num(r.co2_avg, 0), num(r.co2_max, 0)
         ].join(';'));
         const safeName = getLocationName(locId).replace(/[^\wäöüÄÖÜß-]+/g, '_');
         downloadCsv(`climateflow_archiv_${safeName}.csv`, [header.join(';'), ...lines]);
