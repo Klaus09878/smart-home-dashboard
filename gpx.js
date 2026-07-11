@@ -322,18 +322,67 @@ async function exportBackup() {
   });
   const backup = {
     format: 'smarthub-backup',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     settings,
     activities
   };
+
+  // Fotos pro Tour mitsichern (P2-4), sofern R2 aktiv — auf Nachfrage, weil
+  // base64-Bilder die Datei stark vergroessern.
+  const withUid = activities.filter(a => a.uid);
+  if (withUid.length && await photosAvailable()) {
+    const withPhotos = await modalConfirm({
+      title: 'Fotos mitsichern?',
+      message: 'Foto-Anhänge der Touren als base64 einbetten. Das macht die Backup-Datei deutlich größer.',
+      confirmLabel: 'Ja, mit Fotos'
+    });
+    if (withPhotos) {
+      setUploadStatus('Fotos werden gesammelt…');
+      const photos = {};
+      for (const a of withUid) {
+        try {
+          const data = await apiFetch(`/api/photos?uid=${encodeURIComponent(a.uid)}`);
+          const list = (data && data.photos) || [];
+          if (!list.length) continue;
+          const out = [];
+          for (const p of list) {
+            const blob = await fetch(p.url).then(r => r.ok ? r.blob() : null).catch(() => null);
+            if (!blob) continue;
+            const dataUrl = await new Promise(res => {
+              const fr = new FileReader();
+              fr.onload = () => res(fr.result);
+              fr.onerror = () => res(null);
+              fr.readAsDataURL(blob);
+            });
+            if (dataUrl) out.push({ n: p.n, dataUrl });
+          }
+          if (out.length) photos[a.uid] = out;
+        } catch (e) { /* Tour ohne Fotos oder R2 aus */ }
+      }
+      if (Object.keys(photos).length) backup.photos = photos;
+    }
+  }
+
   const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `smarthub-backup-${new Date().toISOString().substring(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
-  setUploadStatus(`Backup mit ${activities.length} Aktivität(en) heruntergeladen.`);
+  const nPhotos = backup.photos ? Object.values(backup.photos).reduce((s, l) => s + l.length, 0) : 0;
+  setUploadStatus(`Backup mit ${activities.length} Aktivität(en)${nPhotos ? ` und ${nPhotos} Foto(s)` : ''} heruntergeladen.`);
+}
+
+// Sind Foto-Anhaenge verfuegbar (R2 + Endpunkt)? Ergebnis wird gecached
+// (_photosSupported aus dem Foto-Modul, Plan-10b).
+async function photosAvailable() {
+  if (_photosSupported !== null) return _photosSupported;
+  const first = state.activities.find(a => a.uid);
+  if (!first) return false;
+  try { await apiFetch(`/api/photos?uid=${encodeURIComponent(first.uid)}`); _photosSupported = true; }
+  catch (e) { _photosSupported = false; }
+  return _photosSupported;
 }
 
 async function handleRestoreInput(event) {
@@ -365,10 +414,27 @@ async function handleRestoreInput(event) {
         if (logical && !logical.endsWith('__ts') && !logical.endsWith('__migrated')) Store.set(logical, v);
       });
     }
+    // Fotos wiederherstellen (P2-4), sofern im Backup und R2 aktiv
+    let photoCount = 0;
+    if (backup.photos && await photosAvailable()) {
+      setUploadStatus('Fotos werden hochgeladen…');
+      for (const [uid, list] of Object.entries(backup.photos)) {
+        for (const p of (list || [])) {
+          try {
+            const blob = await fetch(p.dataUrl).then(r => r.blob());
+            const res = await fetch(`/api/photos?uid=${encodeURIComponent(uid)}&n=${p.n}`, {
+              method: 'PUT', headers: { 'Content-Type': 'image/webp' }, body: blob
+            });
+            if (res.ok) photoCount++;
+          } catch (e) { /* einzelnes Foto ueberspringen */ }
+        }
+      }
+    }
+
     await refreshActivities();
     if (state.activities.length > 0 && state.selectedId === null) selectActivity(state.activities[0].id);
     syncWithCloud();
-    setUploadStatus(`Backup eingespielt: ${restored} neue Aktivität(en), Einstellungen übernommen.`);
+    setUploadStatus(`Backup eingespielt: ${restored} neue Aktivität(en)${photoCount ? `, ${photoCount} Foto(s)` : ''}, Einstellungen übernommen.`);
   } catch (err) {
     console.error('Restore fehlgeschlagen:', err);
     setUploadStatus('Backup konnte nicht gelesen werden.', true);
@@ -614,7 +680,28 @@ async function renderPhotos(act) {
   });
   if (addBtn) addBtn.classList.toggle('hidden', photos.length >= 5);
   if (hint) hint.textContent = photos.length >= 5 ? 'Maximal 5 Fotos pro Tour.' : `${photos.length}/5 Fotos · max. 500 KB pro Bild.`;
+  renderPhotoMarkers(photos);
   updateIcons();
+}
+
+// Foto-Marker mit Geotag auf der Tourkarte (P2-15). Wird nach dem Kartenaufbau
+// (drawMap) aufgerufen; entfernt vorherige Marker.
+function renderPhotoMarkers(photos) {
+  if (!state.map) return;
+  if (state.photoMarkers) { state.map.removeLayer(state.photoMarkers); state.photoMarkers = null; }
+  const geo = (photos || []).filter(p => p.lat != null && p.lon != null);
+  if (!geo.length) return;
+  const icon = L.divIcon({
+    className: '',
+    html: '<div style="background:#0f172a;border:2px solid #14b8a6;border-radius:9999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:#5eead4;box-shadow:0 1px 4px rgba(0,0,0,.5)">📷</div>',
+    iconSize: [26, 26], iconAnchor: [13, 13]
+  });
+  const markers = geo.map(p => {
+    const m = L.marker([p.lat, p.lon], { icon });
+    m.bindPopup(`<img src="${p.url}" alt="Foto" style="max-width:200px;max-height:200px;border-radius:8px;cursor:pointer" data-onclick="openPhotoLightbox|${p.url}">`);
+    return m;
+  });
+  state.photoMarkers = L.layerGroup(markers).addTo(state.map);
 }
 
 // Bild lokal auf max. Kantenlaenge verkleinern und als WebP-Blob liefern.
@@ -644,13 +731,23 @@ async function uploadTourPhoto(event) {
   const act = state.activities.find(a => a.id === state.selectedId);
   if (!file || !act || !act.uid) return;
   try {
+    // EXIF-GPS VOR dem Resize lesen (Canvas verwirft die Metadaten) — P2-15
+    let gps = null;
+    try {
+      if (typeof exifr !== 'undefined' && exifr.gps) {
+        const g = await exifr.gps(file);
+        if (g && typeof g.latitude === 'number' && typeof g.longitude === 'number') gps = { lat: g.latitude, lon: g.longitude };
+      }
+    } catch (e) { /* kein GPS im Foto */ }
+
     let blob = await resizeImageToWebp(file, 1600, 0.8);
     if (blob.size > 500 * 1024) blob = await resizeImageToWebp(file, 1200, 0.7); // zweiter Versuch
     if (blob.size > 500 * 1024) { showToast('Foto ist auch komprimiert zu groß (max. 500 KB).', 'error'); return; }
     const used = JSON.parse((document.getElementById('detail-photos').dataset.usedN) || '[]');
     let n = 0; while (used.includes(n) && n < 5) n++;
     if (n >= 5) { showToast('Maximal 5 Fotos pro Tour.', 'error'); return; }
-    const res = await fetch(`/api/photos?uid=${encodeURIComponent(act.uid)}&n=${n}`, {
+    const geo = gps ? `&lat=${gps.lat}&lon=${gps.lon}` : '';
+    const res = await fetch(`/api/photos?uid=${encodeURIComponent(act.uid)}&n=${n}${geo}`, {
       method: 'PUT', headers: { 'Content-Type': 'image/webp' }, body: blob
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -680,6 +777,121 @@ function openPhotoLightbox(url) {
 function closePhotoLightbox() {
   const lb = document.getElementById('photo-lightbox');
   if (lb) lb.classList.add('hidden');
+}
+
+// ============ Live-Aufzeichnung (P2-13) ============
+// Zeichnet eine Tour direkt im Browser per Geolocation auf. Punkte im selben
+// Format wie der Datei-Import: [lat, lon, ele|null, timestampMs]. Roh-Puffer in
+// localStorage (geraetelokal) fuer Crash-Recovery.
+function toggleRecording() {
+  if (state.rec && state.rec.active) stopRecording(); else startRecording();
+}
+
+async function startRecording() {
+  if (!('geolocation' in navigator)) { setUploadStatus('Kein GPS auf diesem Gerät verfügbar.', true); return; }
+  state.rec = { active: true, points: [], startMs: Date.now(), lastSave: 0, lastLive: 0, wakeLock: null };
+  try { if (navigator.wakeLock) state.rec.wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* Wake Lock optional */ }
+  state.rec.watchId = navigator.geolocation.watchPosition(onRecFix, onRecErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+  state.rec.timer = setInterval(updateRecordingUI, 1000);
+  updateRecordingUI();
+  showToast('Aufzeichnung läuft. Bildschirm anlassen — iOS pausiert GPS bei gesperrtem Display.', 'info');
+}
+
+// Wake Lock nach Tab-Wechsel erneut anfordern (wird beim Verstecken freigegeben)
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && state.rec && state.rec.active && navigator.wakeLock && !state.rec.wakeLock) {
+    try { state.rec.wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* egal */ }
+  } else if (document.visibilityState === 'hidden' && state.rec) {
+    state.rec.wakeLock = null; // wird vom System freigegeben
+  }
+});
+
+function onRecFix(pos) {
+  const r = state.rec;
+  if (!r || !r.active) return;
+  const c = pos.coords;
+  if (c.accuracy != null && c.accuracy > 50) return; // ungenaue Fixes verwerfen
+  const pt = [c.latitude, c.longitude, (c.altitude != null && !isNaN(c.altitude)) ? c.altitude : null, Date.now()];
+  const last = r.points[r.points.length - 1];
+  if (last && haversine(last[0], last[1], pt[0], pt[1]) < 2) return; // Stillstand-Rauschen filtern
+  r.points.push(pt);
+  const now = Date.now();
+  if (now - r.lastSave > 30000) { r.lastSave = now; try { localStorage.setItem('gpx_rec_buffer', JSON.stringify(r.points)); } catch (e) { /* Quota egal */ } }
+  if (state.map && now - r.lastLive > 5000) { r.lastLive = now; drawLivePolyline(); }
+  updateRecordingUI();
+}
+
+function onRecErr(err) { console.warn('GPS-Fehler bei der Aufzeichnung:', err && err.message); }
+
+function drawLivePolyline() {
+  const r = state.rec;
+  if (!r || !state.map || r.points.length < 2) return;
+  const latlngs = r.points.map(p => [p[0], p[1]]);
+  if (state.recLiveLayer) state.recLiveLayer.setLatLngs(latlngs);
+  else state.recLiveLayer = L.polyline(latlngs, { color: '#f43f5e', weight: 4, opacity: 0.9 }).addTo(state.map);
+}
+
+function updateRecordingUI() {
+  const btn = document.getElementById('record-btn');
+  const bar = document.getElementById('record-status');
+  const stats = document.getElementById('record-stats');
+  const active = !!(state.rec && state.rec.active);
+  if (btn) btn.classList.toggle('text-rose-400', active);
+  if (bar) bar.classList.toggle('hidden', !active);
+  if (active && stats) {
+    const r = state.rec;
+    const dur = Math.floor((Date.now() - r.startMs) / 1000);
+    const dist = r.points.length > 1 ? computeStats(r.points).distM : 0;
+    stats.textContent = `${fmtDuration(dur)} · ${fmtDist(dist)} · ${r.points.length} Punkte`;
+  }
+}
+
+async function stopRecording() {
+  const r = state.rec;
+  if (!r) return;
+  r.active = false;
+  if (r.watchId != null) navigator.geolocation.clearWatch(r.watchId);
+  if (r.timer) clearInterval(r.timer);
+  if (r.wakeLock) { try { await r.wakeLock.release(); } catch (e) { /* egal */ } }
+  if (state.recLiveLayer && state.map) { state.map.removeLayer(state.recLiveLayer); state.recLiveLayer = null; }
+  const points = r.points;
+  state.rec = null;
+  localStorage.removeItem('gpx_rec_buffer');
+  updateRecordingUI();
+  if (points.length < 10) { setUploadStatus('Zu wenige GPS-Punkte — Aufzeichnung verworfen.', true); return; }
+  await saveRecordedActivity(points, `Aufzeichnung ${new Date().toLocaleDateString('de-DE')}`);
+}
+
+// Aufgezeichnete Punkte als Aktivitaet speichern (gleiche Struktur wie Import).
+async function saveRecordedActivity(points, name) {
+  const stats = computeStats(points);
+  const storedPoints = downsamplePoints(points, 5000);
+  const activity = {
+    uid: genUid(),
+    name,
+    type: guessTypeWithHints(storedPoints, stats.avgSpeed),
+    points: storedPoints,
+    distM: stats.distM, totalSec: stats.totalSec, movingSec: stats.movingSec,
+    avgSpeed: stats.avgSpeed, maxSpeed: stats.maxSpeed,
+    elevGain: stats.elevGain, eleMin: stats.eleMin, eleMax: stats.eleMax,
+    startTime: stats.startTime, note: null, startWeather: null,
+    addedAt: Date.now(), updatedAt: Date.now()
+  };
+  const localId = await dbPut(activity);
+  pushActivityToCloud(activity);
+  await refreshActivities();
+  if (localId != null) selectActivity(localId);
+  showToast(`Tour gespeichert: ${fmtDist(stats.distM)}.`, 'success');
+}
+
+// Nach einem Absturz/Reload waehrend der Aufnahme anbieten, den Puffer zu retten.
+async function checkRecordingRecovery() {
+  let buf = null;
+  try { buf = JSON.parse(localStorage.getItem('gpx_rec_buffer') || 'null'); } catch (e) { /* kaputt */ }
+  if (!Array.isArray(buf) || buf.length < 10) { localStorage.removeItem('gpx_rec_buffer'); return; }
+  const ok = await modalConfirm({ title: 'Unterbrochene Aufzeichnung', message: `Eine unterbrochene Aufzeichnung mit ${buf.length} Punkten wurde gefunden. Als Tour speichern?`, confirmLabel: 'Speichern' });
+  localStorage.removeItem('gpx_rec_buffer');
+  if (ok) await saveRecordedActivity(buf, `Wiederhergestellt ${new Date().toLocaleDateString('de-DE')}`);
 }
 
 async function saveNote(value) {
@@ -1229,6 +1441,49 @@ async function init() {
   });
 
   registerServiceWorker();
+  handleSharedGpx();          // via Share-Target geteilte Datei (P2-14)
+  handleLaunchQueueFiles();   // via File-Handler geoeffnete .gpx-Datei (P2-14)
+
+  // Live-Aufzeichnung (P2-13): Button nur bei GPS-Unterstuetzung, Crash-Recovery
+  if ('geolocation' in navigator) {
+    const rb = document.getElementById('record-btn');
+    if (rb) rb.classList.remove('hidden');
+    checkRecordingRecovery();
+  }
+}
+
+// Vom Service Worker (Share-Target) zwischengespeicherte GPX-Datei einlesen.
+async function handleSharedGpx() {
+  if (location.hash !== '#shared' || !window.caches) return;
+  try { history.replaceState(null, '', location.pathname); } catch (e) { /* alt */ }
+  try {
+    const resp = await caches.match('shared-gpx');
+    if (!resp) return;
+    const text = await resp.text();
+    const name = resp.headers.get('X-Shared-Name') || 'geteilt.gpx';
+    // Aufraeumen (aus allen Caches, da der Cache-Name hier nicht bekannt ist)
+    const names = await caches.keys();
+    for (const n of names) { try { await (await caches.open(n)).delete('shared-gpx'); } catch (e) { /* egal */ } }
+    const id = await importGpxText(text, name);
+    await refreshActivities();
+    if (id != null) selectActivity(id);
+    setUploadStatus('Geteilte GPX-Datei importiert.');
+  } catch (e) { setUploadStatus('Geteilte Datei konnte nicht gelesen werden.', true); }
+}
+
+// File-Handler: per Betriebssystem geoeffnete .gpx-Dateien.
+function handleLaunchQueueFiles() {
+  if (!('launchQueue' in window) || !window.launchQueue) return;
+  window.launchQueue.setConsumer(async params => {
+    if (!params || !params.files || !params.files.length) return;
+    let last = null;
+    for (const handle of params.files) {
+      try { const file = await handle.getFile(); last = await importGpxText(await file.text(), file.name); } catch (e) { /* Datei ueberspringen */ }
+    }
+    await refreshActivities();
+    if (last != null) selectActivity(last);
+    setUploadStatus('Geöffnete GPX-Datei importiert.');
+  });
 }
 
 window.addEventListener('DOMContentLoaded', init);

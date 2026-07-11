@@ -566,4 +566,91 @@ test('periodCompare: leerer Zeitraum → null-Seite, kein Delta', () => {
   assert.strictEqual(r.deltaT, null);
 });
 
+console.log('\nlib/core.js – ThingSpeak-CSV-Backfill');
+
+test('parseThingSpeakCsv: Kopfzeile, Anfuehrungszeichen, leere Felder', () => {
+  const csv = [
+    'created_at,entry_id,field1,field2',
+    '2026-01-01T10:00:00Z,1,"21,5",55',
+    '2026-01-01T11:00:00Z,2,22,',        // field2 leer
+    '',                                   // Leerzeile
+    '2026-01-01T12:00:00Z,3,"20,0","60"'
+  ].join('\n');
+  const rows = core.parseThingSpeakCsv(csv);
+  assert.strictEqual(rows.length, 3);
+  assert.strictEqual(rows[0].field1, '21,5'); // Rohstring, Komma bleibt
+  assert.strictEqual(rows[0].created_at, '2026-01-01T10:00:00Z');
+  assert.strictEqual(rows[1].field2, '');     // leeres Feld
+  assert.strictEqual(rows[2].field2, '60');   // entquotet
+  // Ohne Datenzeilen: leeres Array
+  assert.deepStrictEqual(core.parseThingSpeakCsv('created_at,entry_id\n'), []);
+  assert.deepStrictEqual(core.parseThingSpeakCsv(''), []);
+});
+
+test('parseThingSpeakCsv + processRawFeeds + aggregateDailyClimate: Kette', () => {
+  const csv = [
+    'created_at,entry_id,field1,field2',
+    '2026-01-01T08:00:00Z,1,"20,0","50"',
+    '2026-01-01T20:00:00Z,2,"24,0","60"',
+    '2026-01-02T09:00:00Z,3,"18,0","70"'
+  ].join('\n');
+  const rows = core.parseThingSpeakCsv(csv);
+  const aligned = core.processRawFeeds(rows, { temp: 'field1', humidity: 'field2' }).aligned;
+  const days = core.aggregateDailyClimate(aligned, '2026-01-03');
+  const d1 = days.find(d => d.day === '2026-01-01');
+  assert.strictEqual(d1.samples, 2);
+  assert.strictEqual(d1.tMin, 20);
+  assert.strictEqual(d1.tMax, 24);
+  assert.strictEqual(d1.tAvg, 22);
+  assert.strictEqual(d1.hAvg, 55);
+});
+
+test('aggregateDailyClimate: heutiger Tag ausgelassen, CO2 nur bei Werten', () => {
+  const mk = (iso, temp, humidity, co2) => ({ time: new Date(iso), temp, humidity, co2 });
+  const aligned = [
+    mk('2026-01-01T08:00:00Z', 20, 50, 800),
+    mk('2026-01-01T20:00:00Z', 22, 54, 1200),
+    mk('2026-01-02T09:00:00Z', 19, 60, null) // kein CO2
+  ];
+  const days = core.aggregateDailyClimate(aligned, '2026-01-02'); // 02. = heute → raus
+  assert.strictEqual(days.length, 1);
+  assert.strictEqual(days[0].day, '2026-01-01');
+  assert.strictEqual(days[0].co2Avg, 1000);
+  assert.strictEqual(days[0].co2Max, 1200);
+  // Tag ohne CO2 hat keine co2-Felder
+  const days2 = core.aggregateDailyClimate(aligned, '2026-01-03');
+  const d2 = days2.find(d => d.day === '2026-01-02');
+  assert.ok(!('co2Avg' in d2));
+});
+
+console.log('\nlib/core.js – Gradtagzahlen (Heizkosten)');
+
+test('degreeDays: nur Tage unter Heizgrenze zaehlen', () => {
+  const r = core.degreeDays([
+    { day: '2026-01-01', tOut: 0 },   // 20-0 = 20
+    { day: '2026-01-02', tOut: 10 },  // 20-10 = 10
+    { day: '2026-01-03', tOut: 15 },  // = heatLimit → 0 (nicht gezaehlt)
+    { day: '2026-01-04', tOut: 18 }   // > heatLimit → 0
+  ]);
+  assert.strictEqual(r.total, 30);
+  assert.strictEqual(r.days, 2);
+  assert.strictEqual(r.byMonth['2026-01'], 30);
+});
+
+test('degreeDays: warmer Sommer ergibt 0', () => {
+  const r = core.degreeDays([{ day: '2026-07-01', tOut: 25 }, { day: '2026-07-02', tOut: 30 }]);
+  assert.strictEqual(r.total, 0);
+  assert.strictEqual(r.days, 0);
+});
+
+test('degreeDays: eigene base/heatLimit, ungueltige Werte ignoriert', () => {
+  const r = core.degreeDays([
+    { day: '2026-02-01', tOut: 5 },       // base 18: 18-5 = 13
+    { day: '2026-02-02', tOut: null },     // ignoriert
+    { day: '2026-02-03', tOut: 12 }        // >= heatLimit 10 → 0
+  ], { base: 18, heatLimit: 10 });
+  assert.strictEqual(r.total, 13);
+  assert.strictEqual(r.days, 1);
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);

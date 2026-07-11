@@ -109,6 +109,8 @@ export async function onRequestGet(context) {
       const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
       await env.DB.prepare("DELETE FROM alert_state WHERE key != 'cron_heartbeat' AND last_sent < ?").bind(cutoff).run();
       try { await env.DB.prepare('DELETE FROM todos WHERE deleted = 1 AND updated_at < ?').bind(cutoff).run(); } catch (e) { /* todos evtl. nicht vorhanden */ }
+      // Login-Fehlversuchszaehler (P2-5): Zeilen aelter als 1 h entfernen
+      try { await env.DB.prepare('DELETE FROM auth_fails WHERE first_ms < ?').bind(Date.now() - 60 * 60 * 1000).run(); } catch (e) { /* auth_fails evtl. noch nicht vorhanden */ }
     } catch (e) { /* Heartbeat/Cleanup ist best effort */ }
   }
 
@@ -193,6 +195,25 @@ export async function onRequestGet(context) {
           };
         }));
       }
+
+      // ---- Amtliche Unwetterwarnungen (DWD via BrightSky, P2-11) ----
+      // Nur schwere/extreme Lagen pushen; Dedupe pro Alert-ID, damit neue
+      // Warnungen trotz Entprellung durchkommen. Ausserhalb DE liefert die API [].
+      try {
+        const ares = await fetch(`https://api.brightsky.dev/alerts?lat=${coords.lat}&lon=${coords.lon}`);
+        if (ares.ok) {
+          const alerts = ((await ares.json()) || {}).alerts || [];
+          const severe = alerts.filter(a => a && (a.severity === 'severe' || a.severity === 'extreme'));
+          if (severe.length) R.dwd = severe.map(a => a.event_de || a.headline_de);
+          for (const a of severe) {
+            report.notified.push(...await dispatch(env, recipients, 'dwd', `${locId}:${a.id}`, () => ({
+              title: `DWD-Warnung: ${a.event_de || 'Unwetter'}`,
+              body: `${a.headline_de || a.event_de} (${loc.label}).${a.instruction_de ? ' ' + a.instruction_de : ''}`,
+              tags: 'cloud_with_lightning'
+            })));
+          }
+        }
+      } catch (e) { R.dwdError = e.message; }
 
       if (moldRh != null) {
         report.notified.push(...await dispatch(env, recipients, 'mold', locId, rec => {

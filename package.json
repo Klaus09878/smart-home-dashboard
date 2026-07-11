@@ -3,11 +3,14 @@
   "private": true,
   "scripts": {
     "build:css": "npx -y tailwindcss@3.4.17 -c tailwind.config.js -i tailwind.input.css -o tailwind.css --minify",
-    "test": "node tests/core.test.js && node tests/webpush.test.js && node tests/smoke.test.js",
+    "test": "node tests/core.test.js && node tests/webpush.test.js && node tests/api.test.js && node tests/smoke.test.js",
+    "lint": "eslint .",
     "test:e2e": "playwright test",
     "build": "npm run test && npm run build:css"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1"
+    "@playwright/test": "^1.61.1",
+    "eslint": "^9.39.5",
+    "globals": "^17.7.0"
   }
 }

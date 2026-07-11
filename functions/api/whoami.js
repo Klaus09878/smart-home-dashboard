@@ -1,7 +1,7 @@
 // Verrät dem Client das aktive Profil (aus dem Basic-Auth-Login bzw. Cloudflare
 // Access). Der Client präfixt damit alle profilbezogenen Einstellungen und lädt
 // den passenden D1-Datensatz. Läuft hinter der Auth-Middleware.
-import { identify, parseUsers } from '../_auth.js';
+import { identify, parseUsers, dbUserNames } from '../_auth.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -13,10 +13,12 @@ export async function onRequestGet(context) {
     });
   }
 
-  // Admin bekommt die Liste aller Profilnamen (für die Benutzerverwaltung-Anzeige).
+  // Admin bekommt die Liste aller Profilnamen (Env + D1) fuer die Anzeige.
   let profiles = null;
   if (id.isAdmin && id.mode === 'basic') {
-    profiles = [...parseUsers(env).users.keys()];
+    const envNames = [...parseUsers(env).users.keys()];
+    const d1Names = await dbUserNames(env);
+    profiles = [...new Set([...envNames, ...d1Names])];
   }
 
   return new Response(JSON.stringify({

@@ -25,12 +25,15 @@ function test(name, fn) {
 }
 
 // IDs, die zur Laufzeit dynamisch erzeugt werden (nicht im HTML zu finden)
-const DYNAMIC_IDS = new Set(['toast-container']);
+const DYNAMIC_IDS = new Set(['toast-container', 'profile-admin']);
 
+// app.js wurde in mehrere klassische Skripte zerlegt (Plan2-9) — fuer die
+// Konsistenzpruefungen werden sie zu einem String zusammengefuehrt.
+const APP_PARTS = ['app-core.js', 'app-analysis.js', 'app-archive.js', 'app-hub.js', 'app-settings.js', 'app-main.js'];
 const files = {
   'index.html': read('index.html'),
   'gpx.html': read('gpx.html'),
-  'app.js': read('app.js'),
+  'app.js': APP_PARTS.map(read).join('\n'),
   'gpx.js': read('gpx.js'),
   'shared.js': read('shared.js'),
   'sw.js': read('sw.js')
@@ -53,27 +56,34 @@ test('gpx.js: alle getElementById-IDs existieren in gpx.html', () => {
   assert.deepStrictEqual(missing, [], `fehlende IDs in gpx.html: ${missing.join(', ')}`);
 });
 
-// onclick/onchange/onsubmit-Handler im HTML müssen im Seiten-JS (oder in
-// shared.js/lib/core.js) als Funktion definiert sein
+// data-onclick/onchange/oninput/onsubmit/onbackdrop-Handler im HTML (Event-
+// Delegation, P2-8) muessen im Seiten-JS (oder shared.js/lib/core.js) als
+// Funktion definiert sein. Format: data-onX="fnName|arg1|arg2".
 function checkHandlers(htmlFile, jsFiles) {
   const html = files[htmlFile];
   const js = jsFiles.map(f => files[f] || read(f)).join('\n');
-  const calls = [...html.matchAll(/on(?:click|change|submit|input)="\s*([A-Za-z_$][\w$]*)\s*\(/g)].map(m => m[1]);
+  const calls = [...html.matchAll(/data-on(?:click|change|submit|input|keyup|backdrop)="\s*([A-Za-z_$][\w$]*)/g)].map(m => m[1]);
   const missing = [...new Set(calls)].filter(fn =>
     !new RegExp(`function\\s+${fn}\\s*\\(`).test(js) &&
-    !new RegExp(`(const|let|var)\\s+${fn}\\s*=`).test(js) &&
-    // JS-Schlüsselwörter/Globals in Inline-Handlern sind keine App-Funktionen
-    !['document', 'window', 'location', 'if', 'event'].includes(fn)
+    !new RegExp(`(const|let|var)\\s+${fn}\\s*=`).test(js)
   );
   assert.deepStrictEqual(missing, [], `nicht definierte Handler in ${htmlFile}: ${missing.join(', ')}`);
 }
 
-test('index.html: alle onclick-Handler sind in app.js/shared.js definiert', () => {
+test('index.html: alle data-on*-Handler sind in app.js/shared.js definiert', () => {
   checkHandlers('index.html', ['app.js', 'shared.js', 'lib/core.js']);
 });
 
-test('gpx.html: alle onclick-Handler sind in gpx.js/shared.js definiert', () => {
+test('gpx.html: alle data-on*-Handler sind in gpx.js/shared.js definiert', () => {
   checkHandlers('gpx.html', ['gpx.js', 'shared.js', 'lib/core.js']);
+});
+
+test('HTML: keine Inline-Event-Handler mehr (CSP ohne unsafe-inline)', () => {
+  ['index.html', 'gpx.html'].forEach(page => {
+    // jedes Inline-on*-Attribut (mit fuehrendem Leerzeichen; data-on* hat '-')
+    const bare = files[page].match(/\son[a-z]+="/);
+    assert.strictEqual(bare, null, `${page}: Inline-Handler gefunden (muss data-on* sein): ${bare && bare[0]}`);
+  });
 });
 
 test('HTML: alle lokalen script-src/link-href-Dateien existieren', () => {
@@ -97,8 +107,8 @@ test('sw.js: alle APP_SHELL-Dateien existieren', () => {
     const rel = e === './' ? 'index.html' : e.replace(/^\.\//, '');
     assert.ok(fs.existsSync(path.join(root, rel)), `Shell-Datei fehlt: ${e}`);
   });
-  // Beide Seiten-Skripte müssen in der Offline-Shell liegen
-  ['./app.js', './gpx.js', './shared.js'].forEach(mustHave => {
+  // Alle Seiten-Skripte müssen in der Offline-Shell liegen (app-* Teile + Rest)
+  [...APP_PARTS.map(p => './' + p), './gpx.js', './shared.js'].forEach(mustHave => {
     assert.ok(entries.includes(mustHave), `APP_SHELL sollte ${mustHave} enthalten`);
   });
 });
@@ -110,6 +120,26 @@ test('_headers: existiert und enthaelt eine Content-Security-Policy', () => {
   assert.ok(/Content-Security-Policy:/.test(h), 'CSP-Header fehlt in _headers');
   assert.ok(/X-Content-Type-Options:\s*nosniff/.test(h), 'X-Content-Type-Options fehlt');
   assert.ok(/Strict-Transport-Security:/.test(h), 'HSTS-Header fehlt');
+});
+
+// CSP-Haerte (P2-8b): script-src ohne 'unsafe-inline', und der SHA-256-Hash des
+// Inline-Theme-Snippets muss zum tatsaechlichen Snippet in beiden Seiten passen.
+test('_headers: script-src ohne unsafe-inline, Theme-Snippet-Hash stimmt', () => {
+  const crypto = require('crypto');
+  const h = read('_headers');
+  // nur die echte CSP-Header-Zeile betrachten (nicht die Kommentare darueber)
+  const csp = (h.match(/Content-Security-Policy:\s*([^\n]+)/) || [])[1] || '';
+  const scriptSrc = (csp.match(/script-src ([^;]+)/) || [])[1] || '';
+  assert.ok(scriptSrc, 'script-src-Direktive fehlt in der CSP');
+  assert.ok(!/'unsafe-inline'/.test(scriptSrc), "script-src darf kein 'unsafe-inline' enthalten");
+
+  const snippet = (files['index.html'].match(/<script>([\s\S]*?)<\/script>/) || [])[1];
+  assert.ok(snippet, 'Inline-Theme-Snippet in index.html nicht gefunden');
+  const gpxSnippet = (files['gpx.html'].match(/<script>([\s\S]*?)<\/script>/) || [])[1];
+  assert.strictEqual(gpxSnippet, snippet, 'Theme-Snippet in index.html und gpx.html muss identisch sein');
+
+  const hash = 'sha256-' + crypto.createHash('sha256').update(snippet, 'utf8').digest('base64');
+  assert.ok(h.includes(hash), `CSP-Hash passt nicht zum Snippet — erwartet '${hash}' in _headers`);
 });
 
 console.log(process.exitCode === 1 ? '\nSmoke-Tests FEHLGESCHLAGEN' : `\nAlle ${passed} Smoke-Tests bestanden ✔`);
