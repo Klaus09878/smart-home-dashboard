@@ -109,6 +109,8 @@ export async function onRequestGet(context) {
       const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
       await env.DB.prepare("DELETE FROM alert_state WHERE key != 'cron_heartbeat' AND last_sent < ?").bind(cutoff).run();
       try { await env.DB.prepare('DELETE FROM todos WHERE deleted = 1 AND updated_at < ?').bind(cutoff).run(); } catch (e) { /* todos evtl. nicht vorhanden */ }
+      // Login-Fehlversuchszaehler (P2-5): Zeilen aelter als 1 h entfernen
+      try { await env.DB.prepare('DELETE FROM auth_fails WHERE first_ms < ?').bind(Date.now() - 60 * 60 * 1000).run(); } catch (e) { /* auth_fails evtl. noch nicht vorhanden */ }
     } catch (e) { /* Heartbeat/Cleanup ist best effort */ }
   }
 
