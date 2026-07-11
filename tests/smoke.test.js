@@ -27,10 +27,13 @@ function test(name, fn) {
 // IDs, die zur Laufzeit dynamisch erzeugt werden (nicht im HTML zu finden)
 const DYNAMIC_IDS = new Set(['toast-container']);
 
+// app.js wurde in mehrere klassische Skripte zerlegt (Plan2-9) — fuer die
+// Konsistenzpruefungen werden sie zu einem String zusammengefuehrt.
+const APP_PARTS = ['app-core.js', 'app-analysis.js', 'app-archive.js', 'app-hub.js', 'app-settings.js', 'app-main.js'];
 const files = {
   'index.html': read('index.html'),
   'gpx.html': read('gpx.html'),
-  'app.js': read('app.js'),
+  'app.js': APP_PARTS.map(read).join('\n'),
   'gpx.js': read('gpx.js'),
   'shared.js': read('shared.js'),
   'sw.js': read('sw.js')
@@ -104,8 +107,8 @@ test('sw.js: alle APP_SHELL-Dateien existieren', () => {
     const rel = e === './' ? 'index.html' : e.replace(/^\.\//, '');
     assert.ok(fs.existsSync(path.join(root, rel)), `Shell-Datei fehlt: ${e}`);
   });
-  // Beide Seiten-Skripte müssen in der Offline-Shell liegen
-  ['./app.js', './gpx.js', './shared.js'].forEach(mustHave => {
+  // Alle Seiten-Skripte müssen in der Offline-Shell liegen (app-* Teile + Rest)
+  [...APP_PARTS.map(p => './' + p), './gpx.js', './shared.js'].forEach(mustHave => {
     assert.ok(entries.includes(mustHave), `APP_SHELL sollte ${mustHave} enthalten`);
   });
 });

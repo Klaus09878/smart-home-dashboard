@@ -14,7 +14,12 @@ function declaredNames(file) {
   return out;
 }
 const coreGlobals = Object.fromEntries(Object.keys(require('./lib/core.js')).map(k => [k, 'readonly']));
-const sharedGlobals = { ...declaredNames('shared.js'), ...declaredNames('settings-sync.js'), ...coreGlobals };
+// app.js wurde in mehrere klassische Skripte zerlegt (Plan2-9), die sich zur
+// Laufzeit denselben globalen Scope teilen — daher sind ihre Top-Level-Namen
+// gegenseitig global. Namen aus allen Teilen einsammeln.
+const APP_PARTS = ['app-core.js', 'app-analysis.js', 'app-archive.js', 'app-hub.js', 'app-settings.js', 'app-main.js'];
+const appGlobals = Object.assign({}, ...APP_PARTS.filter(f => fs.existsSync(f)).map(declaredNames));
+const sharedGlobals = { ...declaredNames('shared.js'), ...declaredNames('settings-sync.js'), ...coreGlobals, ...appGlobals };
 
 // Von Vendor-Bibliotheken bereitgestellte Globals.
 const vendorGlobals = { Chart: 'readonly', L: 'readonly', lucide: 'readonly', Hammer: 'readonly', Store: 'readonly' };
@@ -27,7 +32,7 @@ module.exports = [
   // per data-on*-Delegation (String-Referenzen) aufgerufen, was ESLint pro Datei
   // nicht sieht → sonst nur Fehlalarme. no-undef faengt echte Tippfehler.
   {
-    files: ['app.js', 'gpx.js', 'shared.js', 'settings-sync.js'],
+    files: ['app-*.js', 'gpx.js', 'shared.js', 'settings-sync.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'script',

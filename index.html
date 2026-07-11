@@ -1067,7 +1067,13 @@
   <!-- Profil- & Einstellungs-Schicht (Login-Profile, D1-Sync) -->
   <script src="settings-sync.js"></script>
 
-  <!-- App-Logik (Hub + ClimateFlow) -->
-  <script src="app.js"></script>
+  <!-- App-Logik (Hub + ClimateFlow) — aus app.js zerlegt (Plan2-9), Reihenfolge
+       entspricht der urspruenglichen Dateireihenfolge; app-main.js zuletzt. -->
+  <script src="app-core.js"></script>
+  <script src="app-analysis.js"></script>
+  <script src="app-archive.js"></script>
+  <script src="app-hub.js"></script>
+  <script src="app-settings.js"></script>
+  <script src="app-main.js"></script>
 </body>
 </html>
