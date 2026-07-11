@@ -322,18 +322,67 @@ async function exportBackup() {
   });
   const backup = {
     format: 'smarthub-backup',
-    version: 2,
+    version: 3,
     exportedAt: new Date().toISOString(),
     settings,
     activities
   };
+
+  // Fotos pro Tour mitsichern (P2-4), sofern R2 aktiv — auf Nachfrage, weil
+  // base64-Bilder die Datei stark vergroessern.
+  const withUid = activities.filter(a => a.uid);
+  if (withUid.length && await photosAvailable()) {
+    const withPhotos = await modalConfirm({
+      title: 'Fotos mitsichern?',
+      message: 'Foto-Anhänge der Touren als base64 einbetten. Das macht die Backup-Datei deutlich größer.',
+      confirmLabel: 'Ja, mit Fotos'
+    });
+    if (withPhotos) {
+      setUploadStatus('Fotos werden gesammelt…');
+      const photos = {};
+      for (const a of withUid) {
+        try {
+          const data = await apiFetch(`/api/photos?uid=${encodeURIComponent(a.uid)}`);
+          const list = (data && data.photos) || [];
+          if (!list.length) continue;
+          const out = [];
+          for (const p of list) {
+            const blob = await fetch(p.url).then(r => r.ok ? r.blob() : null).catch(() => null);
+            if (!blob) continue;
+            const dataUrl = await new Promise(res => {
+              const fr = new FileReader();
+              fr.onload = () => res(fr.result);
+              fr.onerror = () => res(null);
+              fr.readAsDataURL(blob);
+            });
+            if (dataUrl) out.push({ n: p.n, dataUrl });
+          }
+          if (out.length) photos[a.uid] = out;
+        } catch (e) { /* Tour ohne Fotos oder R2 aus */ }
+      }
+      if (Object.keys(photos).length) backup.photos = photos;
+    }
+  }
+
   const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `smarthub-backup-${new Date().toISOString().substring(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
-  setUploadStatus(`Backup mit ${activities.length} Aktivität(en) heruntergeladen.`);
+  const nPhotos = backup.photos ? Object.values(backup.photos).reduce((s, l) => s + l.length, 0) : 0;
+  setUploadStatus(`Backup mit ${activities.length} Aktivität(en)${nPhotos ? ` und ${nPhotos} Foto(s)` : ''} heruntergeladen.`);
+}
+
+// Sind Foto-Anhaenge verfuegbar (R2 + Endpunkt)? Ergebnis wird gecached
+// (_photosSupported aus dem Foto-Modul, Plan-10b).
+async function photosAvailable() {
+  if (_photosSupported !== null) return _photosSupported;
+  const first = state.activities.find(a => a.uid);
+  if (!first) return false;
+  try { await apiFetch(`/api/photos?uid=${encodeURIComponent(first.uid)}`); _photosSupported = true; }
+  catch (e) { _photosSupported = false; }
+  return _photosSupported;
 }
 
 async function handleRestoreInput(event) {
@@ -365,10 +414,27 @@ async function handleRestoreInput(event) {
         if (logical && !logical.endsWith('__ts') && !logical.endsWith('__migrated')) Store.set(logical, v);
       });
     }
+    // Fotos wiederherstellen (P2-4), sofern im Backup und R2 aktiv
+    let photoCount = 0;
+    if (backup.photos && await photosAvailable()) {
+      setUploadStatus('Fotos werden hochgeladen…');
+      for (const [uid, list] of Object.entries(backup.photos)) {
+        for (const p of (list || [])) {
+          try {
+            const blob = await fetch(p.dataUrl).then(r => r.blob());
+            const res = await fetch(`/api/photos?uid=${encodeURIComponent(uid)}&n=${p.n}`, {
+              method: 'PUT', headers: { 'Content-Type': 'image/webp' }, body: blob
+            });
+            if (res.ok) photoCount++;
+          } catch (e) { /* einzelnes Foto ueberspringen */ }
+        }
+      }
+    }
+
     await refreshActivities();
     if (state.activities.length > 0 && state.selectedId === null) selectActivity(state.activities[0].id);
     syncWithCloud();
-    setUploadStatus(`Backup eingespielt: ${restored} neue Aktivität(en), Einstellungen übernommen.`);
+    setUploadStatus(`Backup eingespielt: ${restored} neue Aktivität(en)${photoCount ? `, ${photoCount} Foto(s)` : ''}, Einstellungen übernommen.`);
   } catch (err) {
     console.error('Restore fehlgeschlagen:', err);
     setUploadStatus('Backup konnte nicht gelesen werden.', true);
