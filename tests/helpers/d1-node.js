@@ -67,7 +67,11 @@ async function loadEndpoint(relPath) {
 // Minimaler Kontext. auth: 'test'/'test' erzeugt gueltigen Basic-Header.
 function ctx(method, urlPath, { env = {}, body, auth } = {}) {
   const headers = {};
-  if (auth) headers['Authorization'] = 'Basic ' + Buffer.from(`${auth}:${auth}`).toString('base64');
+  // auth 'name' → name:name; auth 'name:pass' → wird roh verwendet
+  if (auth) {
+    const pair = auth.includes(':') ? auth : `${auth}:${auth}`;
+    headers['Authorization'] = 'Basic ' + Buffer.from(pair).toString('base64');
+  }
   const init = { method, headers };
   if (body !== undefined) { init.body = JSON.stringify(body); headers['Content-Type'] = 'application/json'; }
   const request = new Request('https://test.local' + urlPath, init);

@@ -1,4 +1,4 @@
-import { authenticate } from './_auth.js';
+import { authenticateAsync } from './_auth.js';
 
 export async function onRequest(context) {
   const { request, next, env } = context;
@@ -14,9 +14,9 @@ export async function onRequest(context) {
     return new Response("Zugriff nur über Cloudflare Access (AUTH_MODE=access gesetzt, aber kein Access-JWT vorhanden — Access-Application prüfen).", { status: 403 });
   }
 
-  // Mehrbenutzer-Login: gültige Zugangsdaten = Admin-Konto (AUTH_USER/AUTH_PASS)
-  // ODER ein Eintrag in AUTH_USERS. Jeder Name ist ein eigenes Profil.
-  if (authenticate(request, env)) {
+  // Mehrbenutzer-Login: gültige Zugangsdaten = Admin-Konto (AUTH_USER/AUTH_PASS),
+  // ein Eintrag in AUTH_USERS ODER ein D1-Nutzer (Plan2-16, PBKDF2).
+  if (await authenticateAsync(request, env)) {
     return await next();
   }
 

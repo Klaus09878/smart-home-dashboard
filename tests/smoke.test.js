@@ -25,7 +25,7 @@ function test(name, fn) {
 }
 
 // IDs, die zur Laufzeit dynamisch erzeugt werden (nicht im HTML zu finden)
-const DYNAMIC_IDS = new Set(['toast-container']);
+const DYNAMIC_IDS = new Set(['toast-container', 'profile-admin']);
 
 // app.js wurde in mehrere klassische Skripte zerlegt (Plan2-9) — fuer die
 // Konsistenzpruefungen werden sie zu einem String zusammengefuehrt.

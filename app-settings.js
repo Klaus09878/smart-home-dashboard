@@ -12,8 +12,8 @@
         const mode = (window.Store && Store.mode) === 'server' ? 'angemeldet (Login)' : 'nur lokal';
         let html = `<p>Aktives Profil: <strong class="text-white">${escapeHtml(name)}</strong> <span class="text-slate-500">· ${mode}</span></p>`;
         if (Store.isAdmin && Store.profiles && Store.profiles.length) {
-          html += `<p class="text-xs text-slate-400 mt-1">Profile: ${Store.profiles.map(p => escapeHtml(p)).join(', ')}</p>`;
-          html += `<p class="text-[11px] text-slate-500 mt-1">Neues Profil anlegen: in Cloudflare die Env-Var <code class="text-slate-300">AUTH_USERS</code> um <code class="text-slate-300">name:passwort</code> ergänzen (mit „;" getrennt) und neu deployen.</p>`;
+          // Interaktive Nutzerverwaltung (P2-16) — wird async nachgeladen
+          html += `<div id="profile-admin" class="mt-2"></div>`;
         } else if (Store.mode !== 'server') {
           html += `<p class="text-[11px] text-slate-500 mt-1">Auf dem Server ist jedes Login-Passwort ein eigenes Profil. Lokal wird „Standard" verwendet.</p>`;
         }
@@ -26,6 +26,7 @@
           html += `<div class="mt-2 flex justify-end"><button data-onclick="logout" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-red-500/40 text-xs text-slate-400 hover:text-red-300 transition-colors flex items-center gap-1.5"><i data-lucide="log-out" class="w-3.5 h-3.5"></i> Abmelden</button></div>`;
         }
         pEl.innerHTML = html;
+        if (Store.isAdmin && Store.profiles && Store.profiles.length) renderProfileAdmin();
       }
 
       // ntfy-Topic
@@ -140,6 +141,72 @@
       renderSettings();
       if (typeof renderActiveView === 'function') renderActiveView();
       showNotification('Schwellwerte gespeichert.');
+    }
+
+    // ============ Nutzerverwaltung in D1 (P2-16, nur Admin) ============
+    // Legt zusaetzliche Login-Profile ohne Redeploy an. Env-Nutzer bleiben der
+    // Fallback und sind hier nicht aenderbar.
+    async function renderProfileAdmin() {
+      const el = document.getElementById('profile-admin');
+      if (!el) return;
+      let users = [];
+      try { const d = await apiFetch('/api/users'); users = d.users || []; }
+      catch (e) {
+        el.innerHTML = '<p class="text-[11px] text-slate-500 mt-1">Nutzerverwaltung braucht die Cloud-DB (D1) — sonst gelten die Env-Profile.</p>';
+        return;
+      }
+      const rows = users.map(u => `
+        <div class="flex items-center justify-between gap-2 py-1">
+          <span class="text-xs text-slate-300">${escapeHtml(u.name)}${u.source === 'env' ? ' <span class="text-[10px] text-slate-500">(Env)</span>' : ''}</span>
+          ${u.source === 'd1' ? `<span class="flex gap-1">
+            <button data-onclick="changeProfilePassword|${escapeHtml(u.name)}" title="Passwort ändern" class="p-1 rounded text-slate-500 hover:text-white transition-colors"><i data-lucide="key-round" class="w-3 h-3"></i></button>
+            <button data-onclick="deleteProfile|${escapeHtml(u.name)}" title="Löschen" class="p-1 rounded text-slate-500 hover:text-red-400 transition-colors"><i data-lucide="trash-2" class="w-3 h-3"></i></button>
+          </span>` : ''}
+        </div>`).join('');
+      el.innerHTML = `
+        <p class="text-[11px] text-slate-500 uppercase font-semibold mt-1">Profile verwalten</p>
+        <div class="mt-1 divide-y divide-slate-800/60">${rows}</div>
+        <button data-onclick="addProfile" class="mt-2 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-teal-500/40 text-xs text-slate-200 hover:text-teal-300 transition-colors flex items-center gap-1.5"><i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Profil anlegen</button>`;
+      updateIcons();
+    }
+
+    async function addProfile() {
+      const vals = await modalPrompt({
+        title: 'Profil anlegen',
+        description: 'Neues Login-Profil (Name + Passwort) — gilt sofort, ohne Deploy.',
+        fields: [
+          { key: 'name', label: 'Name (2–32: Buchstaben, Ziffern, . _ -)', type: 'text', value: '' },
+          { key: 'password', label: 'Passwort (min. 6 Zeichen)', type: 'password', value: '' }
+        ]
+      });
+      if (!vals) return;
+      try {
+        await apiFetch('/api/users', { method: 'POST', body: JSON.stringify({ name: (vals.name || '').trim(), password: vals.password || '' }) });
+        showNotification('Profil angelegt.');
+        renderProfileAdmin();
+      } catch (e) { showNotification('Anlegen fehlgeschlagen (Name vergeben oder Eingabe ungültig).', 'error'); }
+    }
+
+    async function changeProfilePassword(name) {
+      const vals = await modalPrompt({
+        title: `Passwort für „${name}"`,
+        fields: [{ key: 'password', label: 'Neues Passwort (min. 6 Zeichen)', type: 'password', value: '' }]
+      });
+      if (!vals) return;
+      try {
+        await apiFetch('/api/users', { method: 'PUT', body: JSON.stringify({ name, password: vals.password || '' }) });
+        showNotification('Passwort geändert.');
+      } catch (e) { showNotification('Änderung fehlgeschlagen.', 'error'); }
+    }
+
+    async function deleteProfile(name) {
+      const ok = await modalConfirm({ title: 'Profil löschen?', message: `„${name}" und dessen Login entfernen? Die synchronisierten Daten des Profils bleiben in D1.`, confirmLabel: 'Löschen', danger: true });
+      if (!ok) return;
+      try {
+        await apiFetch(`/api/users?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+        showNotification('Profil gelöscht.');
+        renderProfileAdmin();
+      } catch (e) { showNotification('Löschen fehlgeschlagen.', 'error'); }
     }
 
     // Zusatz-Standort über die Oberfläche anlegen (P8, nur Admin). Der Read-Key

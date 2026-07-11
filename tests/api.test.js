@@ -98,6 +98,51 @@ test('gpx: POST anlegen, DELETE setzt Tombstone, GET-Liste enthaelt ihn', async 
   assert.strictEqual(t.deleted, true);
 });
 
+// ---- users.js + authenticateAsync: D1-Nutzerverwaltung (Plan2-16) ----
+test('users: Admin legt D1-Nutzer an, D1-Login funktioniert, falsches Passwort nicht', async () => {
+  const mod = await loadEndpoint('api/users');
+  const auth = await loadEndpoint('_auth');
+  const env = { AUTH_USER: 'test', AUTH_PASS: 'test', DB: createD1() };
+
+  // Nicht-Admin (kein Env-Admin) darf nicht
+  const forbidden = await call(mod, ctx('GET', '/api/users', { env, auth: 'bob:x' }));
+  assert.strictEqual(forbidden.status, 403);
+
+  // Admin legt Nutzer an
+  const created = await call(mod, ctx('POST', '/api/users', { env, auth: 'test', body: { name: 'bob', password: 'geheim1' } }));
+  assert.strictEqual(created.status, 200);
+
+  // GET listet Env- + D1-Nutzer
+  const list = await jsonOf(await call(mod, ctx('GET', '/api/users', { env, auth: 'test' })));
+  assert.ok(list.users.some(u => u.name === 'bob' && u.source === 'd1'));
+  assert.ok(list.users.some(u => u.name === 'test' && u.source === 'env'));
+
+  // D1-Login: authenticateAsync akzeptiert bob mit korrektem Passwort
+  const okId = await auth.authenticateAsync(ctx('GET', '/x', { env, auth: 'bob:geheim1' }).request, env);
+  assert.ok(okId && okId.user === 'bob' && okId.isAdmin === false);
+
+  // falsches Passwort → null
+  const bad = await auth.authenticateAsync(ctx('GET', '/x', { env, auth: 'bob:falsch' }).request, env);
+  assert.strictEqual(bad, null);
+
+  // Env-Admin weiterhin gueltig
+  const admin = await auth.authenticateAsync(ctx('GET', '/x', { env, auth: 'test' }).request, env);
+  assert.ok(admin && admin.isAdmin === true);
+});
+
+test('users: doppelter Name und Env-Kollision werden abgelehnt', async () => {
+  const mod = await loadEndpoint('api/users');
+  const env = { DB: createD1() };
+  await call(mod, ctx('POST', '/api/users', { env, auth: 'test', body: { name: 'bob', password: 'geheim1' } }));
+  const dup = await call(mod, ctx('POST', '/api/users', { env, auth: 'test', body: { name: 'bob', password: 'geheim2' } }));
+  assert.strictEqual(dup.status, 409);
+  const envCollision = await call(mod, ctx('POST', '/api/users', { env, auth: 'test', body: { name: 'test', password: 'geheim2' } }));
+  assert.strictEqual(envCollision.status, 409);
+  // DELETE eines Env-Nutzers verboten
+  const delEnv = await call(mod, ctx('DELETE', '/api/users?name=test', { env, auth: 'test' }));
+  assert.strictEqual(delEnv.status, 400);
+});
+
 // ---- Runner ----
 (async () => {
   console.log('functions/api – Server-Endpunkte (node:sqlite)');
