@@ -1295,6 +1295,42 @@ async function init() {
   });
 
   registerServiceWorker();
+  handleSharedGpx();          // via Share-Target geteilte Datei (P2-14)
+  handleLaunchQueueFiles();   // via File-Handler geoeffnete .gpx-Datei (P2-14)
+}
+
+// Vom Service Worker (Share-Target) zwischengespeicherte GPX-Datei einlesen.
+async function handleSharedGpx() {
+  if (location.hash !== '#shared' || !window.caches) return;
+  try { history.replaceState(null, '', location.pathname); } catch (e) { /* alt */ }
+  try {
+    const resp = await caches.match('shared-gpx');
+    if (!resp) return;
+    const text = await resp.text();
+    const name = resp.headers.get('X-Shared-Name') || 'geteilt.gpx';
+    // Aufraeumen (aus allen Caches, da der Cache-Name hier nicht bekannt ist)
+    const names = await caches.keys();
+    for (const n of names) { try { await (await caches.open(n)).delete('shared-gpx'); } catch (e) { /* egal */ } }
+    const id = await importGpxText(text, name);
+    await refreshActivities();
+    if (id != null) selectActivity(id);
+    setUploadStatus('Geteilte GPX-Datei importiert.');
+  } catch (e) { setUploadStatus('Geteilte Datei konnte nicht gelesen werden.', true); }
+}
+
+// File-Handler: per Betriebssystem geoeffnete .gpx-Dateien.
+function handleLaunchQueueFiles() {
+  if (!('launchQueue' in window) || !window.launchQueue) return;
+  window.launchQueue.setConsumer(async params => {
+    if (!params || !params.files || !params.files.length) return;
+    let last = null;
+    for (const handle of params.files) {
+      try { const file = await handle.getFile(); last = await importGpxText(await file.text(), file.name); } catch (e) { /* Datei ueberspringen */ }
+    }
+    await refreshActivities();
+    if (last != null) selectActivity(last);
+    setUploadStatus('Geöffnete GPX-Datei importiert.');
+  });
 }
 
 window.addEventListener('DOMContentLoaded', init);
