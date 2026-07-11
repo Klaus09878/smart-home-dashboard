@@ -1869,32 +1869,9 @@
         const feeds = appState.insideData;
         if (!feeds || feeds.length === 0) return;
 
+        // Tages-Aggregation (getestete Kernlogik in lib/core.js)
         const todayKey = new Date().toISOString().substring(0, 10);
-        const byDay = {};
-        feeds.forEach(f => {
-          const day = f.time.toISOString().substring(0, 10);
-          if (day >= todayKey) return; // nur abgeschlossene Tage archivieren
-          (byDay[day] = byDay[day] || []).push(f);
-        });
-
-        const days = Object.entries(byDay).map(([day, list]) => {
-          const temps = list.map(f => f.temp);
-          const hums = list.map(f => f.humidity);
-          const avg = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
-          const entry = {
-            day,
-            tMin: Math.min(...temps), tMax: Math.max(...temps), tAvg: parseFloat(avg(temps).toFixed(2)),
-            hMin: Math.min(...hums), hMax: Math.max(...hums), hAvg: parseFloat(avg(hums).toFixed(2)),
-            samples: list.length
-          };
-          // CO₂-Aggregate nur, wenn an dem Tag ueberhaupt CO₂-Werte vorliegen
-          const co2s = list.map(f => f.co2).filter(v => v != null && !isNaN(v));
-          if (co2s.length) {
-            entry.co2Avg = parseFloat(avg(co2s).toFixed(1));
-            entry.co2Max = Math.max(...co2s);
-          }
-          return entry;
-        });
+        const days = aggregateDailyClimate(feeds, todayKey);
         if (days.length === 0) return;
 
         await apiFetch('/api/climate', { method: 'POST', body: JSON.stringify({ loc: locId, days }) });
@@ -1902,6 +1879,35 @@
         console.log(`[Archiv] ${days.length} Tages-Aggregate für ${locId} in D1 gesichert.`);
       } catch (err) {
         if (!err.unavailable) console.warn('Klima-Archiv fehlgeschlagen:', err);
+      }
+    }
+
+    // Rueckwirkender Import eines ThingSpeak-CSV-Exports ins Langzeit-Archiv
+    // (P2-3). ThingSpeak haelt nur ~8000 Eintraege — so lassen sich aeltere
+    // Messwerte einmalig nachtragen. Aggregation via getestete Kernlogik.
+    async function importThingSpeakCsv(event) {
+      const file = event.target.files[0];
+      event.target.value = '';
+      if (!file) return;
+      const locId = appState.activeLocId;
+      try {
+        const rows = parseThingSpeakCsv(await file.text());
+        if (rows.length === 0) { showNotification('CSV enthält keine Datenzeilen.', 'error'); return; }
+        const { aligned } = processRawFeeds(rows, getLocationFields(locId));
+        const todayKey = new Date().toISOString().substring(0, 10);
+        const days = aggregateDailyClimate(aligned, todayKey);
+        if (days.length === 0) { showNotification('Keine abgeschlossenen Tage im CSV gefunden.', 'error'); return; }
+        showNotification(`Importiere ${days.length} Tage für ${getLocationName(locId)}…`);
+        // In Bloecken posten (D1-Batch schonen)
+        for (let i = 0; i < days.length; i += 300) {
+          await apiFetch('/api/climate', { method: 'POST', body: JSON.stringify({ loc: locId, days: days.slice(i, i + 300) }) });
+        }
+        showNotification(`${days.length} Tage importiert.`);
+        appState.archiveLoadedFor = null;
+        loadArchiveView(true);
+      } catch (err) {
+        if (err.unavailable) showNotification('Cloud-Datenbank (D1) nicht eingerichtet — Import nicht möglich.', 'error');
+        else showNotification(`Import fehlgeschlagen: ${err.message}`, 'error');
       }
     }
 
