@@ -32,6 +32,19 @@ jobs:
           git diff --exit-code -- tailwind.css \
             || (echo "::error::tailwind.css ist veraltet — 'npm run build:css' ausfuehren und committen"; exit 1)
 
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Abhaengigkeiten installieren
+        run: npm ci
+      - name: ESLint
+        run: npm run lint
+
   e2e:
     name: Browser-E2E (Playwright)
     runs-on: ubuntu-latest
