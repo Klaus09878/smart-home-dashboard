@@ -680,7 +680,28 @@ async function renderPhotos(act) {
   });
   if (addBtn) addBtn.classList.toggle('hidden', photos.length >= 5);
   if (hint) hint.textContent = photos.length >= 5 ? 'Maximal 5 Fotos pro Tour.' : `${photos.length}/5 Fotos · max. 500 KB pro Bild.`;
+  renderPhotoMarkers(photos);
   updateIcons();
+}
+
+// Foto-Marker mit Geotag auf der Tourkarte (P2-15). Wird nach dem Kartenaufbau
+// (drawMap) aufgerufen; entfernt vorherige Marker.
+function renderPhotoMarkers(photos) {
+  if (!state.map) return;
+  if (state.photoMarkers) { state.map.removeLayer(state.photoMarkers); state.photoMarkers = null; }
+  const geo = (photos || []).filter(p => p.lat != null && p.lon != null);
+  if (!geo.length) return;
+  const icon = L.divIcon({
+    className: '',
+    html: '<div style="background:#0f172a;border:2px solid #14b8a6;border-radius:9999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:#5eead4;box-shadow:0 1px 4px rgba(0,0,0,.5)">📷</div>',
+    iconSize: [26, 26], iconAnchor: [13, 13]
+  });
+  const markers = geo.map(p => {
+    const m = L.marker([p.lat, p.lon], { icon });
+    m.bindPopup(`<img src="${p.url}" alt="Foto" style="max-width:200px;max-height:200px;border-radius:8px;cursor:pointer" data-onclick="openPhotoLightbox|${p.url}">`);
+    return m;
+  });
+  state.photoMarkers = L.layerGroup(markers).addTo(state.map);
 }
 
 // Bild lokal auf max. Kantenlaenge verkleinern und als WebP-Blob liefern.
@@ -710,13 +731,23 @@ async function uploadTourPhoto(event) {
   const act = state.activities.find(a => a.id === state.selectedId);
   if (!file || !act || !act.uid) return;
   try {
+    // EXIF-GPS VOR dem Resize lesen (Canvas verwirft die Metadaten) — P2-15
+    let gps = null;
+    try {
+      if (typeof exifr !== 'undefined' && exifr.gps) {
+        const g = await exifr.gps(file);
+        if (g && typeof g.latitude === 'number' && typeof g.longitude === 'number') gps = { lat: g.latitude, lon: g.longitude };
+      }
+    } catch (e) { /* kein GPS im Foto */ }
+
     let blob = await resizeImageToWebp(file, 1600, 0.8);
     if (blob.size > 500 * 1024) blob = await resizeImageToWebp(file, 1200, 0.7); // zweiter Versuch
     if (blob.size > 500 * 1024) { showToast('Foto ist auch komprimiert zu groß (max. 500 KB).', 'error'); return; }
     const used = JSON.parse((document.getElementById('detail-photos').dataset.usedN) || '[]');
     let n = 0; while (used.includes(n) && n < 5) n++;
     if (n >= 5) { showToast('Maximal 5 Fotos pro Tour.', 'error'); return; }
-    const res = await fetch(`/api/photos?uid=${encodeURIComponent(act.uid)}&n=${n}`, {
+    const geo = gps ? `&lat=${gps.lat}&lon=${gps.lon}` : '';
+    const res = await fetch(`/api/photos?uid=${encodeURIComponent(act.uid)}&n=${n}${geo}`, {
       method: 'PUT', headers: { 'Content-Type': 'image/webp' }, body: blob
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);

@@ -44,9 +44,20 @@ export async function onRequest(context) {
   const prefix = `gpx/${profile}/${uid}/`;
 
   if (request.method === 'GET') {
-    const list = await env.MEDIA.list({ prefix });
+    const list = await env.MEDIA.list({ prefix, include: ['customMetadata'] });
     const photos = (list.objects || [])
-      .map(o => ({ n: Number(o.key.slice(prefix.length).replace(/\.webp$/, '')), key: o.key, url: `/api/photos?key=${encodeURIComponent(o.key)}` }))
+      .map(o => {
+        const md = o.customMetadata || {};
+        const lat = md.lat != null ? parseFloat(md.lat) : null;
+        const lon = md.lon != null ? parseFloat(md.lon) : null;
+        return {
+          n: Number(o.key.slice(prefix.length).replace(/\.webp$/, '')),
+          key: o.key,
+          url: `/api/photos?key=${encodeURIComponent(o.key)}`,
+          lat: (lat != null && !isNaN(lat)) ? lat : null,
+          lon: (lon != null && !isNaN(lon)) ? lon : null
+        };
+      })
       .filter(p => !isNaN(p.n))
       .sort((a, b) => a.n - b.n);
     return json({ photos });
@@ -63,7 +74,14 @@ export async function onRequest(context) {
     const keys = new Set((existing.objects || []).map(o => o.key));
     const key = `${prefix}${n}.webp`;
     if (!keys.has(key) && keys.size >= MAX_PER_TOUR) return json({ error: `max. ${MAX_PER_TOUR} Fotos pro Tour` }, 409);
-    await env.MEDIA.put(key, buf, { httpMetadata: { contentType: request.headers.get('content-type') || 'image/webp' } });
+    // Foto-Geotag (P2-15): gueltige Koordinaten als customMetadata ablegen
+    const opts = { httpMetadata: { contentType: request.headers.get('content-type') || 'image/webp' } };
+    const lat = parseFloat(url.searchParams.get('lat'));
+    const lon = parseFloat(url.searchParams.get('lon'));
+    if (!isNaN(lat) && !isNaN(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+      opts.customMetadata = { lat: String(lat), lon: String(lon) };
+    }
+    await env.MEDIA.put(key, buf, opts);
     return json({ ok: true, key, url: `/api/photos?key=${encodeURIComponent(key)}` });
   }
 
