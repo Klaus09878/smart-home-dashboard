@@ -555,6 +555,7 @@
           return;
         }
 
+        appState.calEvents = all; // fuers Status-Briefing (heutige Termine, P2-12)
         const upcoming = all
           .filter(e => e.startMs >= now - (e.allDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000))
           .sort((a, b) => a.startMs - b.startMs)

@@ -202,6 +202,10 @@
             } else if (last.humidity > th.humMax) {
               signals.push({ severity: 'info', text: `Hohe Luftfeuchte ${shortName} (${last.humidity.toFixed(0)} %) – lüften`, target: '#climate' });
             }
+            // CO₂ (P2-12): nur wenn ein CO₂-Sensor konfiguriert ist und der Wert hoch
+            if (last.co2 != null && th.co2Max && last.co2 > th.co2Max) {
+              signals.push({ severity: 'warn', text: `CO₂ hoch ${shortName} (${Math.round(last.co2)} ppm) – lüften`, target: '#climate' });
+            }
           } else {
             el('temp').innerText = '–';
             el('time').innerText = 'keine Daten';
@@ -218,6 +222,40 @@
         const overdue = getTodos().filter(t => !t.deleted && !t.done && t.dueMs && t.dueMs < Date.now()).length;
         if (overdue > 0) signals.push({ severity: 'info', text: `${overdue} überfällige Aufgabe${overdue === 1 ? '' : 'n'}`, target: null });
       } catch (e) { /* To-dos optional */ }
+
+      // Frost/Hitze der naechsten 24 h aus dem bereits geladenen Hub-Forecast (P2-12)
+      try {
+        const hw = appState.hourlyWeather;
+        if (hw && hw.time && hw.temperature_2m) {
+          const ext = forecastExtremes(hw.time, hw.temperature_2m, Date.now(), 24);
+          if (ext) {
+            const rules = getNotifyRules();
+            const frostTh = (rules.types && rules.types.frost && rules.types.frost.threshold) ?? 0;
+            const heatTh = (rules.types && rules.types.heat && rules.types.heat.threshold) ?? 30;
+            if (ext.min <= frostTh) signals.push({ severity: 'warn', text: `Frost erwartet: ${Math.round(ext.min)} °C in den nächsten 24 h`, target: '#climate' });
+            else if (ext.max >= heatTh) signals.push({ severity: 'warn', text: `Hitze erwartet: ${Math.round(ext.max)} °C in den nächsten 24 h`, target: '#climate' });
+          }
+        }
+      } catch (e) { /* Forecast optional */ }
+
+      // Amtliche Unwetterwarnung (P2-12, Daten aus P2-11 bereits geladen)
+      try {
+        const alerts = appState.dwdAlerts || [];
+        if (alerts.length) {
+          const a = alerts[0];
+          signals.push({ severity: 'warn', text: `Wetterwarnung: ${a.event_de || a.headline_de || 'Unwetter'}`, target: '#climate' });
+        }
+      } catch (e) { /* DWD optional */ }
+
+      // Heutige Kalendertermine aus dem bereits geladenen Kalender-Widget (P2-12)
+      try {
+        const evs = appState.calEvents || [];
+        const now = new Date();
+        const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+        const today = evs.filter(e => e.startMs >= dayStart && e.startMs < dayEnd).length;
+        if (today > 0) signals.push({ severity: 'info', text: `${today} Termin${today === 1 ? '' : 'e'} heute`, target: null });
+      } catch (e) { /* Kalender optional */ }
 
       // Cron-Totmannschalter (P2-1): meldet sich der Warn-Cron laenger als 3 h
       // nicht, ist das gesamte serverseitige Warnsystem still gestorben. Nur
