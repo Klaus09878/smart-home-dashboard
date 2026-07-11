@@ -1,5 +1,11 @@
 # Umsetzungsplan Runde 2 — 19 Punkte
 
+> **Status:** Phase A (1–5) und Phase B (6–10) ✅ umgesetzt und verifiziert
+> (`npm run lint` 0 Fehler, `npm test` 53+3+6+9, `npm run test:e2e` 7 Tests — grün).
+> Phase C (11–19) folgt. Abweichung: Punkt 9 bewusst **ohne** esbuild (ein Bundler
+> haette die fuer die data-on*-Delegation noetigen `window`-Globals gebrochen);
+> stattdessen sequenzieller Multi-Script-Split (Verkettung byte-identisch zum Original).
+
 Dieser Plan ist für die schrittweise Umsetzung durch ein KI-Modell (oder einen Menschen)
 geschrieben: pro Punkt Ziel, Dateien, konkrete Schritte, Abnahme und Fallstricke.
 **Ein Punkt = ein Commit** (Prefix `Plan2-N:`), direkt auf `main` (Auto-Deploy, Projektregel 8).
