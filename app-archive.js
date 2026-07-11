@@ -249,7 +249,8 @@
       updateIcons();
     }
 
-    function drawArchiveChart(rows) {
+    async function drawArchiveChart(rows) {
+      await ensureChartJs(); // Chart-Stack bei Bedarf nachladen (P2-19)
       appState.archiveRows = rows; // für den Tages-Detail-Klick (Punkt 21)
       const ctx = document.getElementById('archiveChart').getContext('2d');
       const labels = rows.map(r => {

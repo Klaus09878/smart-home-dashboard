@@ -26,10 +26,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
-  <!-- Chart.js + Zoom/Pan-Plugin (lokal gepinnt, siehe vendor/) -->
-  <script src="vendor/chart.umd.js"></script>
-  <script src="vendor/hammer.min.js"></script>
-  <script src="vendor/chartjs-plugin-zoom.min.js"></script>
+  <!-- Chart.js + Zoom/Pan-Plugin werden erst bei Bedarf nachgeladen (P2-19,
+       ensureChartJs) — der Hub-Start braucht sie nicht. Bleiben in der SW-Shell. -->
   <!-- Lucide Icons (lokal gepinnt) -->
   <script src="vendor/lucide.min.js"></script>
 

@@ -392,3 +392,17 @@ function _delegatedArg(raw, el, event) {
 // Ersetzt inline `document.getElementById(id).click()` fuer versteckte Datei-Inputs.
 function openPicker(id) { const el = document.getElementById(id); if (el) el.click(); }
 window.openPicker = openPicker;
+
+// Skript bei Bedarf nachladen (Promise-gecacht, P2-19: Vendor-Lazy-Loading).
+const _scriptCache = {};
+function loadScript(src) {
+  if (_scriptCache[src]) return _scriptCache[src];
+  _scriptCache[src] = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Skript konnte nicht geladen werden: ' + src));
+    document.head.appendChild(s);
+  });
+  return _scriptCache[src];
+}

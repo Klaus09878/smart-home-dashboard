@@ -267,7 +267,8 @@
     }
 
     // Draw Line Chart.js
-    function drawChart() {
+    async function drawChart() {
+      await ensureChartJs(); // Chart-Stack bei Bedarf nachladen (P2-19)
       const ctx = document.getElementById('climateChart').getContext('2d');
       const timeframeHours = appState.currentChartTimeframe;
       const filtered = filterForTimeframe(appState.insideData, timeframeHours);

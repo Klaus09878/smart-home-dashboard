@@ -552,6 +552,22 @@
         return (((await res.json()) || {}).alerts || []).filter(a => a && a.severity && a.severity !== 'minor');
       } catch (e) { return []; }
     }
+    // Chart.js-Stack (Chart + Hammer + Zoom-Plugin) erst bei Bedarf laden (P2-19).
+    // Reihenfolge zwingend: Chart + Hammer als Globals, dann registriert sich das
+    // Zoom-Plugin selbst am globalen Chart. Promise-gecacht → nur einmal geladen.
+    let _chartJsReady = null;
+    async function ensureChartJs() {
+      if (typeof Chart !== 'undefined') return;
+      if (!_chartJsReady) {
+        _chartJsReady = (async () => {
+          await loadScript('vendor/chart.umd.js');
+          await loadScript('vendor/hammer.min.js');
+          await loadScript('vendor/chartjs-plugin-zoom.min.js');
+        })();
+      }
+      await _chartJsReady;
+    }
+
     function renderDwdBanner(el, alerts) {
       if (!el) return;
       if (!alerts || !alerts.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
