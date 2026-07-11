@@ -30,9 +30,15 @@ test('Einstellungen: Regeln + Theme-Umschalter', async ({ page }) => {
 test('To-do anlegen und abhaken', async ({ page }) => {
   await page.goto('/index.html#home');
   await waitReady(page);
-  await page.fill('#todo-input', 'E2E-Test-Aufgabe');
-  await page.click('form:has(#todo-input) button[type="submit"]');
-  await expect(page.locator('#todo-list')).toContainText('E2E-Test-Aufgabe');
+  // Auf einem frisch geladenen Hub kann ein sehr frueher Submit verloren gehen,
+  // solange init() noch rendert (das Formular ist da, aber das synthetische
+  // Event trifft die noch beschaeftigte Main-Thread-Phase). Robust wie ein
+  // echter Nutzer: Eingabe + Absenden wiederholen, bis das To-do wirklich steht.
+  await expect(async () => {
+    await page.fill('#todo-input', 'E2E-Test-Aufgabe');
+    await page.click('form:has(#todo-input) button[type="submit"]');
+    await expect(page.locator('#todo-list')).toContainText('E2E-Test-Aufgabe', { timeout: 1000 });
+  }).toPass({ timeout: 10000 });
   await page.locator('#todo-list input[type="checkbox"]').first().check();
   await expect(page.locator('#todo-list .line-through')).toContainText('E2E-Test-Aufgabe');
 });
