@@ -21,7 +21,7 @@ test('Hub lädt: Widgets, Uhr, keine JS-Fehler', async ({ page }) => {
 test('Einstellungen: Regeln + Theme-Umschalter', async ({ page }) => {
   await page.goto('/index.html#settings');
   await waitReady(page);
-  await expect(page.locator('#notify-rules > div')).toHaveCount(10); // 10 Regeltypen (inkl. CO₂)
+  await expect(page.locator('#notify-rules > div')).toHaveCount(11); // 11 Regeltypen (inkl. CO₂, DWD)
   // Theme umschalten
   await page.click('button:has-text("umschalten")');
   await expect(page.locator('html')).toHaveClass(/light/);
@@ -63,6 +63,9 @@ async function routeOpenMeteo(page) {
       : weatherResponse();
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
   });
+  // DWD-Warnungen (BrightSky) deterministisch leer halten
+  await page.route(/brightsky\.dev/, route =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ alerts: [] }) }));
 }
 
 test('ClimateFlow: Chart + Lüftungsberater rendern (Demo-Daten)', async ({ page }) => {

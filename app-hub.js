@@ -435,6 +435,8 @@
         });
         renderRainHint();
         updateIcons();
+        // Amtliche Unwetterwarnungen als Banner (P2-11)
+        fetchDwdAlerts(conf.lat, conf.lon).then(alerts => { appState.dwdAlerts = alerts; renderDwdBanner(document.getElementById('hub-dwd'), alerts); });
       } catch (err) {
         console.warn('Hub-Vorschau fehlgeschlagen:', err);
         el.innerHTML = '<p class="text-xs text-slate-500 col-span-3">Vorschau nicht verfügbar.</p>';

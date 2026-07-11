@@ -208,6 +208,7 @@
       { key: 'frost',   label: 'Frost',               icon: 'snowflake', thLabel: 'Grenze °C', thDef: 0 },
       { key: 'heat',    label: 'Hitze',               icon: 'flame',     thLabel: 'Grenze °C', thDef: 30 },
       { key: 'co2',     label: 'CO₂ zu hoch',         icon: 'wind',      thLabel: 'Grenze ppm', thDef: 1200 },
+      { key: 'dwd',     label: 'Unwetterwarnung (DWD)', icon: 'cloud-lightning' },
       { key: 'vent',    label: 'Lüftungsfenster (morgens)', icon: 'wind' },
       { key: 'errors',  label: 'App-Fehler',          icon: 'bug' },
       { key: 'weekly',  label: 'Klima-Wochenbericht', icon: 'bar-chart-3' },
@@ -217,7 +218,7 @@
     const NOTIFY_DEFAULTS = {
       types: {
         sensor: { on: true }, mold: { on: true, threshold: 80 }, frost: { on: true, threshold: 0 },
-        heat: { on: true, threshold: 30 }, co2: { on: false, threshold: 1200 }, vent: { on: false },
+        heat: { on: true, threshold: 30 }, co2: { on: false, threshold: 1200 }, dwd: { on: true }, vent: { on: false },
         errors: { on: true }, weekly: { on: true }, monthly: { on: true }, todo: { on: true }
       },
       quiet: { on: false, from: 22, to: 7 }

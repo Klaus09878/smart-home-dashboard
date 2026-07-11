@@ -536,6 +536,32 @@
         console.warn('Open-Meteo laden fehlgeschlagen, generiere Wetter-Dummy:', err);
         appState.outsideData = generateMockWeather();
       }
+      // Amtliche Unwetterwarnungen fuer die ClimateFlow-Wetterkarte (P2-11)
+      if (appState.weatherConfig) {
+        fetchDwdAlerts(appState.weatherConfig.lat, appState.weatherConfig.lon)
+          .then(alerts => { appState.dwdAlerts = alerts; renderDwdBanner(document.getElementById('cf-dwd'), alerts); });
+      }
+    }
+
+    // ---- Amtliche Unwetterwarnungen (DWD via BrightSky, P2-11) ----
+    // Kostenlos, ohne Key. Ausserhalb Deutschlands leere Liste. Best effort.
+    async function fetchDwdAlerts(lat, lon) {
+      try {
+        const res = await fetch(`https://api.brightsky.dev/alerts?lat=${lat}&lon=${lon}`);
+        if (!res.ok) return [];
+        return (((await res.json()) || {}).alerts || []).filter(a => a && a.severity && a.severity !== 'minor');
+      } catch (e) { return []; }
+    }
+    function renderDwdBanner(el, alerts) {
+      if (!el) return;
+      if (!alerts || !alerts.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+      const worst = alerts.some(a => a.severity === 'extreme' || a.severity === 'severe');
+      const cls = worst ? 'bg-red-500/10 border-red-500/30 text-red-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300';
+      const a = alerts[0];
+      el.className = `mb-3 px-3 py-2 rounded-xl border text-xs flex items-start gap-2 ${cls}`;
+      el.innerHTML = `<i data-lucide="cloud-lightning" class="w-4 h-4 shrink-0 mt-0.5"></i><span><strong>${escapeHtml(a.event_de || 'Wetterwarnung')}:</strong> ${escapeHtml(a.headline_de || '')}${alerts.length > 1 ? ` (+${alerts.length - 1} weitere)` : ''}</span>`;
+      el.classList.remove('hidden');
+      updateIcons();
     }
 
     // Außenluft-Qualität (Open-Meteo Air-Quality-API, kostenlos, ohne Key):

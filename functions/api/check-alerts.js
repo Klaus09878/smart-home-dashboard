@@ -196,6 +196,25 @@ export async function onRequestGet(context) {
         }));
       }
 
+      // ---- Amtliche Unwetterwarnungen (DWD via BrightSky, P2-11) ----
+      // Nur schwere/extreme Lagen pushen; Dedupe pro Alert-ID, damit neue
+      // Warnungen trotz Entprellung durchkommen. Ausserhalb DE liefert die API [].
+      try {
+        const ares = await fetch(`https://api.brightsky.dev/alerts?lat=${coords.lat}&lon=${coords.lon}`);
+        if (ares.ok) {
+          const alerts = ((await ares.json()) || {}).alerts || [];
+          const severe = alerts.filter(a => a && (a.severity === 'severe' || a.severity === 'extreme'));
+          if (severe.length) R.dwd = severe.map(a => a.event_de || a.headline_de);
+          for (const a of severe) {
+            report.notified.push(...await dispatch(env, recipients, 'dwd', `${locId}:${a.id}`, () => ({
+              title: `DWD-Warnung: ${a.event_de || 'Unwetter'}`,
+              body: `${a.headline_de || a.event_de} (${loc.label}).${a.instruction_de ? ' ' + a.instruction_de : ''}`,
+              tags: 'cloud_with_lightning'
+            })));
+          }
+        }
+      } catch (e) { R.dwdError = e.message; }
+
       if (moldRh != null) {
         report.notified.push(...await dispatch(env, recipients, 'mold', locId, rec => {
           const th = typeCfg(rec.rules, 'mold').threshold ?? 80;
