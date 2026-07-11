@@ -22,7 +22,7 @@ const appGlobals = Object.assign({}, ...APP_PARTS.filter(f => fs.existsSync(f)).
 const sharedGlobals = { ...declaredNames('shared.js'), ...declaredNames('settings-sync.js'), ...coreGlobals, ...appGlobals };
 
 // Von Vendor-Bibliotheken bereitgestellte Globals.
-const vendorGlobals = { Chart: 'readonly', L: 'readonly', lucide: 'readonly', Hammer: 'readonly', Store: 'readonly' };
+const vendorGlobals = { Chart: 'readonly', L: 'readonly', lucide: 'readonly', Hammer: 'readonly', Store: 'readonly', exifr: 'readonly' };
 
 module.exports = [
   { ignores: ['vendor/**', 'tailwind.css', 'node_modules/**', 'playwright-report/**', 'test-results/**'] },

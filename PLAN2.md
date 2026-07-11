@@ -1,10 +1,12 @@
 # Umsetzungsplan Runde 2 — 19 Punkte
 
-> **Status:** Phase A (1–5) und Phase B (6–10) ✅ umgesetzt und verifiziert
-> (`npm run lint` 0 Fehler, `npm test` 53+3+6+9, `npm run test:e2e` 7 Tests — grün).
-> Phase C (11–19) folgt. Abweichung: Punkt 9 bewusst **ohne** esbuild (ein Bundler
-> haette die fuer die data-on*-Delegation noetigen `window`-Globals gebrochen);
-> stattdessen sequenzieller Multi-Script-Split (Verkettung byte-identisch zum Original).
+> **Status: ✅ vollständig umgesetzt** (alle 19 Punkte, Commits `Plan2-1` … `Plan2-19`).
+> Verifiziert: `npm run lint` (0 Fehler), `npm test` (56 Core + 3 Web-Push + 8 API
+> + 9 Smoke), `npm run test:e2e` (7 Browser-Tests) — alles grün; Service-Worker v34.
+> Bewusste Abweichung: Punkt 9 **ohne** esbuild (ein Bundler haette die fuer die
+> data-on*-Delegation noetigen `window`-Globals gebrochen); stattdessen ein
+> sequenzieller Multi-Script-Split (Verkettung byte-identisch zum Original).
+> Punkt 18 (Archiv-CSV) war bereits vorhanden und wurde nur um CO₂-Spalten ergaenzt.
 
 Dieser Plan ist für die schrittweise Umsetzung durch ein KI-Modell (oder einen Menschen)
 geschrieben: pro Punkt Ziel, Dateien, konkrete Schritte, Abnahme und Fallstricke.
