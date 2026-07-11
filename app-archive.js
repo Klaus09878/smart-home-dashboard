@@ -148,6 +148,106 @@
       }
 
       renderArchiveYear(rows);
+      renderHeatingCost();
+    }
+
+    // Gradtagzahlen + Heizkosten-Schaetzung fuer die laufende Heizperiode (P2-17).
+    // Aussen-Tagesmittel aus der Open-Meteo Archive-API (best effort, session-
+    // gecacht); Kosten optional ueber energy_config.
+    async function renderHeatingCost() {
+      const wrap = document.getElementById('archive-heating');
+      if (!wrap) return;
+      const conf = appState.weatherConfig;
+      if (!conf) { wrap.classList.add('hidden'); return; }
+
+      const now = new Date();
+      const cutoff = new Date(now.getTime() - 6 * 24 * 3600 * 1000); // Archive-API-Verzoegerung ~5 Tage
+      const iso = d => d.toISOString().slice(0, 10);
+      const heatStartYear = now.getMonth() >= 9 ? now.getFullYear() : now.getFullYear() - 1;
+      const period = y => {
+        const end = new Date(y + 1, 2, 31);
+        return { from: `${y}-10-01`, to: iso(end < cutoff ? end : cutoff) };
+      };
+      const cur = period(heatStartYear), prev = period(heatStartYear - 1);
+
+      async function fetchMeans(p) {
+        if (p.from > p.to) return null; // Periode noch nicht begonnen
+        const key = `hdd_${conf.lat}_${conf.lon}_${p.from}_${p.to}`;
+        try { const c = sessionStorage.getItem(key); if (c) return JSON.parse(c); } catch (e) { /* egal */ }
+        try {
+          const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${conf.lat}&longitude=${conf.lon}&start_date=${p.from}&end_date=${p.to}&daily=temperature_2m_mean&timezone=auto`;
+          const res = await fetch(url);
+          if (!res.ok) return null;
+          const d = await res.json();
+          const times = (d.daily && d.daily.time) || [];
+          const means = (d.daily && d.daily.temperature_2m_mean) || [];
+          const out = times.map((day, i) => ({ day, tOut: means[i] })).filter(x => x.tOut != null);
+          try { sessionStorage.setItem(key, JSON.stringify(out)); } catch (e) { /* Quota egal */ }
+          return out;
+        } catch (e) { return null; }
+      }
+
+      const curMeans = await fetchMeans(cur);
+      if (!curMeans || !curMeans.length) { wrap.classList.add('hidden'); return; }
+      const ddCur = degreeDays(curMeans);
+      const prevMeans = await fetchMeans(prev);
+      const ddPrev = prevMeans && prevMeans.length ? degreeDays(prevMeans) : null;
+
+      const cfg = Store.getJSON('energy_config', { kwhPerDegreeDay: 0, pricePerKwh: 0 }) || {};
+      const kwhPerDd = Number(cfg.kwhPerDegreeDay) || 0;
+      const price = Number(cfg.pricePerKwh) || 0;
+      const euro = (kwhPerDd > 0 && price > 0) ? ddCur.total * kwhPerDd * price : null;
+
+      let deltaHtml = '<span class="text-slate-500">– kein Vorjahresvergleich</span>';
+      if (ddPrev && ddPrev.total > 0) {
+        const pct = ((ddCur.total - ddPrev.total) / ddPrev.total) * 100;
+        const cls = pct > 1 ? 'text-orange-300' : pct < -1 ? 'text-blue-300' : 'text-slate-400';
+        const arrow = pct > 1 ? '↑' : pct < -1 ? '↓' : '→';
+        deltaHtml = `vs. Vorsaison (${ddPrev.total.toLocaleString('de-DE')} Grdt.): <span class="${cls} font-semibold">${arrow} ${pct >= 0 ? '+' : ''}${pct.toFixed(0)} %</span>`;
+      }
+      const heatYearLabel = `${heatStartYear}/${String(heatStartYear + 1).slice(2)}`;
+
+      wrap.innerHTML = `
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <h3 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5"><i data-lucide="flame" class="w-3.5 h-3.5 text-orange-400"></i> Heizperiode ${heatYearLabel}</h3>
+          <button data-onclick="editEnergyConfig" title="Heizkosten-Faktoren einstellen" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all"><i data-lucide="settings-2" class="w-3.5 h-3.5"></i></button>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div class="bg-slate-900/50 border border-slate-800/60 rounded-xl p-2.5 text-center">
+            <p class="text-[9px] text-slate-500 uppercase font-semibold">Gradtage</p>
+            <p class="text-sm font-bold text-orange-300 mt-0.5">${ddCur.total.toLocaleString('de-DE')}</p>
+            <p class="text-[10px] text-slate-400">${ddCur.days} Heiztage</p>
+          </div>
+          ${euro != null ? `<div class="bg-slate-900/50 border border-slate-800/60 rounded-xl p-2.5 text-center">
+            <p class="text-[9px] text-slate-500 uppercase font-semibold">Schätzkosten</p>
+            <p class="text-sm font-bold text-emerald-300 mt-0.5">${euro.toLocaleString('de-DE', { maximumFractionDigits: 0 })} €</p>
+            <p class="text-[10px] text-slate-400">${kwhPerDd} kWh/Grdt · ${price.toString().replace('.', ',')} €/kWh</p>
+          </div>` : `<div class="bg-slate-900/50 border border-slate-800/60 rounded-xl p-2.5 text-center flex flex-col justify-center">
+            <p class="text-[10px] text-slate-500">Für eine Kostenschätzung kWh/Gradtag und Strompreis über das Zahnrad hinterlegen.</p>
+          </div>`}
+          <div class="bg-slate-900/50 border border-slate-800/60 rounded-xl p-2.5 text-center flex flex-col justify-center col-span-2 sm:col-span-1">
+            <p class="text-[9px] text-slate-500 uppercase font-semibold">Vergleich</p>
+            <p class="text-[11px] mt-0.5">${deltaHtml}</p>
+          </div>
+        </div>`;
+      wrap.classList.remove('hidden');
+      updateIcons();
+    }
+
+    async function editEnergyConfig() {
+      const cfg = Store.getJSON('energy_config', { kwhPerDegreeDay: 0, pricePerKwh: 0 }) || {};
+      const vals = await modalPrompt({
+        title: 'Heizkosten-Faktoren',
+        description: 'Grobe Schätzung: Gradtage × kWh je Gradtag × Preis je kWh. Beide 0 lassen = nur Gradtage anzeigen.',
+        fields: [
+          { key: 'kwhPerDegreeDay', label: 'kWh pro Gradtag', type: 'number', value: cfg.kwhPerDegreeDay || '' },
+          { key: 'pricePerKwh', label: 'Preis pro kWh (€)', type: 'number', value: cfg.pricePerKwh || '' }
+        ]
+      });
+      if (!vals) return;
+      const n = v => parseFloat(String(v).replace(',', '.')) || 0;
+      Store.setJSON('energy_config', { kwhPerDegreeDay: n(vals.kwhPerDegreeDay), pricePerKwh: n(vals.pricePerKwh) });
+      renderHeatingCost();
     }
 
     // Jahres-Heatmap + Saisonvergleich (P9). Nutzt yearHeatmap/periodCompare aus

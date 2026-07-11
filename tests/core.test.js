@@ -623,4 +623,34 @@ test('aggregateDailyClimate: heutiger Tag ausgelassen, CO2 nur bei Werten', () =
   assert.ok(!('co2Avg' in d2));
 });
 
+console.log('\nlib/core.js – Gradtagzahlen (Heizkosten)');
+
+test('degreeDays: nur Tage unter Heizgrenze zaehlen', () => {
+  const r = core.degreeDays([
+    { day: '2026-01-01', tOut: 0 },   // 20-0 = 20
+    { day: '2026-01-02', tOut: 10 },  // 20-10 = 10
+    { day: '2026-01-03', tOut: 15 },  // = heatLimit → 0 (nicht gezaehlt)
+    { day: '2026-01-04', tOut: 18 }   // > heatLimit → 0
+  ]);
+  assert.strictEqual(r.total, 30);
+  assert.strictEqual(r.days, 2);
+  assert.strictEqual(r.byMonth['2026-01'], 30);
+});
+
+test('degreeDays: warmer Sommer ergibt 0', () => {
+  const r = core.degreeDays([{ day: '2026-07-01', tOut: 25 }, { day: '2026-07-02', tOut: 30 }]);
+  assert.strictEqual(r.total, 0);
+  assert.strictEqual(r.days, 0);
+});
+
+test('degreeDays: eigene base/heatLimit, ungueltige Werte ignoriert', () => {
+  const r = core.degreeDays([
+    { day: '2026-02-01', tOut: 5 },       // base 18: 18-5 = 13
+    { day: '2026-02-02', tOut: null },     // ignoriert
+    { day: '2026-02-03', tOut: 12 }        // >= heatLimit 10 → 0
+  ], { base: 18, heatLimit: 10 });
+  assert.strictEqual(r.total, 13);
+  assert.strictEqual(r.days, 1);
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);
