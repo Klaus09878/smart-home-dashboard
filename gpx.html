@@ -52,6 +52,9 @@
       </div>
 
       <div class="flex items-center gap-2">
+        <button id="record-btn" data-onclick="toggleRecording" class="hidden p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-rose-400 transition-colors" title="Tour live aufzeichnen (GPS)">
+          <i data-lucide="circle-dot" class="w-4.5 h-4.5"></i>
+        </button>
         <button id="btn-heatmap" data-onclick="toggleHeatmap" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Heatmap: alle Routen übereinander auf der Karte">
           <i data-lucide="flame" class="w-4.5 h-4.5"></i>
         </button>
@@ -69,6 +72,16 @@
       <input type="file" id="file-input" accept=".gpx,application/gpx+xml" multiple class="hidden" data-onchange="handleFileInput|$event">
       <input type="file" id="restore-input" accept=".json,application/json" class="hidden" data-onchange="handleRestoreInput|$event">
     </header>
+
+    <!-- Live-Aufzeichnungs-Statusleiste (P2-13) -->
+    <div id="record-status" class="hidden glass-panel rounded-2xl px-4 py-3 flex items-center justify-between gap-3 border border-rose-500/30 bg-rose-500/5">
+      <span class="flex items-center gap-2 text-sm text-rose-300 font-semibold">
+        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+        Aufzeichnung läuft
+      </span>
+      <span id="record-stats" class="text-xs text-slate-300 font-mono">0:00 · 0,0 km · 0 Punkte</span>
+      <button data-onclick="toggleRecording" class="px-3 py-1.5 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-200 hover:bg-rose-500/30 text-xs font-semibold transition-colors">Stopp & speichern</button>
+    </div>
 
     <!-- Dropzone (auch Empty State) -->
     <div id="dropzone" class="glass-panel rounded-2xl p-8 border-2 border-dashed border-slate-700/80 flex flex-col items-center justify-center text-center transition-all cursor-pointer" data-onclick="openPicker|file-input">

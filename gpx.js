@@ -779,6 +779,121 @@ function closePhotoLightbox() {
   if (lb) lb.classList.add('hidden');
 }
 
+// ============ Live-Aufzeichnung (P2-13) ============
+// Zeichnet eine Tour direkt im Browser per Geolocation auf. Punkte im selben
+// Format wie der Datei-Import: [lat, lon, ele|null, timestampMs]. Roh-Puffer in
+// localStorage (geraetelokal) fuer Crash-Recovery.
+function toggleRecording() {
+  if (state.rec && state.rec.active) stopRecording(); else startRecording();
+}
+
+async function startRecording() {
+  if (!('geolocation' in navigator)) { setUploadStatus('Kein GPS auf diesem Gerät verfügbar.', true); return; }
+  state.rec = { active: true, points: [], startMs: Date.now(), lastSave: 0, lastLive: 0, wakeLock: null };
+  try { if (navigator.wakeLock) state.rec.wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* Wake Lock optional */ }
+  state.rec.watchId = navigator.geolocation.watchPosition(onRecFix, onRecErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+  state.rec.timer = setInterval(updateRecordingUI, 1000);
+  updateRecordingUI();
+  showToast('Aufzeichnung läuft. Bildschirm anlassen — iOS pausiert GPS bei gesperrtem Display.', 'info');
+}
+
+// Wake Lock nach Tab-Wechsel erneut anfordern (wird beim Verstecken freigegeben)
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && state.rec && state.rec.active && navigator.wakeLock && !state.rec.wakeLock) {
+    try { state.rec.wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* egal */ }
+  } else if (document.visibilityState === 'hidden' && state.rec) {
+    state.rec.wakeLock = null; // wird vom System freigegeben
+  }
+});
+
+function onRecFix(pos) {
+  const r = state.rec;
+  if (!r || !r.active) return;
+  const c = pos.coords;
+  if (c.accuracy != null && c.accuracy > 50) return; // ungenaue Fixes verwerfen
+  const pt = [c.latitude, c.longitude, (c.altitude != null && !isNaN(c.altitude)) ? c.altitude : null, Date.now()];
+  const last = r.points[r.points.length - 1];
+  if (last && haversine(last[0], last[1], pt[0], pt[1]) < 2) return; // Stillstand-Rauschen filtern
+  r.points.push(pt);
+  const now = Date.now();
+  if (now - r.lastSave > 30000) { r.lastSave = now; try { localStorage.setItem('gpx_rec_buffer', JSON.stringify(r.points)); } catch (e) { /* Quota egal */ } }
+  if (state.map && now - r.lastLive > 5000) { r.lastLive = now; drawLivePolyline(); }
+  updateRecordingUI();
+}
+
+function onRecErr(err) { console.warn('GPS-Fehler bei der Aufzeichnung:', err && err.message); }
+
+function drawLivePolyline() {
+  const r = state.rec;
+  if (!r || !state.map || r.points.length < 2) return;
+  const latlngs = r.points.map(p => [p[0], p[1]]);
+  if (state.recLiveLayer) state.recLiveLayer.setLatLngs(latlngs);
+  else state.recLiveLayer = L.polyline(latlngs, { color: '#f43f5e', weight: 4, opacity: 0.9 }).addTo(state.map);
+}
+
+function updateRecordingUI() {
+  const btn = document.getElementById('record-btn');
+  const bar = document.getElementById('record-status');
+  const stats = document.getElementById('record-stats');
+  const active = !!(state.rec && state.rec.active);
+  if (btn) btn.classList.toggle('text-rose-400', active);
+  if (bar) bar.classList.toggle('hidden', !active);
+  if (active && stats) {
+    const r = state.rec;
+    const dur = Math.floor((Date.now() - r.startMs) / 1000);
+    const dist = r.points.length > 1 ? computeStats(r.points).distM : 0;
+    stats.textContent = `${fmtDuration(dur)} · ${fmtDist(dist)} · ${r.points.length} Punkte`;
+  }
+}
+
+async function stopRecording() {
+  const r = state.rec;
+  if (!r) return;
+  r.active = false;
+  if (r.watchId != null) navigator.geolocation.clearWatch(r.watchId);
+  if (r.timer) clearInterval(r.timer);
+  if (r.wakeLock) { try { await r.wakeLock.release(); } catch (e) { /* egal */ } }
+  if (state.recLiveLayer && state.map) { state.map.removeLayer(state.recLiveLayer); state.recLiveLayer = null; }
+  const points = r.points;
+  state.rec = null;
+  localStorage.removeItem('gpx_rec_buffer');
+  updateRecordingUI();
+  if (points.length < 10) { setUploadStatus('Zu wenige GPS-Punkte — Aufzeichnung verworfen.', true); return; }
+  await saveRecordedActivity(points, `Aufzeichnung ${new Date().toLocaleDateString('de-DE')}`);
+}
+
+// Aufgezeichnete Punkte als Aktivitaet speichern (gleiche Struktur wie Import).
+async function saveRecordedActivity(points, name) {
+  const stats = computeStats(points);
+  const storedPoints = downsamplePoints(points, 5000);
+  const activity = {
+    uid: genUid(),
+    name,
+    type: guessTypeWithHints(storedPoints, stats.avgSpeed),
+    points: storedPoints,
+    distM: stats.distM, totalSec: stats.totalSec, movingSec: stats.movingSec,
+    avgSpeed: stats.avgSpeed, maxSpeed: stats.maxSpeed,
+    elevGain: stats.elevGain, eleMin: stats.eleMin, eleMax: stats.eleMax,
+    startTime: stats.startTime, note: null, startWeather: null,
+    addedAt: Date.now(), updatedAt: Date.now()
+  };
+  const localId = await dbPut(activity);
+  pushActivityToCloud(activity);
+  await refreshActivities();
+  if (localId != null) selectActivity(localId);
+  showToast(`Tour gespeichert: ${fmtDist(stats.distM)}.`, 'success');
+}
+
+// Nach einem Absturz/Reload waehrend der Aufnahme anbieten, den Puffer zu retten.
+async function checkRecordingRecovery() {
+  let buf = null;
+  try { buf = JSON.parse(localStorage.getItem('gpx_rec_buffer') || 'null'); } catch (e) { /* kaputt */ }
+  if (!Array.isArray(buf) || buf.length < 10) { localStorage.removeItem('gpx_rec_buffer'); return; }
+  const ok = await modalConfirm({ title: 'Unterbrochene Aufzeichnung', message: `Eine unterbrochene Aufzeichnung mit ${buf.length} Punkten wurde gefunden. Als Tour speichern?`, confirmLabel: 'Speichern' });
+  localStorage.removeItem('gpx_rec_buffer');
+  if (ok) await saveRecordedActivity(buf, `Wiederhergestellt ${new Date().toLocaleDateString('de-DE')}`);
+}
+
 async function saveNote(value) {
   const act = state.activities.find(a => a.id === state.selectedId);
   if (!act) return;
@@ -1328,6 +1443,13 @@ async function init() {
   registerServiceWorker();
   handleSharedGpx();          // via Share-Target geteilte Datei (P2-14)
   handleLaunchQueueFiles();   // via File-Handler geoeffnete .gpx-Datei (P2-14)
+
+  // Live-Aufzeichnung (P2-13): Button nur bei GPS-Unterstuetzung, Crash-Recovery
+  if ('geolocation' in navigator) {
+    const rb = document.getElementById('record-btn');
+    if (rb) rb.classList.remove('hidden');
+    checkRecordingRecovery();
+  }
 }
 
 // Vom Service Worker (Share-Target) zwischengespeicherte GPX-Datei einlesen.
