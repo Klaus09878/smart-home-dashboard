@@ -653,4 +653,28 @@ test('degreeDays: eigene base/heatLimit, ungueltige Werte ignoriert', () => {
   assert.strictEqual(r.days, 1);
 });
 
+console.log('\nlib/core.js – Fenster-offen-Erkennung');
+
+const mkPt = (minAgo, temp, T0) => ({ time: new Date(T0 - minAgo * 60000), temp });
+
+test('detectOpenWindow: klarer Sturz ohne Erholung -> offen', () => {
+  const T0 = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const aligned = [mkPt(45, 22, T0), mkPt(30, 21, T0), mkPt(15, 20, T0), mkPt(0, 19.5, T0)];
+  const r = core.detectOpenWindow(aligned, { now: T0 });
+  assert.strictEqual(r.open, true);
+  assert.strictEqual(r.dropC, 2.5);
+});
+
+test('detectOpenWindow: Sturz mit Erholung (Stosslueften) -> zu', () => {
+  const T0 = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const aligned = [mkPt(45, 24, T0), mkPt(20, 20, T0), mkPt(0, 21, T0)]; // wieder gestiegen
+  assert.strictEqual(core.detectOpenWindow(aligned, { now: T0 }).open, false);
+});
+
+test('detectOpenWindow: stale letzter Wert -> zu', () => {
+  const T0 = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const aligned = [mkPt(75, 22, T0), mkPt(45, 20, T0), mkPt(30, 19, T0)]; // letzter Wert 30 min alt
+  assert.strictEqual(core.detectOpenWindow(aligned, { now: T0 }).open, false);
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);

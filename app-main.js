@@ -206,6 +206,11 @@
             if (last.co2 != null && th.co2Max && last.co2 > th.co2Max) {
               signals.push({ severity: 'warn', text: `CO₂ hoch ${shortName} (${Math.round(last.co2)} ppm) – lüften`, target: '#climate' });
             }
+            // Fenster offen vergessen (P3-4)
+            try {
+              const ow = detectOpenWindow(processed.aligned);
+              if (ow.open) signals.push({ severity: 'warn', text: `Fenster offen? ${shortName}: −${ow.dropC} °C in 45 min`, target: '#climate' });
+            } catch (e) { /* optional */ }
           } else {
             el('temp').innerText = '–';
             el('time').innerText = 'keine Daten';

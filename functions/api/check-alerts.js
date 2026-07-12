@@ -69,6 +69,29 @@ function bestVentWindow(inAH, hourly, nowMs) {
   return best;
 }
 
+// Fenster-offen-Erkennung — Quelle der Wahrheit: detectOpenWindow in lib/core.js
+// (dort getestet); hier bewusst inline, weil die Pages-Function eigenstaendig
+// gebuendelt wird.
+function detectOpenWindowRaw(feeds, tempField, now) {
+  const pts = [];
+  for (const f of feeds) {
+    const v = f[tempField];
+    if (v == null || v.toString().trim() === '') continue;
+    const t = parseFloat(v.toString().replace(',', '.'));
+    if (!isNaN(t)) pts.push({ ms: new Date(f.created_at).getTime(), temp: t });
+  }
+  if (pts.length < 2) return { open: false };
+  const last = pts[pts.length - 1];
+  if (now - last.ms > 20 * 60 * 1000) return { open: false };
+  const span = pts.filter(p => p.ms >= last.ms - 45 * 60 * 1000);
+  if (span.length < 2) return { open: false };
+  const temps = span.map(p => p.temp);
+  const drop = Math.max(...temps) - last.temp;
+  if (drop < 2.5) return { open: false };
+  if (last.temp > Math.min(...temps) + 0.3) return { open: false };
+  return { open: true, dropC: Math.round(drop * 10) / 10 };
+}
+
 function lastRealValue(feeds, field) {
   for (let i = feeds.length - 1; i >= 0; i--) {
     const v = feeds[i][field];
@@ -196,6 +219,17 @@ export async function onRequestGet(context) {
             tags: 'fire'
           };
         }));
+      }
+
+      // ---- Fenster offen vergessen (P3-4) ----
+      const ow = detectOpenWindowRaw(feeds, loc.tempField, now);
+      if (ow.open) {
+        R.openWindow = ow.dropC;
+        report.notified.push(...await dispatch(env, recipients, 'window', locId, () => ({
+          title: 'ClimateFlow: Fenster offen?',
+          body: `Bei ${loc.label} ist die Temperatur in ~45 min um ${ow.dropC} °C gefallen und erholt sich nicht — Fenster offen vergessen?`,
+          tags: 'window'
+        })));
       }
 
       // ---- Amtliche Unwetterwarnungen (DWD via BrightSky, P2-11) ----
