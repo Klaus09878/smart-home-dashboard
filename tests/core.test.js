@@ -692,4 +692,27 @@ test('applyCalibration: ohne Offset unveraendert, leeres Array', () => {
   assert.deepStrictEqual(core.applyCalibration([], { tempOffset: 2 }), []);
 });
 
+console.log('\nlib/core.js – Termin-Wiederholung');
+
+test('expandSimpleRepeat: taeglich im Fenster', () => {
+  const start = Date.UTC(2026, 0, 1, 9, 0, 0);
+  const r = core.expandSimpleRepeat([{ id: 'a', startMs: start, repeat: 'daily' }], start, start + 3 * 86400000);
+  assert.strictEqual(r.length, 4); // Tag 0,1,2,3
+});
+
+test('expandSimpleRepeat: monatlich am 31. klemmt auf Monatsende', () => {
+  const start = Date.UTC(2026, 0, 31, 8, 0, 0); // 31. Jan
+  const r = core.expandSimpleRepeat([{ id: 'b', startMs: start, repeat: 'monthly' }], start, Date.UTC(2026, 2, 1));
+  // Jan 31 + Feb (28.) → zwei Vorkommen; das Februar-Datum ist der 28.
+  const febDay = new Date(r[1].startMs).getUTCDate();
+  assert.strictEqual(r.length, 2);
+  assert.strictEqual(febDay, 28);
+});
+
+test('expandSimpleRepeat: none nur im Fenster', () => {
+  const start = Date.UTC(2026, 5, 1);
+  assert.strictEqual(core.expandSimpleRepeat([{ id: 'c', startMs: start, repeat: 'none' }], start - 10, start + 10).length, 1);
+  assert.strictEqual(core.expandSimpleRepeat([{ id: 'c', startMs: start, repeat: 'none' }], start + 100, start + 200).length, 0);
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);

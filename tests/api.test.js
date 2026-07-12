@@ -175,6 +175,28 @@ test('backup-dump: Dump nach R2, Liste, Restore in frische DB', async () => {
   assert.strictEqual(check.settings.theme.value, 'dark');
 });
 
+// ---- events.js: eigene Termine (Plan3-8) ----
+test('events: Upsert, Tombstone, Profiltrennung', async () => {
+  const mod = await loadEndpoint('api/events');
+  const env = { AUTH_USER: 'test', AUTH_PASS: 'test', DB: createD1() };
+  await call(mod, ctx('POST', '/api/events', { env, auth: 'test', body: { items: [{ id: 'e1', title: 'Zahnarzt', startMs: 1000, repeat: 'none', createdAt: 1, updatedAt: 1 }] } }));
+  let data = await jsonOf(await call(mod, ctx('GET', '/api/events', { env, auth: 'test' })));
+  assert.strictEqual(data.events.length, 1);
+  assert.strictEqual(data.events[0].title, 'Zahnarzt');
+
+  // Tombstone (LWW) → GET filtert geloeschte
+  await call(mod, ctx('POST', '/api/events', { env, auth: 'test', body: { items: [{ id: 'e1', deleted: true, updatedAt: 2 }] } }));
+  data = await jsonOf(await call(mod, ctx('GET', '/api/events', { env, auth: 'test' })));
+  assert.strictEqual(data.events.length, 0);
+
+  // Profiltrennung: bobs Termin ist fuer test nicht sichtbar
+  await call(mod, ctx('POST', '/api/events', { env, auth: 'bob:bob', body: { items: [{ id: 'e2', title: 'Bob', startMs: 5, updatedAt: 1 }] } }));
+  const asTest = await jsonOf(await call(mod, ctx('GET', '/api/events', { env, auth: 'test' })));
+  assert.ok(!asTest.events.some(e => e.id === 'e2'));
+  const asBob = await jsonOf(await call(mod, ctx('GET', '/api/events', { env, auth: 'bob:bob' })));
+  assert.ok(asBob.events.some(e => e.id === 'e2'));
+});
+
 // ---- climate.js: Tagesnotiz (Plan3-7) ----
 test('climate: Tagesnotiz bleibt beim POST-Upsert erhalten', async () => {
   const mod = await loadEndpoint('api/climate');
