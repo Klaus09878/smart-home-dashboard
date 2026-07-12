@@ -47,19 +47,24 @@
           const card = document.createElement('div');
           card.className = 'bg-slate-900/50 border border-slate-800/60 rounded-xl p-3';
           const adminDyn = loc.dynamic && window.Store && Store.isAdmin;
+          const cal = (appState.calib && appState.calib[loc.id]) || null;
+          const calStr = cal ? `${cal.tempOffset >= 0 ? '+' : ''}${cal.tempOffset} °C / ${cal.humOffset >= 0 ? '+' : ''}${cal.humOffset} %` : 'keine';
           card.innerHTML = `
             <div class="flex items-center justify-between gap-2">
               <p class="text-sm font-semibold text-white truncate">${escapeHtml(getLocationName(loc.id))}</p>
               <button class="p-1 rounded text-slate-500 hover:text-white transition-colors" title="Umbenennen"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
             </div>
             <p class="text-[11px] text-slate-400 mt-1">Wohlfühlband: ${th.tempMin}–${th.tempMax} °C · ${th.humMin}–${th.humMax} %</p>
-            <div class="mt-2 flex items-center gap-3 text-[11px]">
+            <p class="text-[11px] text-slate-500">Kalibrierung: ${calStr}</p>
+            <div class="mt-2 flex items-center gap-3 text-[11px] flex-wrap">
               <button data-role="thresh" class="text-teal-300 hover:text-teal-200 transition-colors">Schwellwerte bearbeiten</button>
+              <button data-role="calib" class="text-slate-400 hover:text-white transition-colors">Kalibrieren</button>
               ${adminDyn ? '<button data-role="editloc" class="text-slate-400 hover:text-white transition-colors">Standort bearbeiten</button><button data-role="delloc" class="text-slate-400 hover:text-red-400 transition-colors ml-auto">Löschen</button>' : ''}
             </div>
           `;
           card.querySelector('button[title="Umbenennen"]').onclick = () => renameLocation(loc.id);
           card.querySelector('[data-role="thresh"]').onclick = () => editLocationThresholds(loc.id);
+          card.querySelector('[data-role="calib"]').onclick = () => calibrateLocation(loc.id);
           if (adminDyn) {
             card.querySelector('[data-role="editloc"]').onclick = () => editDynamicLocation(loc.id);
             card.querySelector('[data-role="delloc"]').onclick = () => deleteDynamicLocation(loc.id);
@@ -349,6 +354,30 @@
         showNotification('Standort gelöscht – lade neu…');
         setTimeout(() => location.reload(), 900);
       } catch (e) { showNotification('Löschen fehlgeschlagen.', 'error'); }
+    }
+
+    // Sensor-Kalibrierung eines Standorts (P3-6). Offsets werden serverseitig in
+    // app_config (calib_<id>) gespeichert, damit auch check-alerts sie nutzt.
+    async function calibrateLocation(locId) {
+      const cur = (appState.calib && appState.calib[locId]) || { tempOffset: 0, humOffset: 0 };
+      const vals = await modalPrompt({
+        title: `Kalibrierung „${getLocationName(locId)}"`,
+        description: 'Konstante Korrektur (wird auf jeden Messwert addiert). Beispiel: zeigt der Sensor 1,2 °C zu viel, hier −1,2 eintragen.',
+        fields: [
+          { key: 'tempOffset', label: 'Temperatur-Offset (°C)', type: 'number', value: cur.tempOffset || 0 },
+          { key: 'humOffset', label: 'Feuchte-Offset (%)', type: 'number', value: cur.humOffset || 0 }
+        ]
+      });
+      if (!vals) return;
+      const n = v => parseFloat(String(v).replace(',', '.')) || 0;
+      const value = { tempOffset: n(vals.tempOffset), humOffset: n(vals.humOffset) };
+      try {
+        await apiFetch('/api/config', { method: 'POST', body: JSON.stringify({ key: `calib_${locId}`, value }) });
+        appState.calib = appState.calib || {};
+        appState.calib[locId] = value;
+        showNotification('Kalibrierung gespeichert – lade neu…');
+        setTimeout(() => location.reload(), 900);
+      } catch (e) { showNotification('Speichern fehlgeschlagen (Cloud-DB nötig).', 'error'); }
     }
 
     async function editHubGoals() {

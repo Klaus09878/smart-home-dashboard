@@ -185,6 +185,16 @@ export async function onRequestGet(context) {
 
       const t = lastRealValue(feeds, loc.tempField);
       const h = lastRealValue(feeds, loc.humField);
+      // Sensor-Kalibrierung (P3-6): Offsets aus app_config auf die Messwerte
+      // anwenden, bevor Schimmel-/Frost-/Hitze-Checks rechnen (CO2 bleibt roh).
+      try {
+        const calRow = await env.DB.prepare('SELECT value FROM app_config WHERE key = ?').bind(`calib_${locId}`).first();
+        const cal = calRow ? JSON.parse(calRow.value) : null;
+        if (cal) {
+          if (t && cal.tempOffset) t.value += Number(cal.tempOffset) || 0;
+          if (h && cal.humOffset) h.value = Math.max(0, Math.min(100, h.value + (Number(cal.humOffset) || 0)));
+        }
+      } catch (e) { /* keine Kalibrierung / kein D1 */ }
       const fmt = ms => ms ? `${Math.round((now - ms) / 3600000)} h` : 'nie';
       const problems = [];
       if (!t || now - t.ms > STALE_MS) problems.push(`Temperatur (letzter Wert vor ${fmt(t && t.ms)})`);

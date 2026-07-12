@@ -167,6 +167,7 @@
         try {
           const data = await fetchFeeds(loc, { results: 400 });
           const processed = processRawFeeds((data && data.feeds) || [], loc.fields);
+          processed.aligned = calibratedAligned(loc.id, processed.aligned); // Kalibrierung (P3-6)
 
           // Sensor-Status-Punkt: grün wenn beide Felder frisch, sonst rot
           const fresh = t => t instanceof Date && (Date.now() - t.getTime()) < SENSOR_STALE_MS;
@@ -334,6 +335,7 @@
       applyTheme(getTheme()); // profilbezogenes Theme anwenden
       // Zusatz-Standorte aus D1 ergänzen, bevor Tabs/Configs rendern
       await loadDynamicLocations();
+      loadCalibrations(); // Sensor-Offsets laden (P3-6, best effort)
 
       updateIcons();
       initConfigs();

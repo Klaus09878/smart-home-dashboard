@@ -232,6 +232,24 @@
       }
     }
 
+    // Sensor-Kalibrierung (P3-6): Offsets je Standort aus app_config laden und
+    // anwenden. appState.calib[locId] = { tempOffset, humOffset }.
+    async function loadCalibrations() {
+      appState.calib = appState.calib || {};
+      await Promise.all(LOCATIONS.map(async loc => {
+        try {
+          const r = await apiFetch(`/api/config?key=calib_${loc.id}`);
+          if (r && r.value && (Number(r.value.tempOffset) || Number(r.value.humOffset))) {
+            appState.calib[loc.id] = { tempOffset: Number(r.value.tempOffset) || 0, humOffset: Number(r.value.humOffset) || 0 };
+          }
+        } catch (e) { /* kein D1 / kein Offset */ }
+      }));
+    }
+    function calibratedAligned(locId, aligned) {
+      const c = appState.calib && appState.calib[locId];
+      return (c && (c.tempOffset || c.humOffset)) ? applyCalibration(aligned, c) : aligned;
+    }
+
     // Toggle Location Search Panel
     function toggleLocationModal() {
       const dropdown = document.getElementById('location-dropdown');
@@ -460,6 +478,7 @@
 
         const processed = processRawFeeds(rawFeeds, activeLoc.fields);
         if (processed.aligned.length === 0) throw new Error('Keine gültigen abgeglichenen Daten gefunden');
+        processed.aligned = calibratedAligned(activeLoc.id, processed.aligned); // Kalibrierung (P3-6)
 
         appState.feedCache[activeLoc.id] = { rawFeeds };
         appState.insideData = processed.aligned;
@@ -476,7 +495,7 @@
           // Aktualisierung fehlgeschlagen, aber Daten vorhanden → weiter mit Cache statt Demo-Modus
           console.warn('ThingSpeak-Refresh fehlgeschlagen, verwende zwischengespeicherte Daten:', err);
           const processed = processRawFeeds(cache.rawFeeds, activeLoc.fields);
-          appState.insideData = processed.aligned;
+          appState.insideData = calibratedAligned(activeLoc.id, processed.aligned);
           appState.lastSensorUpdate = { temp: processed.lastTempTime, humidity: processed.lastHumTime };
           showNotification('Aktualisierung fehlgeschlagen – zeige letzte bekannte Daten.', 'error');
         } else {

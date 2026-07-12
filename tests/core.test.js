@@ -677,4 +677,19 @@ test('detectOpenWindow: stale letzter Wert -> zu', () => {
   assert.strictEqual(core.detectOpenWindow(aligned, { now: T0 }).open, false);
 });
 
+console.log('\nlib/core.js – Sensor-Kalibrierung');
+
+test('applyCalibration: Offsets angewandt, Feuchte geklemmt', () => {
+  const r = core.applyCalibration([{ temp: 20, humidity: 55 }, { temp: 18, humidity: 98 }], { tempOffset: 1.5, humOffset: 5 });
+  assert.strictEqual(r[0].temp, 21.5);
+  assert.strictEqual(r[0].humidity, 60);
+  assert.strictEqual(r[1].humidity, 100); // 98+5 -> auf 100 geklemmt
+});
+
+test('applyCalibration: ohne Offset unveraendert, leeres Array', () => {
+  const src = [{ temp: 20, humidity: 50 }];
+  assert.strictEqual(core.applyCalibration(src, {}), src); // gleiche Referenz
+  assert.deepStrictEqual(core.applyCalibration([], { tempOffset: 2 }), []);
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);
