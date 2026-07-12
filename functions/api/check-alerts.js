@@ -10,7 +10,32 @@
 // Env (Pages → Settings → Environment variables):
 //   NTFY_TOPIC                    – Fallback-Topic (wenn keine Profile in D1)
 //   TS_KEY_GILLIAN / TS_KEY_SEAN  – ThingSpeak Read-Keys (wie beim feeds-Proxy)
-import { loadRecipients, dispatch, typeCfg, isQuietNow, shouldSend, pushTo } from '../_notify.js';
+import { loadRecipients, dispatch, typeCfg, isQuietNow, shouldSend, pushTo, pushToSubs, vapidFromEnv } from '../_notify.js';
+
+// ICS-Host-Allowlist (Kopie aus functions/api/ical.js) fuer den Morgen-Digest.
+const DIGEST_ICAL_HOSTS = ['google.com', 'googleusercontent.com', 'icloud.com', 'me.com', 'outlook.com', 'outlook.office365.com', 'office365.com', 'live.com', 'yahoo.com', 'fastmail.com', 'posteo.de', 'mailbox.org', 'gmx.net', 'web.de'];
+function digestIcalAllowed(url) {
+  try { const h = new URL(url).hostname.toLowerCase(); return DIGEST_ICAL_HOSTS.some(s => h === s || h.endsWith('.' + s)); }
+  catch (e) { return false; }
+}
+// Titel heutiger Termine grob aus dem ICS ziehen (kein RRULE-Support — bewusst
+// simpel: nur VEVENTs, deren DTSTART das heutige Datum enthaelt).
+async function fetchTodayIcs(url, ymd) {
+  try {
+    const res = await fetch(url, { cf: { cacheTtl: 300 } });
+    if (!res.ok) return [];
+    const text = (await res.text()).slice(0, 512 * 1024);
+    const out = [];
+    for (const block of text.split('BEGIN:VEVENT').slice(1)) {
+      const dt = (block.match(/DTSTART[^:]*:([0-9T]+)/) || [])[1] || '';
+      if (dt.indexOf(ymd) !== 0) continue;
+      const sum = (block.match(/SUMMARY[^:]*:(.+)/) || [])[1];
+      if (sum) out.push(sum.trim().replace(/\\,/g, ',').slice(0, 60));
+      if (out.length >= 3) break;
+    }
+    return out;
+  } catch (e) { return []; }
+}
 
 const CHANNELS = {
   gillian: { channel: '3417815', envKey: 'TS_KEY_GILLIAN', label: 'Gillian', lat: 48.7758, lon: 9.1829, tempField: 'field1', humField: 'field2' },
@@ -142,6 +167,10 @@ export async function onRequestGet(context) {
   const report = { checkedAt: new Date().toISOString(), recipients: recipients.map(r => r.profile), locations: {}, notified: [] };
   const now = Date.now();
   const channels = await loadChannels(env);
+
+  // Fuer den Morgen-Digest (P3-5) waehrend der Schleife eingesammelt
+  const digestClimate = [];
+  let digestWeather = null;
 
   for (const [locId, loc] of Object.entries(channels)) {
     const apiKey = loc.apiKey;
@@ -285,6 +314,10 @@ export async function onRequestGet(context) {
         }
       }
 
+      // Fuer den Morgen-Digest einsammeln (P3-5)
+      if (t && h) digestClimate.push({ label: loc.label, temp: t.value, hum: h.value });
+      if (!digestWeather && (frostMin != null || heatMax != null)) digestWeather = { min: frostMin, max: heatMax };
+
       // Lüftungsfenster-Push (Punkt 16): nur morgens (Berlin 6–10 Uhr) und wenn
       // es ein gutes Fenster gibt. Typ 'vent' ist per Voreinstellung aus (opt-in).
       const berlinHour = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/Berlin' }).format(new Date()));
@@ -327,6 +360,51 @@ export async function onRequestGet(context) {
         report.notified.push(`${rec.profile}:todo:overdue`);
       }
     } catch (e) { report.todoError = e.message; }
+  }
+
+  // ---- Morgen-Digest (P3-5): ein Push mit dem Tagesueberblick, opt-in ----
+  if (env.DB) {
+    try {
+      const berlinHour = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/Berlin' }).format(new Date()));
+      if (berlinHour >= 6 && berlinHour <= 9) {
+        const berlinYmd = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, '');
+        const vapid = vapidFromEnv(env);
+        for (const rec of recipients) {
+          if (rec.profile === '_global') continue;
+          const cfg = typeCfg(rec.rules, 'digest');
+          if (!cfg.on || isQuietNow(rec.rules)) continue;
+          if (!(await shouldSend(env.DB, `${rec.profile}:digest`, (cfg.dedupeH ?? 20) * 60 * 60 * 1000))) continue;
+
+          const parts = [];
+          if (digestWeather) {
+            const w = [];
+            if (digestWeather.min != null) w.push(`min ${digestWeather.min.toFixed(0)} °C`);
+            if (digestWeather.max != null) w.push(`max ${digestWeather.max.toFixed(0)} °C`);
+            if (w.length) parts.push(`Wetter: ${w.join(' / ')}`);
+          }
+          if (digestClimate.length) parts.push('Innen: ' + digestClimate.map(c => `${c.label} ${c.temp.toFixed(1)} °C/${c.hum.toFixed(0)} %`).join(' · '));
+          try {
+            const { results } = await env.DB.prepare("SELECT text FROM todos WHERE (profile = ? OR shared = 1) AND done = 0 AND deleted = 0 AND due_ms IS NOT NULL AND due_ms < ? ORDER BY due_ms LIMIT 5")
+              .bind(rec.profile, Date.now() + 24 * 60 * 60 * 1000).all();
+            const todos = (results || []).map(r => r.text);
+            if (todos.length) parts.push(`To-dos: ${todos.join(', ')}`);
+          } catch (e) { /* optional */ }
+          try {
+            const s = await env.DB.prepare("SELECT value FROM user_settings WHERE profile = ? AND key = 'ical_url'").bind(rec.profile).first();
+            if (s && s.value && digestIcalAllowed(s.value)) {
+              const evs = await fetchTodayIcs(s.value, berlinYmd);
+              if (evs.length) parts.push(`Termine: ${evs.join(', ')}`);
+            }
+          } catch (e) { /* optional */ }
+
+          if (!parts.length) continue;
+          const msg = { title: 'Guten Morgen – Tagesüberblick', body: parts.join('\n'), tags: 'sun_with_face', priority: 'default' };
+          if (rec.topic) { try { await pushTo(rec.topic, msg); } catch (e) { /* ntfy */ } }
+          if (rec.subs && rec.subs.length) { try { await pushToSubs(env.DB, rec.subs, msg, vapid); } catch (e) { /* web-push */ } }
+          report.notified.push(`${rec.profile}:digest`);
+        }
+      }
+    } catch (e) { report.digestError = e.message; }
   }
 
   return json(report);
