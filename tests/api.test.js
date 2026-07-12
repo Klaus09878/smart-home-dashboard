@@ -175,6 +175,21 @@ test('backup-dump: Dump nach R2, Liste, Restore in frische DB', async () => {
   assert.strictEqual(check.settings.theme.value, 'dark');
 });
 
+// ---- climate.js: Tagesnotiz (Plan3-7) ----
+test('climate: Tagesnotiz bleibt beim POST-Upsert erhalten', async () => {
+  const mod = await loadEndpoint('api/climate');
+  const env = { DB: createD1() };
+  await call(mod, ctx('POST', '/api/climate', { env, body: { loc: 'x', days: [{ day: '2026-01-01', tAvg: 5 }] } }));
+  await call(mod, ctx('PUT', '/api/climate', { env, body: { loc: 'x', day: '2026-01-01', note: 'Fenster getauscht' } }));
+  await call(mod, ctx('POST', '/api/climate', { env, body: { loc: 'x', days: [{ day: '2026-01-01', tAvg: 6 }] } })); // taeglicher Push
+  const rows = await jsonOf(await call(mod, ctx('GET', '/api/climate?loc=x', { env })));
+  assert.strictEqual(rows[0].t_avg, 6); // aktualisiert
+  assert.strictEqual(rows[0].note, 'Fenster getauscht'); // erhalten
+  await call(mod, ctx('PUT', '/api/climate', { env, body: { loc: 'x', day: '2026-01-01', note: '' } }));
+  const rows2 = await jsonOf(await call(mod, ctx('GET', '/api/climate?loc=x', { env })));
+  assert.strictEqual(rows2[0].note, null);
+});
+
 // ---- locations.js: PUT + sauberes DELETE (Plan3-3) ----
 test('locations: PUT aendert nur uebergebene Felder, DELETE raeumt Archiv', async () => {
   const mod = await loadEndpoint('api/locations');

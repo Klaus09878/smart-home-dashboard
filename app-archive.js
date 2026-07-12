@@ -290,8 +290,11 @@
           const dayKey = `${year}-${mm}-${String(d).padStart(2, '0')}`;
           const rec = byDay[dayKey];
           const color = rec ? tempToColor(rec.tAvg, hm.min, hm.max) : 'rgba(100,116,139,0.12)';
-          const title = rec ? `${dayKey}: Ø ${rec.tAvg.toFixed(1)} °C${rec.hAvg != null ? `, ${rec.hAvg.toFixed(0)} %` : ''}` : `${dayKey}: keine Daten`;
-          cells += `<div data-day="${dayKey}" title="${title}" class="aspect-square rounded-[3px] ${rec ? 'cursor-pointer hover:ring-1 hover:ring-white/40' : ''}" style="background:${color}"></div>`;
+          const hasNote = rec && rec.note;
+          const title = rec ? `${dayKey}: Ø ${rec.tAvg.toFixed(1)} °C${rec.hAvg != null ? `, ${rec.hAvg.toFixed(0)} %` : ''}${hasNote ? ` — ${rec.note}` : ''}` : `${dayKey}: keine Daten`;
+          // Tage mit Notiz (P3-7) bekommen einen weissen Rahmen
+          const noteStyle = hasNote ? 'box-shadow:inset 0 0 0 1px rgba(255,255,255,.75);' : '';
+          cells += `<div data-day="${dayKey}" title="${title.replace(/"/g, '&quot;')}" class="aspect-square rounded-[3px] ${rec ? 'cursor-pointer hover:ring-1 hover:ring-white/40' : ''}" style="background:${color};${noteStyle}"></div>`;
         }
         grid += `<div class="flex items-center gap-1.5">
           <span class="w-7 shrink-0 text-[10px] text-slate-500 text-right">${MONTHS[m]}</span>
@@ -427,11 +430,28 @@
           </div>
           <div class="mt-2 text-center"><span class="text-xs text-slate-400">Komfort-Score: </span><span class="text-sm font-bold text-emerald-400">${score ?? '–'}/100</span>${r.samples ? ` <span class="text-[10px] text-slate-500">· ${r.samples} Messungen</span>` : ''}</div>
           ${cmp}
+          <div class="mt-3 pt-3 border-t border-slate-800/60">
+            <label class="text-[11px] text-slate-500 uppercase font-semibold">Notiz</label>
+            <textarea data-note rows="2" maxlength="280" placeholder="Ereignis an diesem Tag (z. B. Fenster getauscht, Urlaub) …" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-teal-500/50 focus:outline-none resize-y">${escapeHtml(r.note || '')}</textarea>
+            <button data-save-note class="mt-1.5 w-full px-3 py-1.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-200 hover:bg-teal-500/25 text-xs font-semibold transition-colors">Notiz speichern</button>
+          </div>
         </div>`;
       const close = () => { document.removeEventListener('keydown', onKey); overlay.remove(); };
       const onKey = e => { if (e.key === 'Escape') close(); };
       overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
       overlay.querySelector('[data-x]').onclick = close;
+      // Tagesnotiz speichern (P3-7)
+      const saveNoteBtn = overlay.querySelector('[data-save-note]');
+      if (saveNoteBtn) saveNoteBtn.onclick = async () => {
+        const note = overlay.querySelector('[data-note]').value;
+        try {
+          await apiFetch('/api/climate', { method: 'PUT', body: JSON.stringify({ loc: appState.activeLocId, day: r.day, note }) });
+          r.note = note.trim() || null; // lokalen Cache aktualisieren
+          showNotification('Notiz gespeichert.');
+          close();
+          renderArchiveYear(appState.archiveRows || []); // Markierung aktualisieren
+        } catch (e) { showNotification('Speichern fehlgeschlagen (Cloud-DB nötig).', 'error'); }
+      };
       document.addEventListener('keydown', onKey);
       document.body.appendChild(overlay);
       updateIcons();
