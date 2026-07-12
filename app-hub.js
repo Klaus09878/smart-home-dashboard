@@ -260,6 +260,13 @@
       const dueToday = todos.filter(t => !t.done && t.dueMs && t.dueMs <= todayEnd && t.dueMs >= Date.now()).length;
       if (countEl) countEl.innerText = todos.length ? `${open} offen${overdue ? ` · ${overdue} überfällig` : ''}${dueToday ? ` · ${dueToday} heute` : ''}` : '';
 
+      // App-Badge (P3-10): ueberfaellige To-dos am installierten App-Icon
+      try {
+        if ('setAppBadge' in navigator) {
+          if (overdue > 0) navigator.setAppBadge(overdue); else navigator.clearAppBadge();
+        }
+      } catch (e) { /* Badging nur in installierter PWA / sicherem Kontext */ }
+
       listEl.innerHTML = '';
       if (todos.length === 0) {
         listEl.innerHTML = '<p class="text-xs text-slate-500">Nichts zu tun 🎉</p>';
@@ -526,62 +533,113 @@
     async function loadHubCalendar(force = false) {
       const el = document.getElementById('hub-cal-list');
       if (!el) return;
-      const url1 = Store.get('ical_url');
-      const url2 = Store.get('ical_url2');
-      if (!url1 && !url2) {
-        el.innerHTML = 'Kein Kalender verbunden — über das Zahnrad eine .ics-URL hinterlegen (z. B. Google Kalender „geheime Adresse").';
-        return;
-      }
-
       const now = Date.now();
       const from = now - 24 * 60 * 60 * 1000;
       const horizon = now + 14 * 24 * 60 * 60 * 1000;
       const colors = ['bg-orange-400', 'bg-indigo-400'];
-      const feeds = [url1, url2].filter(Boolean);
+      const feeds = [Store.get('ical_url'), Store.get('ical_url2')].filter(Boolean);
 
+      let all = [];
+      let ownAvailable = false;
+      let proxyMissing = false;
+
+      // Eigene Termine aus D1 (P3-8) — expandiert ueber das Fenster
       try {
-        let all = [];
-        let proxyMissing = false;
-        for (let i = 0; i < feeds.length; i++) {
-          try {
-            const evs = await fetchIcalEvents(feeds[i], from, horizon);
-            evs.forEach(e => all.push({ ...e, cal: i }));
-          } catch (err) {
-            if (err.unavailable) proxyMissing = true; else throw err;
-          }
-        }
-        if (proxyMissing && all.length === 0) {
-          el.innerHTML = 'Kalender-Proxy (/api/ical) noch nicht deployt — erscheint nach dem nächsten Cloudflare-Deploy automatisch.';
-          return;
-        }
+        const data = await apiFetch('/api/events');
+        ownAvailable = true;
+        expandSimpleRepeat(data.events || [], from, horizon).forEach(e =>
+          all.push({ startMs: e.startMs, allDay: e.allDay, summary: e.title, recurring: e.repeat && e.repeat !== 'none', cal: 2, own: true, id: e.id }));
+      } catch (e) { /* kein D1 → keine eigenen Termine */ }
 
-        appState.calEvents = all; // fuers Status-Briefing (heutige Termine, P2-12)
-        const upcoming = all
-          .filter(e => e.startMs >= now - (e.allDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000))
-          .sort((a, b) => a.startMs - b.startMs)
-          .slice(0, 6);
-
-        if (upcoming.length === 0) {
-          el.innerHTML = 'Keine Termine in den nächsten 14 Tagen.';
-          return;
+      // ICS-Feeds
+      for (let i = 0; i < feeds.length; i++) {
+        try {
+          const evs = await fetchIcalEvents(feeds[i], from, horizon);
+          evs.forEach(e => all.push({ ...e, cal: i }));
+        } catch (err) {
+          if (err.unavailable) proxyMissing = true; else console.warn('Kalender-Feed fehlgeschlagen:', err);
         }
-
-        el.innerHTML = '';
-        upcoming.forEach(e => {
-          const d = new Date(e.startMs);
-          const dayLabel = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-          const row = document.createElement('div');
-          row.className = 'flex items-center gap-2';
-          const dot = feeds.length > 1 ? `<span class="w-1.5 h-1.5 rounded-full shrink-0 ${colors[e.cal] || colors[0]}"></span>` : '';
-          row.innerHTML = `
-            ${dot}
-            <span class="shrink-0 w-20 text-[10px] font-semibold text-orange-300">${dayLabel}${e.allDay ? '' : ` ${formatTime(d)}`}</span>
-            <span class="flex-1 min-w-0 truncate text-slate-300">${escapeHtml(e.summary || '(ohne Titel)')}${e.recurring ? ' ↻' : ''}</span>
-          `;
-          el.appendChild(row);
-        });
-      } catch (err) {
-        console.warn('Kalender laden fehlgeschlagen:', err);
-        el.innerHTML = `Kalender konnte nicht geladen werden: ${escapeHtml(err.message)}`;
       }
+
+      appState.calEvents = all; // fuers Status-Briefing (heutige Termine)
+
+      if (all.length === 0) {
+        if (feeds.length === 0 && !ownAvailable) el.innerHTML = 'Kein Kalender verbunden — über das Zahnrad eine .ics-URL hinterlegen oder mit „+" einen eigenen Termin anlegen.';
+        else if (proxyMissing) el.innerHTML = 'Kalender-Proxy (/api/ical) noch nicht deployt — erscheint nach dem nächsten Cloudflare-Deploy automatisch.';
+        else el.innerHTML = 'Keine Termine in den nächsten 14 Tagen.';
+        return;
+      }
+
+      const upcoming = all
+        .filter(e => e.startMs >= now - (e.allDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000))
+        .sort((a, b) => a.startMs - b.startMs)
+        .slice(0, 6);
+      el.innerHTML = '';
+      upcoming.forEach(e => {
+        const d = new Date(e.startMs);
+        const dayLabel = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2' + (e.own ? ' cursor-pointer' : '');
+        const dot = e.own
+          ? '<span class="w-1.5 h-1.5 rounded-full shrink-0 bg-teal-400"></span>'
+          : (feeds.length > 1 ? `<span class="w-1.5 h-1.5 rounded-full shrink-0 ${colors[e.cal] || colors[0]}"></span>` : '');
+        row.innerHTML = `
+          ${dot}
+          <span class="shrink-0 w-20 text-[10px] font-semibold text-orange-300">${dayLabel}${e.allDay ? '' : ` ${formatTime(d)}`}</span>
+          <span class="flex-1 min-w-0 truncate text-slate-300">${escapeHtml(e.summary || '(ohne Titel)')}${e.recurring ? ' ↻' : ''}</span>
+        `;
+        if (e.own) { row.title = 'Eigener Termin — klicken zum Löschen'; row.onclick = () => deleteOwnEvent(e.id, e.summary); }
+        el.appendChild(row);
+      });
+    }
+
+    // Datum "TT.MM.JJJJ" + optionale Uhrzeit "HH:MM" → Zeitstempel (lokal).
+    function parseGermanDateTime(dateStr, timeStr) {
+      const m = String(dateStr || '').match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      if (!m) return null;
+      let h = 0, min = 0;
+      const tm = String(timeStr || '').match(/^(\d{1,2}):(\d{2})$/);
+      if (tm) { h = +tm[1]; min = +tm[2]; }
+      const d = new Date(+m[3], +m[2] - 1, +m[1], h, min, 0, 0);
+      return isNaN(d.getTime()) ? null : d.getTime();
+    }
+
+    async function addOwnEvent() {
+      const vals = await modalPrompt({
+        title: 'Termin anlegen',
+        description: 'Eigener Termin — erscheint im Kalender-Widget und im Briefing.',
+        fields: [
+          { key: 'title', label: 'Titel', value: '' },
+          { key: 'date', label: 'Datum (TT.MM.JJJJ)', value: new Date().toLocaleDateString('de-DE') },
+          { key: 'time', label: 'Uhrzeit (HH:MM, leer = ganztägig)', value: '' },
+          { key: 'repeat', label: 'Wiederholung', type: 'select', value: 'none', options: [
+            { value: 'none', label: 'keine' }, { value: 'daily', label: 'täglich' }, { value: 'weekly', label: 'wöchentlich' },
+            { value: 'monthly', label: 'monatlich' }, { value: 'yearly', label: 'jährlich' }
+          ] }
+        ]
+      });
+      if (!vals) return;
+      const startMs = parseGermanDateTime(vals.date, vals.time);
+      if (!startMs) { showNotification('Ungültiges Datum (TT.MM.JJJJ).', 'error'); return; }
+      const ev = {
+        id: `${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+        title: (vals.title || '').trim() || 'Termin', startMs, endMs: null,
+        allDay: !(vals.time || '').trim(), repeat: vals.repeat || 'none',
+        createdAt: Date.now(), updatedAt: Date.now()
+      };
+      try {
+        await apiFetch('/api/events', { method: 'POST', body: JSON.stringify({ items: [ev] }) });
+        showNotification('Termin angelegt.');
+        loadHubCalendar(true);
+      } catch (e) { showNotification('Anlegen fehlgeschlagen (Cloud-DB nötig).', 'error'); }
+    }
+
+    async function deleteOwnEvent(eventId, title) {
+      const ok = await modalConfirm({ title: 'Termin löschen?', message: `„${title || 'Termin'}" entfernen?`, confirmLabel: 'Löschen', danger: true });
+      if (!ok) return;
+      try {
+        await apiFetch('/api/events', { method: 'POST', body: JSON.stringify({ items: [{ id: eventId, deleted: true, updatedAt: Date.now() }] }) });
+        showNotification('Termin gelöscht.');
+        loadHubCalendar(true);
+      } catch (e) { showNotification('Löschen fehlgeschlagen.', 'error'); }
     }

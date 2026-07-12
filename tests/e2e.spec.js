@@ -21,7 +21,7 @@ test('Hub lädt: Widgets, Uhr, keine JS-Fehler', async ({ page }) => {
 test('Einstellungen: Regeln + Theme-Umschalter', async ({ page }) => {
   await page.goto('/index.html#settings');
   await waitReady(page);
-  await expect(page.locator('#notify-rules > div')).toHaveCount(11); // 11 Regeltypen (inkl. CO₂, DWD)
+  await expect(page.locator('#notify-rules > div')).toHaveCount(13); // 13 Regeltypen (inkl. CO₂, DWD, Fenster, Digest)
   // Theme umschalten
   await page.click('button:has-text("umschalten")');
   await expect(page.locator('html')).toHaveClass(/light/);

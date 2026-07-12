@@ -3,7 +3,7 @@
 // vor allem die riskante Merge-/Tombstone-Logik (LWW). Ausfuehren: npm test.
 // Benoetigt Node >= 22 (node:sqlite).
 const assert = require('assert');
-const { createD1, loadEndpoint, ctx, call } = require('./helpers/d1-node.js');
+const { createD1, createR2, loadEndpoint, ctx, call } = require('./helpers/d1-node.js');
 
 let passed = 0, failed = 0;
 const tests = [];
@@ -141,6 +141,112 @@ test('users: doppelter Name und Env-Kollision werden abgelehnt', async () => {
   // DELETE eines Env-Nutzers verboten
   const delEnv = await call(mod, ctx('DELETE', '/api/users?name=test', { env, auth: 'test' }));
   assert.strictEqual(delEnv.status, 400);
+});
+
+// ---- backup-dump.js: Dump nach R2 + Restore (Plan3-1) ----
+test('backup-dump: Dump nach R2, Liste, Restore in frische DB', async () => {
+  const dump = await loadEndpoint('api/backup-dump');
+  const settings = await loadEndpoint('api/settings');
+  const MEDIA = createR2();
+  const env = { AUTH_USER: 'test', AUTH_PASS: 'test', DB: createD1(), MEDIA };
+
+  await call(settings, ctx('POST', '/api/settings', { env, auth: 'test', body: { items: [{ key: 'theme', value: 'dark', updatedAt: 1000 }] } }));
+
+  // Nicht-Admin darf nicht
+  const forbidden = await call(dump, ctx('GET', '/api/backup-dump', { env, auth: 'bob:x' }));
+  assert.strictEqual(forbidden.status, 403);
+
+  const dumped = await jsonOf(await call(dump, ctx('GET', '/api/backup-dump', { env, auth: 'test' })));
+  assert.ok(dumped.ok && dumped.key);
+
+  const listed = await jsonOf(await call(dump, ctx('GET', '/api/backup-dump?list=1', { env, auth: 'test' })));
+  assert.ok(listed.dumps.some(d => d.key === dumped.key));
+
+  // Restore in eine frische DB (gleiches MEDIA), mit Doppelbestaetigung
+  const env2 = { AUTH_USER: 'test', AUTH_PASS: 'test', DB: createD1(), MEDIA };
+  const badConfirm = await call(dump, ctx('POST', '/api/backup-dump', { env: env2, auth: 'test', body: { key: dumped.key, confirm: 'falsch' } }));
+  assert.strictEqual(badConfirm.status, 400);
+
+  const restored = await jsonOf(await call(dump, ctx('POST', '/api/backup-dump', { env: env2, auth: 'test', body: { key: dumped.key, confirm: dumped.key } })));
+  assert.ok(restored.ok);
+  assert.strictEqual(restored.restored.user_settings, 1);
+
+  const check = await jsonOf(await call(settings, ctx('GET', '/api/settings', { env: env2, auth: 'test' })));
+  assert.strictEqual(check.settings.theme.value, 'dark');
+});
+
+// ---- events.js: eigene Termine (Plan3-8) ----
+test('events: Upsert, Tombstone, Profiltrennung', async () => {
+  const mod = await loadEndpoint('api/events');
+  const env = { AUTH_USER: 'test', AUTH_PASS: 'test', DB: createD1() };
+  await call(mod, ctx('POST', '/api/events', { env, auth: 'test', body: { items: [{ id: 'e1', title: 'Zahnarzt', startMs: 1000, repeat: 'none', createdAt: 1, updatedAt: 1 }] } }));
+  let data = await jsonOf(await call(mod, ctx('GET', '/api/events', { env, auth: 'test' })));
+  assert.strictEqual(data.events.length, 1);
+  assert.strictEqual(data.events[0].title, 'Zahnarzt');
+
+  // Tombstone (LWW) → GET filtert geloeschte
+  await call(mod, ctx('POST', '/api/events', { env, auth: 'test', body: { items: [{ id: 'e1', deleted: true, updatedAt: 2 }] } }));
+  data = await jsonOf(await call(mod, ctx('GET', '/api/events', { env, auth: 'test' })));
+  assert.strictEqual(data.events.length, 0);
+
+  // Profiltrennung: bobs Termin ist fuer test nicht sichtbar
+  await call(mod, ctx('POST', '/api/events', { env, auth: 'bob:bob', body: { items: [{ id: 'e2', title: 'Bob', startMs: 5, updatedAt: 1 }] } }));
+  const asTest = await jsonOf(await call(mod, ctx('GET', '/api/events', { env, auth: 'test' })));
+  assert.ok(!asTest.events.some(e => e.id === 'e2'));
+  const asBob = await jsonOf(await call(mod, ctx('GET', '/api/events', { env, auth: 'bob:bob' })));
+  assert.ok(asBob.events.some(e => e.id === 'e2'));
+});
+
+// ---- climate.js: Tagesnotiz (Plan3-7) ----
+test('climate: Tagesnotiz bleibt beim POST-Upsert erhalten', async () => {
+  const mod = await loadEndpoint('api/climate');
+  const env = { DB: createD1() };
+  await call(mod, ctx('POST', '/api/climate', { env, body: { loc: 'x', days: [{ day: '2026-01-01', tAvg: 5 }] } }));
+  await call(mod, ctx('PUT', '/api/climate', { env, body: { loc: 'x', day: '2026-01-01', note: 'Fenster getauscht' } }));
+  await call(mod, ctx('POST', '/api/climate', { env, body: { loc: 'x', days: [{ day: '2026-01-01', tAvg: 6 }] } })); // taeglicher Push
+  const rows = await jsonOf(await call(mod, ctx('GET', '/api/climate?loc=x', { env })));
+  assert.strictEqual(rows[0].t_avg, 6); // aktualisiert
+  assert.strictEqual(rows[0].note, 'Fenster getauscht'); // erhalten
+  await call(mod, ctx('PUT', '/api/climate', { env, body: { loc: 'x', day: '2026-01-01', note: '' } }));
+  const rows2 = await jsonOf(await call(mod, ctx('GET', '/api/climate?loc=x', { env })));
+  assert.strictEqual(rows2[0].note, null);
+});
+
+// ---- locations.js: PUT + sauberes DELETE (Plan3-3) ----
+test('locations: PUT aendert nur uebergebene Felder, DELETE raeumt Archiv', async () => {
+  const mod = await loadEndpoint('api/locations');
+  const climate = await loadEndpoint('api/climate');
+  const env = { AUTH_USER: 'test', AUTH_PASS: 'test', DB: createD1() };
+  await call(mod, ctx('POST', '/api/locations', { env, auth: 'test', body: { id: 'buero', name: 'Buero', channel: '111', readKey: 'KEY1', lat: 48, lon: 9, fields: { temp: 'field1', humidity: 'field2', extra: [] } } }));
+  await call(climate, ctx('POST', '/api/climate', { env, body: { loc: 'buero', days: [{ day: '2026-01-01', tAvg: 20 }] } }));
+
+  const forbidden = await call(mod, ctx('PUT', '/api/locations', { env, auth: 'bob:x', body: { id: 'buero', name: 'X' } }));
+  assert.strictEqual(forbidden.status, 403);
+
+  await call(mod, ctx('PUT', '/api/locations', { env, auth: 'test', body: { id: 'buero', name: 'Neu' } }));
+  const row = await env.DB.prepare('SELECT name, channel, read_key FROM locations WHERE id = ?').bind('buero').first();
+  assert.strictEqual(row.name, 'Neu');
+  assert.strictEqual(row.channel, '111'); // nicht uebergeben -> unveraendert
+  assert.strictEqual(row.read_key, 'KEY1'); // leer -> behalten
+
+  await call(mod, ctx('DELETE', '/api/locations?id=buero', { env, auth: 'test' }));
+  const cd = await env.DB.prepare('SELECT COUNT(*) AS n FROM climate_daily WHERE loc = ?').bind('buero').first();
+  assert.strictEqual(cd.n, 0);
+});
+
+// ---- _notify.dispatch: erfolgreicher Versand wird protokolliert (Plan3-2) ----
+test('dispatch: erfolgreicher Versand landet in alert_log', async () => {
+  const notify = await loadEndpoint('_notify');
+  const env = { DB: createD1() };
+  const origFetch = global.fetch;
+  global.fetch = async () => new Response('ok', { status: 200 }); // ntfy-Versand stubben
+  try {
+    const recipients = [{ profile: 'sean', topic: 'topic-x', rules: { types: { frost: { on: true } }, quiet: { on: false } }, subs: [] }];
+    await notify.dispatch(env, recipients, 'frost', 'gillian', () => ({ title: 'Frost-Warnung', body: 'kalt', tags: 'snowflake' }));
+  } finally { global.fetch = origFetch; }
+  const row = await env.DB.prepare('SELECT COUNT(*) AS n, MAX(type) AS t FROM alert_log').first();
+  assert.strictEqual(row.n, 1);
+  assert.strictEqual(row.t, 'frost');
 });
 
 // ---- Runner ----

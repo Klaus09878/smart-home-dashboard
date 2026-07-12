@@ -653,4 +653,66 @@ test('degreeDays: eigene base/heatLimit, ungueltige Werte ignoriert', () => {
   assert.strictEqual(r.days, 1);
 });
 
+console.log('\nlib/core.js – Fenster-offen-Erkennung');
+
+const mkPt = (minAgo, temp, T0) => ({ time: new Date(T0 - minAgo * 60000), temp });
+
+test('detectOpenWindow: klarer Sturz ohne Erholung -> offen', () => {
+  const T0 = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const aligned = [mkPt(45, 22, T0), mkPt(30, 21, T0), mkPt(15, 20, T0), mkPt(0, 19.5, T0)];
+  const r = core.detectOpenWindow(aligned, { now: T0 });
+  assert.strictEqual(r.open, true);
+  assert.strictEqual(r.dropC, 2.5);
+});
+
+test('detectOpenWindow: Sturz mit Erholung (Stosslueften) -> zu', () => {
+  const T0 = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const aligned = [mkPt(45, 24, T0), mkPt(20, 20, T0), mkPt(0, 21, T0)]; // wieder gestiegen
+  assert.strictEqual(core.detectOpenWindow(aligned, { now: T0 }).open, false);
+});
+
+test('detectOpenWindow: stale letzter Wert -> zu', () => {
+  const T0 = Date.UTC(2026, 0, 1, 12, 0, 0);
+  const aligned = [mkPt(75, 22, T0), mkPt(45, 20, T0), mkPt(30, 19, T0)]; // letzter Wert 30 min alt
+  assert.strictEqual(core.detectOpenWindow(aligned, { now: T0 }).open, false);
+});
+
+console.log('\nlib/core.js – Sensor-Kalibrierung');
+
+test('applyCalibration: Offsets angewandt, Feuchte geklemmt', () => {
+  const r = core.applyCalibration([{ temp: 20, humidity: 55 }, { temp: 18, humidity: 98 }], { tempOffset: 1.5, humOffset: 5 });
+  assert.strictEqual(r[0].temp, 21.5);
+  assert.strictEqual(r[0].humidity, 60);
+  assert.strictEqual(r[1].humidity, 100); // 98+5 -> auf 100 geklemmt
+});
+
+test('applyCalibration: ohne Offset unveraendert, leeres Array', () => {
+  const src = [{ temp: 20, humidity: 50 }];
+  assert.strictEqual(core.applyCalibration(src, {}), src); // gleiche Referenz
+  assert.deepStrictEqual(core.applyCalibration([], { tempOffset: 2 }), []);
+});
+
+console.log('\nlib/core.js – Termin-Wiederholung');
+
+test('expandSimpleRepeat: taeglich im Fenster', () => {
+  const start = Date.UTC(2026, 0, 1, 9, 0, 0);
+  const r = core.expandSimpleRepeat([{ id: 'a', startMs: start, repeat: 'daily' }], start, start + 3 * 86400000);
+  assert.strictEqual(r.length, 4); // Tag 0,1,2,3
+});
+
+test('expandSimpleRepeat: monatlich am 31. klemmt auf Monatsende', () => {
+  const start = Date.UTC(2026, 0, 31, 8, 0, 0); // 31. Jan
+  const r = core.expandSimpleRepeat([{ id: 'b', startMs: start, repeat: 'monthly' }], start, Date.UTC(2026, 2, 1));
+  // Jan 31 + Feb (28.) → zwei Vorkommen; das Februar-Datum ist der 28.
+  const febDay = new Date(r[1].startMs).getUTCDate();
+  assert.strictEqual(r.length, 2);
+  assert.strictEqual(febDay, 28);
+});
+
+test('expandSimpleRepeat: none nur im Fenster', () => {
+  const start = Date.UTC(2026, 5, 1);
+  assert.strictEqual(core.expandSimpleRepeat([{ id: 'c', startMs: start, repeat: 'none' }], start - 10, start + 10).length, 1);
+  assert.strictEqual(core.expandSimpleRepeat([{ id: 'c', startMs: start, repeat: 'none' }], start + 100, start + 200).length, 0);
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);

@@ -167,6 +167,7 @@
         try {
           const data = await fetchFeeds(loc, { results: 400 });
           const processed = processRawFeeds((data && data.feeds) || [], loc.fields);
+          processed.aligned = calibratedAligned(loc.id, processed.aligned); // Kalibrierung (P3-6)
 
           // Sensor-Status-Punkt: grün wenn beide Felder frisch, sonst rot
           const fresh = t => t instanceof Date && (Date.now() - t.getTime()) < SENSOR_STALE_MS;
@@ -206,6 +207,11 @@
             if (last.co2 != null && th.co2Max && last.co2 > th.co2Max) {
               signals.push({ severity: 'warn', text: `CO₂ hoch ${shortName} (${Math.round(last.co2)} ppm) – lüften`, target: '#climate' });
             }
+            // Fenster offen vergessen (P3-4)
+            try {
+              const ow = detectOpenWindow(processed.aligned);
+              if (ow.open) signals.push({ severity: 'warn', text: `Fenster offen? ${shortName}: −${ow.dropC} °C in 45 min`, target: '#climate' });
+            } catch (e) { /* optional */ }
           } else {
             el('temp').innerText = '–';
             el('time').innerText = 'keine Daten';
@@ -329,6 +335,7 @@
       applyTheme(getTheme()); // profilbezogenes Theme anwenden
       // Zusatz-Standorte aus D1 ergänzen, bevor Tabs/Configs rendern
       await loadDynamicLocations();
+      loadCalibrations(); // Sensor-Offsets laden (P3-6, best effort)
 
       updateIcons();
       initConfigs();

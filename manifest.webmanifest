@@ -22,5 +22,10 @@
   },
   "file_handlers": [
     { "action": "gpx.html", "accept": { "application/gpx+xml": [".gpx"] } }
+  ],
+  "shortcuts": [
+    { "name": "ClimateFlow", "short_name": "Klima", "url": "index.html#climate", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "GPX-Viewer", "short_name": "GPX", "url": "gpx.html", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Aufzeichnung starten", "short_name": "Aufnahme", "url": "gpx.html#record", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

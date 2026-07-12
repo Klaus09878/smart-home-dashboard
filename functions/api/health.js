@@ -47,7 +47,8 @@ export async function onRequestGet(context) {
     lastCron: null,
     channels: {},
     counts: {},
-    errors: []
+    errors: [],
+    alerts: []
   };
 
   // D1-abhängige Werte
@@ -75,6 +76,14 @@ export async function onRequestGet(context) {
         .all();
       out.errors = results || [];
     } catch (e) { /* error_log evtl. noch nicht angelegt */ }
+
+    // Letzte versendete Warnungen (Plan3-2)
+    try {
+      const { results } = await env.DB
+        .prepare('SELECT ts, profile, type, title FROM alert_log ORDER BY ts DESC LIMIT 15')
+        .all();
+      out.alerts = results || [];
+    } catch (e) { /* alert_log evtl. noch nicht angelegt */ }
   }
 
   // Letzte Messwert-Zeit je Kanal (kleiner ThingSpeak-Abruf)

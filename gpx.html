@@ -74,13 +74,18 @@
     </header>
 
     <!-- Live-Aufzeichnungs-Statusleiste (P2-13) -->
-    <div id="record-status" class="hidden glass-panel rounded-2xl px-4 py-3 flex items-center justify-between gap-3 border border-rose-500/30 bg-rose-500/5">
-      <span class="flex items-center gap-2 text-sm text-rose-300 font-semibold">
+    <div id="record-status" class="hidden glass-panel rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 border border-rose-500/30 bg-rose-500/5">
+      <span id="record-label" class="flex items-center gap-2 text-sm text-rose-300 font-semibold">
         <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
         Aufzeichnung läuft
       </span>
       <span id="record-stats" class="text-xs text-slate-300 font-mono">0:00 · 0,0 km · 0 Punkte</span>
-      <button data-onclick="toggleRecording" class="px-3 py-1.5 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-200 hover:bg-rose-500/30 text-xs font-semibold transition-colors">Stopp & speichern</button>
+      <div class="flex items-center gap-2">
+        <button data-onclick="recordPhoto" title="Foto aufnehmen" class="p-1.5 rounded-lg bg-slate-900/70 border border-slate-700 text-slate-300 hover:text-white transition-colors"><i data-lucide="camera" class="w-4 h-4"></i></button>
+        <button id="record-pause-btn" data-onclick="togglePauseRecording" class="px-3 py-1.5 rounded-lg bg-slate-900/70 border border-slate-700 text-slate-200 hover:border-slate-600 text-xs font-semibold transition-colors">Pause</button>
+        <button data-onclick="toggleRecording" class="px-3 py-1.5 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-200 hover:bg-rose-500/30 text-xs font-semibold transition-colors">Stopp &amp; speichern</button>
+      </div>
+      <input type="file" id="rec-photo-input" accept="image/*" capture="environment" class="hidden" data-onchange="onRecPhotoPicked|$event">
     </div>
 
     <!-- Dropzone (auch Empty State) -->

@@ -52,10 +52,42 @@ export async function onRequest(context) {
     return json({ ok: true });
   }
 
+  if (request.method === 'PUT') {
+    const b = await request.json();
+    if (!b.id) return json({ error: 'id erforderlich' }, 400);
+    if (RESERVED.has(b.id)) return json({ error: 'fest verdrahtete Standorte sind nicht editierbar' }, 400);
+    // Nur bekannte Feld-Schluessel uebernehmen
+    let fieldsJson = null;
+    if (b.fields && typeof b.fields === 'object') {
+      fieldsJson = JSON.stringify({
+        temp: b.fields.temp || 'field1',
+        humidity: b.fields.humidity || 'field2',
+        extra: Array.isArray(b.fields.extra) ? b.fields.extra : []
+      });
+    }
+    // leerer readKey = unveraendert lassen
+    const readKey = (b.readKey != null && String(b.readKey).trim() !== '') ? String(b.readKey) : null;
+    await env.DB.prepare(
+      'UPDATE locations SET name = COALESCE(?, name), channel = COALESCE(?, channel), read_key = COALESCE(?, read_key), lat = COALESCE(?, lat), lon = COALESCE(?, lon), fields = COALESCE(?, fields) WHERE id = ?'
+    ).bind(
+      b.name != null ? String(b.name).substring(0, 60) : null,
+      b.channel != null ? String(b.channel) : null,
+      readKey,
+      b.lat != null ? Number(b.lat) : null,
+      b.lon != null ? Number(b.lon) : null,
+      fieldsJson,
+      b.id
+    ).run();
+    return json({ ok: true });
+  }
+
   if (request.method === 'DELETE') {
     const locId = new URL(request.url).searchParams.get('id');
     if (!locId) return json({ error: 'id erforderlich' }, 400);
     await env.DB.prepare('DELETE FROM locations WHERE id = ?').bind(locId).run();
+    // Altdaten des Standorts aufraeumen (best effort)
+    try { await env.DB.prepare('DELETE FROM climate_daily WHERE loc = ?').bind(locId).run(); } catch (e) { /* egal */ }
+    try { await env.DB.prepare('DELETE FROM app_config WHERE key = ?').bind(`weather_${locId}`).run(); } catch (e) { /* egal */ }
     return json({ ok: true });
   }
 

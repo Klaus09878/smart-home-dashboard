@@ -15,6 +15,8 @@ export const DEFAULT_RULES = {
     heat:    { on: true, dedupeH: 18, threshold: 30 },
     co2:     { on: false, dedupeH: 6, threshold: 1200 }, // opt-in (braucht CO₂-Sensor)
     dwd:     { on: true, dedupeH: 12 }, // amtliche Unwetterwarnungen (DWD/BrightSky)
+    window:  { on: true, dedupeH: 3 }, // Fenster offen vergessen (P3-4)
+    digest:  { on: false, dedupeH: 20 }, // Morgen-Digest (P3-5, opt-in)
     vent:    { on: false, dedupeH: 20 }, // Lüftungsfenster-Morgen-Push (opt-in)
     errors:  { on: true, dedupeH: 6 },
     weekly:  { on: true, dedupeH: 120 },  // max. 1 Wochenbericht / 5 Tage
@@ -149,7 +151,16 @@ export async function dispatch(env, recipients, type, dedupeSlug, build) {
     if (rec.subs && rec.subs.length) {
       try { await pushToSubs(env.DB, rec.subs, msg, vapid); sent = true; } catch (e) { /* Web-Push-Fehler ignorieren */ }
     }
-    if (sent) notified.push(key);
+    if (sent) {
+      notified.push(key);
+      // Protokoll (Plan3-2): jeden tatsaechlichen Versand loggen. Best effort —
+      // env.DB kann fehlen, dann bleibt es beim ntfy-/Push-Versand.
+      try {
+        await env.DB.exec('CREATE TABLE IF NOT EXISTS alert_log (ts INTEGER, profile TEXT, type TEXT, slug TEXT, title TEXT)');
+        await env.DB.prepare('INSERT INTO alert_log (ts, profile, type, slug, title) VALUES (?,?,?,?,?)')
+          .bind(Date.now(), rec.profile, type, String(dedupeSlug), (msg.title || '').slice(0, 120)).run();
+      } catch (e) { /* Protokoll ist optional */ }
+    }
   }
   return notified;
 }
