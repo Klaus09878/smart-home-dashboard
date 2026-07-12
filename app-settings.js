@@ -583,6 +583,14 @@
           rows.push(`<div class="text-[11px] text-slate-500 truncate">· ${escapeHtml((e.page || '') + ' ' + (e.message || ''))}</div>`);
         });
       }
+      // Letzte versendete Warnungen (Plan3-2)
+      if (Array.isArray(h.alerts) && h.alerts.length) {
+        const typeLabel = k => (NOTIFY_TYPES.find(t => t.key === k) || {}).label || k;
+        rows.push(`<div class="text-xs text-slate-500 mt-2 border-t border-slate-800/60 pt-2">Letzte Warnungen:</div>`);
+        h.alerts.slice(0, 10).forEach(a => {
+          rows.push(`<div class="text-[11px] text-slate-400 truncate">· ${escapeHtml(formatRelativeTime(new Date(a.ts)))} — ${escapeHtml(typeLabel(a.type))}${a.profile && a.profile !== '_global' ? ` <span class="text-slate-500">(${escapeHtml(a.profile)})</span>` : ''}</div>`);
+        });
+      }
       return rows.join('');
     }
 

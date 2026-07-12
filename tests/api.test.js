@@ -175,6 +175,21 @@ test('backup-dump: Dump nach R2, Liste, Restore in frische DB', async () => {
   assert.strictEqual(check.settings.theme.value, 'dark');
 });
 
+// ---- _notify.dispatch: erfolgreicher Versand wird protokolliert (Plan3-2) ----
+test('dispatch: erfolgreicher Versand landet in alert_log', async () => {
+  const notify = await loadEndpoint('_notify');
+  const env = { DB: createD1() };
+  const origFetch = global.fetch;
+  global.fetch = async () => new Response('ok', { status: 200 }); // ntfy-Versand stubben
+  try {
+    const recipients = [{ profile: 'sean', topic: 'topic-x', rules: { types: { frost: { on: true } }, quiet: { on: false } }, subs: [] }];
+    await notify.dispatch(env, recipients, 'frost', 'gillian', () => ({ title: 'Frost-Warnung', body: 'kalt', tags: 'snowflake' }));
+  } finally { global.fetch = origFetch; }
+  const row = await env.DB.prepare('SELECT COUNT(*) AS n, MAX(type) AS t FROM alert_log').first();
+  assert.strictEqual(row.n, 1);
+  assert.strictEqual(row.t, 'frost');
+});
+
 // ---- Runner ----
 (async () => {
   console.log('functions/api – Server-Endpunkte (node:sqlite)');

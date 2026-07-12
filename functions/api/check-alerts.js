@@ -111,6 +111,8 @@ export async function onRequestGet(context) {
       try { await env.DB.prepare('DELETE FROM todos WHERE deleted = 1 AND updated_at < ?').bind(cutoff).run(); } catch (e) { /* todos evtl. nicht vorhanden */ }
       // Login-Fehlversuchszaehler (P2-5): Zeilen aelter als 1 h entfernen
       try { await env.DB.prepare('DELETE FROM auth_fails WHERE first_ms < ?').bind(Date.now() - 60 * 60 * 1000).run(); } catch (e) { /* auth_fails evtl. noch nicht vorhanden */ }
+      // Warnungs-Protokoll (P3-2): Eintraege aelter als 60 Tage entfernen
+      try { await env.DB.prepare('DELETE FROM alert_log WHERE ts < ?').bind(Date.now() - 60 * 24 * 60 * 60 * 1000).run(); } catch (e) { /* alert_log evtl. noch nicht vorhanden */ }
     } catch (e) { /* Heartbeat/Cleanup ist best effort */ }
   }
 

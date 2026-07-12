@@ -149,7 +149,16 @@ export async function dispatch(env, recipients, type, dedupeSlug, build) {
     if (rec.subs && rec.subs.length) {
       try { await pushToSubs(env.DB, rec.subs, msg, vapid); sent = true; } catch (e) { /* Web-Push-Fehler ignorieren */ }
     }
-    if (sent) notified.push(key);
+    if (sent) {
+      notified.push(key);
+      // Protokoll (Plan3-2): jeden tatsaechlichen Versand loggen. Best effort —
+      // env.DB kann fehlen, dann bleibt es beim ntfy-/Push-Versand.
+      try {
+        await env.DB.exec('CREATE TABLE IF NOT EXISTS alert_log (ts INTEGER, profile TEXT, type TEXT, slug TEXT, title TEXT)');
+        await env.DB.prepare('INSERT INTO alert_log (ts, profile, type, slug, title) VALUES (?,?,?,?,?)')
+          .bind(Date.now(), rec.profile, type, String(dedupeSlug), (msg.title || '').slice(0, 120)).run();
+      } catch (e) { /* Protokoll ist optional */ }
+    }
   }
   return notified;
 }
