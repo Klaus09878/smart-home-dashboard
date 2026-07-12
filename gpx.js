@@ -1511,6 +1511,19 @@ async function init() {
     const rb = document.getElementById('record-btn');
     if (rb) rb.classList.remove('hidden');
     checkRecordingRecovery();
+    // PWA-Shortcut "Aufzeichnung starten" (P3-10): direkt loslegen. Der Wunsch
+    // wird in sessionStorage gemerkt, damit er einen Service-Worker-Reload beim
+    // ersten Start uebersteht (Flag wird genau einmal eingeloest).
+    if (location.hash === '#record') {
+      sessionStorage.setItem('gpx_autostart', '1');
+      try { history.replaceState(null, '', location.pathname); } catch (e) { /* alt */ }
+    }
+    if (sessionStorage.getItem('gpx_autostart') === '1' && !(state.rec && state.rec.active)) {
+      startRecording();
+      // Flag erst nach dem SW-Reload-Fenster loeschen (der erste SW-Install
+      // reloadt die Seite via controllerchange) — so ueberlebt der Autostart.
+      setTimeout(() => sessionStorage.removeItem('gpx_autostart'), 4000);
+    }
   }
 }
 

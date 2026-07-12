@@ -7,10 +7,16 @@
 # connect-src listet alle vom Client direkt kontaktierten Fremd-Hosts; alles
 # andere laeuft ueber gleiche Herkunft (/api/*). Aenderungen an Fetch-Zielen
 # hier nachziehen.
+# Vendor-Bibliotheken 7 Tage cachen (P3-10). BEWUSST kein 'immutable': die
+# Dateinamen tragen keine Version — bei einem Vendor-Upgrade die Datei umbenennen
+# oder diese Cache-Zeit beachten, sonst haengen alte Bibliotheken im Cache fest.
+/vendor/*
+  Cache-Control: public, max-age=604800
+
 /*
   Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-eLZhyzXdu32xZFF/i0jEbzBcH5z949HuC9z7s5q31EY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self' https://ntfy.sh https://api.open-meteo.com https://archive-api.open-meteo.com https://geocoding-api.open-meteo.com https://air-quality-api.open-meteo.com https://api.brightsky.dev https://nominatim.openstreetmap.org; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: no-referrer
-  Permissions-Policy: geolocation=(), camera=(), microphone=(), interest-cohort=()
+  Permissions-Policy: geolocation=(self), camera=(self), microphone=(), interest-cohort=()

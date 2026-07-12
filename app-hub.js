@@ -260,6 +260,13 @@
       const dueToday = todos.filter(t => !t.done && t.dueMs && t.dueMs <= todayEnd && t.dueMs >= Date.now()).length;
       if (countEl) countEl.innerText = todos.length ? `${open} offen${overdue ? ` · ${overdue} überfällig` : ''}${dueToday ? ` · ${dueToday} heute` : ''}` : '';
 
+      // App-Badge (P3-10): ueberfaellige To-dos am installierten App-Icon
+      try {
+        if ('setAppBadge' in navigator) {
+          if (overdue > 0) navigator.setAppBadge(overdue); else navigator.clearAppBadge();
+        }
+      } catch (e) { /* Badging nur in installierter PWA / sicherem Kontext */ }
+
       listEl.innerHTML = '';
       if (todos.length === 0) {
         listEl.innerHTML = '<p class="text-xs text-slate-500">Nichts zu tun 🎉</p>';
