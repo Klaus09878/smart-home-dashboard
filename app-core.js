@@ -221,6 +221,7 @@
           if (LOCATIONS.some(x => x.id === l.id)) return;
           LOCATIONS.push({
             id: l.id,
+            dynamic: true, // ueber die Oberflaeche angelegt (bearbeitbar, P3-3)
             defaultName: l.name || l.id,
             defaultWeather: { lat: l.lat, lon: l.lon, name: l.name || l.id },
             fields: l.fields || { temp: 'field1', humidity: 'field2', extra: [] }

@@ -175,6 +175,28 @@ test('backup-dump: Dump nach R2, Liste, Restore in frische DB', async () => {
   assert.strictEqual(check.settings.theme.value, 'dark');
 });
 
+// ---- locations.js: PUT + sauberes DELETE (Plan3-3) ----
+test('locations: PUT aendert nur uebergebene Felder, DELETE raeumt Archiv', async () => {
+  const mod = await loadEndpoint('api/locations');
+  const climate = await loadEndpoint('api/climate');
+  const env = { AUTH_USER: 'test', AUTH_PASS: 'test', DB: createD1() };
+  await call(mod, ctx('POST', '/api/locations', { env, auth: 'test', body: { id: 'buero', name: 'Buero', channel: '111', readKey: 'KEY1', lat: 48, lon: 9, fields: { temp: 'field1', humidity: 'field2', extra: [] } } }));
+  await call(climate, ctx('POST', '/api/climate', { env, body: { loc: 'buero', days: [{ day: '2026-01-01', tAvg: 20 }] } }));
+
+  const forbidden = await call(mod, ctx('PUT', '/api/locations', { env, auth: 'bob:x', body: { id: 'buero', name: 'X' } }));
+  assert.strictEqual(forbidden.status, 403);
+
+  await call(mod, ctx('PUT', '/api/locations', { env, auth: 'test', body: { id: 'buero', name: 'Neu' } }));
+  const row = await env.DB.prepare('SELECT name, channel, read_key FROM locations WHERE id = ?').bind('buero').first();
+  assert.strictEqual(row.name, 'Neu');
+  assert.strictEqual(row.channel, '111'); // nicht uebergeben -> unveraendert
+  assert.strictEqual(row.read_key, 'KEY1'); // leer -> behalten
+
+  await call(mod, ctx('DELETE', '/api/locations?id=buero', { env, auth: 'test' }));
+  const cd = await env.DB.prepare('SELECT COUNT(*) AS n FROM climate_daily WHERE loc = ?').bind('buero').first();
+  assert.strictEqual(cd.n, 0);
+});
+
 // ---- _notify.dispatch: erfolgreicher Versand wird protokolliert (Plan3-2) ----
 test('dispatch: erfolgreicher Versand landet in alert_log', async () => {
   const notify = await loadEndpoint('_notify');

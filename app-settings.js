@@ -46,16 +46,24 @@
           const th = getThresholds(loc.id);
           const card = document.createElement('div');
           card.className = 'bg-slate-900/50 border border-slate-800/60 rounded-xl p-3';
+          const adminDyn = loc.dynamic && window.Store && Store.isAdmin;
           card.innerHTML = `
             <div class="flex items-center justify-between gap-2">
               <p class="text-sm font-semibold text-white truncate">${escapeHtml(getLocationName(loc.id))}</p>
               <button class="p-1 rounded text-slate-500 hover:text-white transition-colors" title="Umbenennen"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
             </div>
             <p class="text-[11px] text-slate-400 mt-1">Wohlfühlband: ${th.tempMin}–${th.tempMax} °C · ${th.humMin}–${th.humMax} %</p>
-            <button class="mt-2 text-[11px] text-teal-300 hover:text-teal-200 transition-colors">Schwellwerte bearbeiten</button>
+            <div class="mt-2 flex items-center gap-3 text-[11px]">
+              <button data-role="thresh" class="text-teal-300 hover:text-teal-200 transition-colors">Schwellwerte bearbeiten</button>
+              ${adminDyn ? '<button data-role="editloc" class="text-slate-400 hover:text-white transition-colors">Standort bearbeiten</button><button data-role="delloc" class="text-slate-400 hover:text-red-400 transition-colors ml-auto">Löschen</button>' : ''}
+            </div>
           `;
           card.querySelector('button[title="Umbenennen"]').onclick = () => renameLocation(loc.id);
-          card.querySelectorAll('button')[1].onclick = () => editLocationThresholds(loc.id);
+          card.querySelector('[data-role="thresh"]').onclick = () => editLocationThresholds(loc.id);
+          if (adminDyn) {
+            card.querySelector('[data-role="editloc"]').onclick = () => editDynamicLocation(loc.id);
+            card.querySelector('[data-role="delloc"]').onclick = () => deleteDynamicLocation(loc.id);
+          }
           locEl.appendChild(card);
         });
 
@@ -287,6 +295,60 @@
       } catch (err) {
         showNotification(err.unavailable ? 'Cloud-DB nicht eingerichtet.' : `Fehlgeschlagen: ${err.message}`, 'error');
       }
+    }
+
+    // Dynamischen Standort bearbeiten (P3-3, nur Admin). Kanal/Read-Key werden
+    // vom Server nie ausgeliefert → leer lassen behaelt sie.
+    async function editDynamicLocation(locId) {
+      const loc = LOCATIONS.find(l => l.id === locId);
+      if (!loc) return;
+      const f = loc.fields || {};
+      const extraStr = (f.extra || []).map(e => `${e.key}:${e.field}:${e.label || e.key}:${e.unit || ''}`).join(', ');
+      const vals = await modalPrompt({
+        title: `Standort „${getLocationName(locId)}" bearbeiten`,
+        description: 'Kanal-ID und Read-Key nur ausfüllen, wenn sie geändert werden sollen (leer = unverändert).',
+        fields: [
+          { key: 'name', label: 'Anzeigename', value: getLocationName(locId) },
+          { key: 'channel', label: 'ThingSpeak Kanal-ID (leer = unverändert)', value: '' },
+          { key: 'readKey', label: 'Read API Key (leer = unverändert)', value: '' },
+          { key: 'lat', label: 'Breitengrad', type: 'number', value: loc.defaultWeather.lat },
+          { key: 'lon', label: 'Längengrad', type: 'number', value: loc.defaultWeather.lon },
+          { key: 'tempField', label: 'Feld Temperatur', value: f.temp || 'field1' },
+          { key: 'humField', label: 'Feld Luftfeuchte', value: f.humidity || 'field2' },
+          { key: 'extra', label: 'Extra-Sensoren', value: extraStr, hint: 'key:field:Label:Einheit, mit Komma getrennt' }
+        ]
+      });
+      if (!vals) return;
+      const extra = (vals.extra || '').split(',').map(s => s.trim()).filter(Boolean).map(s => {
+        const [key, field, label, unit] = s.split(':').map(x => (x || '').trim());
+        return key && field ? { key, field, label: label || key, unit: unit || '', decimals: 0 } : null;
+      }).filter(Boolean);
+      const body = {
+        id: locId, name: (vals.name || '').trim(),
+        lat: parseFloat(String(vals.lat).replace(',', '.')), lon: parseFloat(String(vals.lon).replace(',', '.')),
+        fields: { temp: vals.tempField || 'field1', humidity: vals.humField || 'field2', extra }
+      };
+      if ((vals.channel || '').trim()) body.channel = vals.channel.trim();
+      if ((vals.readKey || '').trim()) body.readKey = vals.readKey.trim();
+      try {
+        await apiFetch('/api/locations', { method: 'PUT', body: JSON.stringify(body) });
+        showNotification('Standort gespeichert – lade neu…');
+        setTimeout(() => location.reload(), 900);
+      } catch (e) { showNotification('Speichern fehlgeschlagen.', 'error'); }
+    }
+
+    async function deleteDynamicLocation(locId) {
+      const ok = await modalConfirm({
+        title: 'Standort löschen?',
+        message: `„${getLocationName(locId)}" und dessen Archivdaten (Langzeit-Archiv) werden entfernt. Das lässt sich nicht rückgängig machen.`,
+        confirmLabel: 'Löschen', danger: true
+      });
+      if (!ok) return;
+      try {
+        await apiFetch(`/api/locations?id=${encodeURIComponent(locId)}`, { method: 'DELETE' });
+        showNotification('Standort gelöscht – lade neu…');
+        setTimeout(() => location.reload(), 900);
+      } catch (e) { showNotification('Löschen fehlgeschlagen.', 'error'); }
     }
 
     async function editHubGoals() {
