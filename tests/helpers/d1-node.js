@@ -31,6 +31,26 @@ function createD1() {
   };
 }
 
+// ---- R2-Adapter (in-memory) fuer die Backup-Tests ----
+function createR2() {
+  const store = new Map(); // key -> { body, meta, uploaded }
+  return {
+    async put(key, value, opts = {}) { store.set(key, { body: value, meta: (opts && opts.customMetadata) || {}, uploaded: new Date() }); },
+    async get(key) {
+      if (!store.has(key)) return null;
+      const o = store.get(key);
+      return { body: o.body, customMetadata: o.meta, async text() { return o.body; }, async json() { return JSON.parse(o.body); } };
+    },
+    async list({ prefix = '' } = {}) {
+      const objects = [...store.entries()]
+        .filter(([k]) => k.startsWith(prefix))
+        .map(([key, o]) => ({ key, size: (o.body || '').length, uploaded: o.uploaded, customMetadata: o.meta }));
+      return { objects };
+    },
+    async delete(key) { (Array.isArray(key) ? key : [key]).forEach(k => store.delete(k)); }
+  };
+}
+
 // ---- Functions als ESM ladbar machen ----
 let _dir = null;
 function loadFunctions() {
@@ -84,4 +104,4 @@ async function call(mod, context) {
   return fn(context);
 }
 
-module.exports = { createD1, loadEndpoint, ctx, call };
+module.exports = { createD1, createR2, loadEndpoint, ctx, call };

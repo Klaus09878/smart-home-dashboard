@@ -36,6 +36,7 @@
 
       renderNotifyRules();
       initWebPushUI(); // Web-Push-Button je nach Server-/Geraete-Faehigkeit
+      renderServerBackups(); // R2-Server-Backups (nur Admin, P3-1)
 
       // Standorte
       const locEl = document.getElementById('settings-locations');
@@ -141,6 +142,43 @@
       renderSettings();
       if (typeof renderActiveView === 'function') renderActiveView();
       showNotification('Schwellwerte gespeichert.');
+    }
+
+    // ============ Server-Backups aus R2 wiederherstellen (P3-1, nur Admin) ============
+    async function renderServerBackups() {
+      const el = document.getElementById('server-backups');
+      if (!el || !window.Store || !Store.isAdmin) { if (el) el.classList.add('hidden'); return; }
+      let dumps = [];
+      try { const d = await apiFetch('/api/backup-dump?list=1'); dumps = d.dumps || []; }
+      catch (e) { el.classList.add('hidden'); return; } // ohne R2/Admin ausblenden
+      el.classList.remove('hidden');
+      const rows = dumps.length ? dumps.map(d => `
+        <div class="flex items-center justify-between gap-2 py-1">
+          <span class="text-xs text-slate-300">${escapeHtml(d.date)} <span class="text-[10px] text-slate-500">(${Math.round((d.size || 0) / 1024)} KB)</span></span>
+          <button data-onclick="restoreServerBackup|${escapeHtml(d.key)}" class="px-2 py-0.5 rounded text-[11px] text-amber-300 border border-amber-500/30 hover:bg-amber-500/10 transition-colors">Wiederherstellen</button>
+        </div>`).join('') : '<p class="text-[11px] text-slate-500">Noch keine Server-Backups. Der Cron auf /api/backup-dump legt sie an.</p>';
+      el.innerHTML = `<span class="block text-[10px] text-slate-500 uppercase font-semibold mb-1">Server-Backups (R2)</span>${rows}`;
+      updateIcons();
+    }
+
+    async function restoreServerBackup(key) {
+      const ok = await modalConfirm({
+        title: 'Server-Backup wiederherstellen?',
+        message: `„${key}" überschreibt die Server-Daten ALLER Profile mit dem Stand dieses Backups. Das lässt sich nicht rückgängig machen.`,
+        confirmLabel: 'Weiter', danger: true
+      });
+      if (!ok) return;
+      const vals = await modalPrompt({
+        title: 'Bestätigen',
+        description: 'Zum Bestätigen den Dateinamen exakt eintippen.',
+        fields: [{ key: 'confirm', label: key, type: 'text', value: '' }]
+      });
+      if (!vals || (vals.confirm || '').trim() !== key) { showNotification('Bestätigung stimmt nicht — abgebrochen.', 'error'); return; }
+      try {
+        await apiFetch('/api/backup-dump', { method: 'POST', body: JSON.stringify({ key, confirm: key }) });
+        showNotification('Wiederhergestellt. Lade neu…');
+        setTimeout(() => location.reload(), 1000);
+      } catch (e) { showNotification('Wiederherstellung fehlgeschlagen.', 'error'); }
     }
 
     // ============ Nutzerverwaltung in D1 (P2-16, nur Admin) ============

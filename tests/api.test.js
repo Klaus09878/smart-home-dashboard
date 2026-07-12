@@ -3,7 +3,7 @@
 // vor allem die riskante Merge-/Tombstone-Logik (LWW). Ausfuehren: npm test.
 // Benoetigt Node >= 22 (node:sqlite).
 const assert = require('assert');
-const { createD1, loadEndpoint, ctx, call } = require('./helpers/d1-node.js');
+const { createD1, createR2, loadEndpoint, ctx, call } = require('./helpers/d1-node.js');
 
 let passed = 0, failed = 0;
 const tests = [];
@@ -141,6 +141,38 @@ test('users: doppelter Name und Env-Kollision werden abgelehnt', async () => {
   // DELETE eines Env-Nutzers verboten
   const delEnv = await call(mod, ctx('DELETE', '/api/users?name=test', { env, auth: 'test' }));
   assert.strictEqual(delEnv.status, 400);
+});
+
+// ---- backup-dump.js: Dump nach R2 + Restore (Plan3-1) ----
+test('backup-dump: Dump nach R2, Liste, Restore in frische DB', async () => {
+  const dump = await loadEndpoint('api/backup-dump');
+  const settings = await loadEndpoint('api/settings');
+  const MEDIA = createR2();
+  const env = { AUTH_USER: 'test', AUTH_PASS: 'test', DB: createD1(), MEDIA };
+
+  await call(settings, ctx('POST', '/api/settings', { env, auth: 'test', body: { items: [{ key: 'theme', value: 'dark', updatedAt: 1000 }] } }));
+
+  // Nicht-Admin darf nicht
+  const forbidden = await call(dump, ctx('GET', '/api/backup-dump', { env, auth: 'bob:x' }));
+  assert.strictEqual(forbidden.status, 403);
+
+  const dumped = await jsonOf(await call(dump, ctx('GET', '/api/backup-dump', { env, auth: 'test' })));
+  assert.ok(dumped.ok && dumped.key);
+
+  const listed = await jsonOf(await call(dump, ctx('GET', '/api/backup-dump?list=1', { env, auth: 'test' })));
+  assert.ok(listed.dumps.some(d => d.key === dumped.key));
+
+  // Restore in eine frische DB (gleiches MEDIA), mit Doppelbestaetigung
+  const env2 = { AUTH_USER: 'test', AUTH_PASS: 'test', DB: createD1(), MEDIA };
+  const badConfirm = await call(dump, ctx('POST', '/api/backup-dump', { env: env2, auth: 'test', body: { key: dumped.key, confirm: 'falsch' } }));
+  assert.strictEqual(badConfirm.status, 400);
+
+  const restored = await jsonOf(await call(dump, ctx('POST', '/api/backup-dump', { env: env2, auth: 'test', body: { key: dumped.key, confirm: dumped.key } })));
+  assert.ok(restored.ok);
+  assert.strictEqual(restored.restored.user_settings, 1);
+
+  const check = await jsonOf(await call(settings, ctx('GET', '/api/settings', { env: env2, auth: 'test' })));
+  assert.strictEqual(check.settings.theme.value, 'dark');
 });
 
 // ---- Runner ----
