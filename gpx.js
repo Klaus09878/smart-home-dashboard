@@ -725,32 +725,41 @@ function resizeImageToWebp(file, maxDim, quality) {
   });
 }
 
+// EXIF-GPS eines Bildes lesen (vor dem Resize, der EXIF verwirft) — P2-15.
+async function exifGps(file) {
+  try {
+    if (typeof exifr !== 'undefined' && exifr.gps) {
+      const g = await exifr.gps(file);
+      if (g && typeof g.latitude === 'number' && typeof g.longitude === 'number') return { lat: g.latitude, lon: g.longitude };
+    }
+  } catch (e) { /* kein GPS im Foto */ }
+  return null;
+}
+
+// Ein Foto (auf WebP verkleinert) unter Nummer n zu einer Tour hochladen.
+// Gemeinsam genutzt von uploadTourPhoto und der Aufzeichnungs-Queue (P3-9).
+async function uploadPhotoBlob(uid, file, gps, n) {
+  let blob = await resizeImageToWebp(file, 1600, 0.8);
+  if (blob.size > 500 * 1024) blob = await resizeImageToWebp(file, 1200, 0.7);
+  if (blob.size > 500 * 1024) throw new Error('Foto auch komprimiert zu groß');
+  const geo = gps ? `&lat=${gps.lat}&lon=${gps.lon}` : '';
+  const res = await fetch(`/api/photos?uid=${encodeURIComponent(uid)}&n=${n}${geo}`, {
+    method: 'PUT', headers: { 'Content-Type': 'image/webp' }, body: blob
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
 async function uploadTourPhoto(event) {
   const file = event.target.files[0];
   event.target.value = '';
   const act = state.activities.find(a => a.id === state.selectedId);
   if (!file || !act || !act.uid) return;
   try {
-    // EXIF-GPS VOR dem Resize lesen (Canvas verwirft die Metadaten) — P2-15
-    let gps = null;
-    try {
-      if (typeof exifr !== 'undefined' && exifr.gps) {
-        const g = await exifr.gps(file);
-        if (g && typeof g.latitude === 'number' && typeof g.longitude === 'number') gps = { lat: g.latitude, lon: g.longitude };
-      }
-    } catch (e) { /* kein GPS im Foto */ }
-
-    let blob = await resizeImageToWebp(file, 1600, 0.8);
-    if (blob.size > 500 * 1024) blob = await resizeImageToWebp(file, 1200, 0.7); // zweiter Versuch
-    if (blob.size > 500 * 1024) { showToast('Foto ist auch komprimiert zu groß (max. 500 KB).', 'error'); return; }
+    const gps = await exifGps(file);
     const used = JSON.parse((document.getElementById('detail-photos').dataset.usedN) || '[]');
     let n = 0; while (used.includes(n) && n < 5) n++;
     if (n >= 5) { showToast('Maximal 5 Fotos pro Tour.', 'error'); return; }
-    const geo = gps ? `&lat=${gps.lat}&lon=${gps.lon}` : '';
-    const res = await fetch(`/api/photos?uid=${encodeURIComponent(act.uid)}&n=${n}${geo}`, {
-      method: 'PUT', headers: { 'Content-Type': 'image/webp' }, body: blob
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    await uploadPhotoBlob(act.uid, file, gps, n);
     await renderPhotos(act);
     showToast('Foto hinzugefügt.', 'success');
   } catch (e) {
@@ -789,12 +798,47 @@ function toggleRecording() {
 
 async function startRecording() {
   if (!('geolocation' in navigator)) { setUploadStatus('Kein GPS auf diesem Gerät verfügbar.', true); return; }
-  state.rec = { active: true, points: [], startMs: Date.now(), lastSave: 0, lastLive: 0, wakeLock: null };
+  state.rec = { active: true, paused: false, points: [], photos: [], startMs: Date.now(), lastSave: 0, lastLive: 0, lastFixMs: Date.now(), wakeLock: null };
   try { if (navigator.wakeLock) state.rec.wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { /* Wake Lock optional */ }
   state.rec.watchId = navigator.geolocation.watchPosition(onRecFix, onRecErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
   state.rec.timer = setInterval(updateRecordingUI, 1000);
   updateRecordingUI();
   showToast('Aufzeichnung läuft. Bildschirm anlassen — iOS pausiert GPS bei gesperrtem Display.', 'info');
+}
+
+// Pause / Weiter (P3-9): Pause stoppt nur die Punkte-Sammlung, Wake Lock bleibt.
+function togglePauseRecording() {
+  const r = state.rec;
+  if (!r || !r.active) return;
+  if (r.paused) {
+    r.paused = false;
+    r.lastFixMs = Date.now();
+    r.watchId = navigator.geolocation.watchPosition(onRecFix, onRecErr, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+  } else {
+    r.paused = true;
+    if (r.watchId != null) navigator.geolocation.clearWatch(r.watchId);
+    r.watchId = null;
+  }
+  updateRecordingUI();
+}
+
+// Foto waehrend der Aufnahme (P3-9): Geotag = aktuelle Position, sonst EXIF.
+function recordPhoto() {
+  if (!state.rec || !state.rec.active) { showToast('Nur während einer Aufzeichnung.', 'error'); return; }
+  const inp = document.getElementById('rec-photo-input');
+  if (inp) inp.click();
+}
+async function onRecPhotoPicked(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  const r = state.rec;
+  if (!file || !r) return;
+  const last = r.points[r.points.length - 1];
+  const gps = last ? { lat: last[0], lon: last[1] } : await exifGps(file);
+  r.photos = r.photos || [];
+  if (r.photos.length >= 5) { showToast('Maximal 5 Fotos pro Tour.', 'error'); return; }
+  r.photos.push({ file, gps });
+  showToast(`Foto vorgemerkt (${r.photos.length}).`, 'success');
 }
 
 // Wake Lock nach Tab-Wechsel erneut anfordern (wird beim Verstecken freigegeben)
@@ -808,8 +852,9 @@ document.addEventListener('visibilitychange', async () => {
 
 function onRecFix(pos) {
   const r = state.rec;
-  if (!r || !r.active) return;
+  if (!r || !r.active || r.paused) return;
   const c = pos.coords;
+  r.lastFixMs = Date.now(); // fuer den Stillstands-Hinweis
   if (c.accuracy != null && c.accuracy > 50) return; // ungenaue Fixes verwerfen
   const pt = [c.latitude, c.longitude, (c.altitude != null && !isNaN(c.altitude)) ? c.altitude : null, Date.now()];
   const last = r.points[r.points.length - 1];
@@ -835,15 +880,21 @@ function updateRecordingUI() {
   const btn = document.getElementById('record-btn');
   const bar = document.getElementById('record-status');
   const stats = document.getElementById('record-stats');
-  const active = !!(state.rec && state.rec.active);
+  const label = document.getElementById('record-label');
+  const pauseBtn = document.getElementById('record-pause-btn');
+  const r = state.rec;
+  const active = !!(r && r.active);
   if (btn) btn.classList.toggle('text-rose-400', active);
   if (bar) bar.classList.toggle('hidden', !active);
-  if (active && stats) {
-    const r = state.rec;
-    const dur = Math.floor((Date.now() - r.startMs) / 1000);
-    const dist = r.points.length > 1 ? computeStats(r.points).distM : 0;
-    stats.textContent = `${fmtDuration(dur)} · ${fmtDist(dist)} · ${r.points.length} Punkte`;
-  }
+  if (!active) return;
+  const dur = Math.floor((Date.now() - r.startMs) / 1000);
+  const dist = r.points.length > 1 ? computeStats(r.points).distM : 0;
+  const still = !r.paused && r.lastFixMs && (Date.now() - r.lastFixMs > 90000);
+  if (stats) stats.textContent = `${fmtDuration(dur)} · ${fmtDist(dist)} · ${r.points.length} Punkte${still ? ' · steht still' : ''}`;
+  if (label) label.innerHTML = r.paused
+    ? '<span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Pausiert'
+    : '<span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span> Aufzeichnung läuft';
+  if (pauseBtn) pauseBtn.textContent = r.paused ? 'Weiter' : 'Pause';
 }
 
 async function stopRecording() {
@@ -855,15 +906,16 @@ async function stopRecording() {
   if (r.wakeLock) { try { await r.wakeLock.release(); } catch (e) { /* egal */ } }
   if (state.recLiveLayer && state.map) { state.map.removeLayer(state.recLiveLayer); state.recLiveLayer = null; }
   const points = r.points;
+  const photos = r.photos || [];
   state.rec = null;
   localStorage.removeItem('gpx_rec_buffer');
   updateRecordingUI();
   if (points.length < 10) { setUploadStatus('Zu wenige GPS-Punkte — Aufzeichnung verworfen.', true); return; }
-  await saveRecordedActivity(points, `Aufzeichnung ${new Date().toLocaleDateString('de-DE')}`);
+  await saveRecordedActivity(points, `Aufzeichnung ${new Date().toLocaleDateString('de-DE')}`, photos);
 }
 
 // Aufgezeichnete Punkte als Aktivitaet speichern (gleiche Struktur wie Import).
-async function saveRecordedActivity(points, name) {
+async function saveRecordedActivity(points, name, photos) {
   const stats = computeStats(points);
   const storedPoints = downsamplePoints(points, 5000);
   const activity = {
@@ -882,6 +934,16 @@ async function saveRecordedActivity(points, name) {
   await refreshActivities();
   if (localId != null) selectActivity(localId);
   showToast(`Tour gespeichert: ${fmtDist(stats.distM)}.`, 'success');
+
+  // Waehrend der Aufnahme vorgemerkte Fotos hochladen (P3-9)
+  if (photos && photos.length && await photosAvailable()) {
+    let ok = 0;
+    for (let n = 0; n < photos.length && n < 5; n++) {
+      try { await uploadPhotoBlob(activity.uid, photos[n].file, photos[n].gps, n); ok++; } catch (e) { /* einzelnes Foto */ }
+    }
+    if (ok) { showToast(`${ok} Foto(s) hochgeladen.`, 'success'); const a = state.activities.find(x => x.uid === activity.uid); if (a) renderPhotos(a); }
+    else showToast('Fotos konnten nicht hochgeladen werden (R2 fehlt?).', 'error');
+  }
 }
 
 // Nach einem Absturz/Reload waehrend der Aufnahme anbieten, den Puffer zu retten.
