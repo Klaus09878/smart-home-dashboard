@@ -1,5 +1,11 @@
 # Umsetzungsplan Runde 3 — 10 Punkte
 
+> **Status: ✅ vollständig umgesetzt** (Commits `Plan3-1` … `Plan3-10`).
+> Verifiziert: `npm run lint` (0 Fehler), `npm test` (64 Core + 3 Web-Push + 13 API
+> + 9 Smoke), `npm run test:e2e` (7 Browser-Tests) — alles grün; Service-Worker v44.
+> Zusatz-Fix in Punkt 10: `Permissions-Policy: geolocation=()` → `geolocation=(self)`
+> (das alte Setzen haette GPS-Aufzeichnung + Standortsuche in Produktion blockiert).
+
 Für die schrittweise Umsetzung durch ein KI-Modell (oder einen Menschen) geschrieben:
 pro Punkt Ziel, Dateien mit Funktionsankern, konkrete Schritte, Abnahme und Fallstricke.
 **Ein Punkt = ein Commit** (Prefix `Plan3-N:`), direkt auf `main` (Auto-Deploy, Projektregel 8).

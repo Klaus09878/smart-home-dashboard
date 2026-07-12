@@ -174,7 +174,7 @@ Runde 1 (Web Push, Briefing, CO₂, Jahres-Heatmap, Backup, GPX-Fotos …) und
 **Runde 2** ([PLAN2.md](PLAN2.md): Datensicherheit, CSP-Härtung, Modularisierung,
 DWD-Warnungen, Live-Aufzeichnung, Nutzerverwaltung u. v. m.) sind vollständig umgesetzt.
 
-**Runde 3 (10 Punkte):** detaillierter Umsetzungsplan in [PLAN3.md](PLAN3.md), drei Phasen:
+**Runde 3** ([PLAN3.md](PLAN3.md)) ist ebenfalls vollständig umgesetzt:
 
 - **A — Vervollständigen:** R2-Backup-Restore, Warnungs-Protokoll (alert_log), Standorte bearbeiten/löschen
 - **B — Klima-Intelligenz:** Fenster-offen-Erkennung, Morgen-Digest-Push, Sensor-Kalibrierung, Tagesnotizen im Archiv
