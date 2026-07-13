@@ -348,8 +348,14 @@ function registerServiceWorker() {
     });
   }).catch(err => console.warn('Service Worker Registrierung fehlgeschlagen:', err));
 
+  // Beim ERSTEN Install uebernimmt der neue SW die Seite (clients.claim) und
+  // loest controllerchange aus — dieses eine Mal NICHT neu laden (Plan4-7),
+  // sonst gibt es beim Erstbesuch einen unnoetigen Voll-Reload mitten im Start.
+  // Nur echte Updates (Nutzer tippt "Neu laden") sollen reloaden.
+  let hadController = !!navigator.serviceWorker.controller;
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) { hadController = true; return; }
     if (refreshing) return;
     refreshing = true;
     location.reload();

@@ -1520,8 +1520,9 @@ async function init() {
     }
     if (sessionStorage.getItem('gpx_autostart') === '1' && !(state.rec && state.rec.active)) {
       startRecording();
-      // Flag erst nach dem SW-Reload-Fenster loeschen (der erste SW-Install
-      // reloadt die Seite via controllerchange) — so ueberlebt der Autostart.
+      // Flag nach kurzer Frist loeschen. Seit Plan4-7 reloadt der erste
+      // SW-Install nicht mehr, der Autostart laeuft also genau einmal direkt;
+      // die Frist deckt den Fall ab, dass doch ein Reload dazwischenkommt.
       setTimeout(() => sessionStorage.removeItem('gpx_autostart'), 4000);
     }
   }
