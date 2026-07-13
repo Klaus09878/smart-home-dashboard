@@ -302,6 +302,7 @@
       } catch (e) { /* Health/D1 evtl. nicht verfuegbar */ }
 
       renderBriefing(signals);
+      appState.lastDataAt = Date.now(); // fuer den Rueckkehr-Refresh (Plan4-21)
     }
 
     // ============ Hub-Widget: Status-Briefing (Plan-Punkt 5) ============
@@ -426,7 +427,12 @@
         handleRoute();
       });
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && window.Store) Store.pull();
+        if (document.visibilityState !== 'visible') return;
+        if (window.Store) Store.pull();
+        // Nach laengerer Abwesenheit (> Refresh-Intervall) sofort auffrischen
+        // statt bis zum naechsten Timer-Tick zu warten (Plan4-21).
+        const maxAgeMs = getAppPrefs().refreshMin * 60 * 1000;
+        if (navigator.onLine && Date.now() - appState.lastDataAt > maxAgeMs) refreshVisibleView(true);
       });
 
       // Netz-Rueckkehr (Plan4-20): sofort die sichtbare View auffrischen.

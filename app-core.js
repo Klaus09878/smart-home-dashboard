@@ -60,6 +60,7 @@
       currentChartTimeframe: 24, // hours
       climateLoaded: false,
       initDone: false, // true, sobald init() Store+Standorte geladen hat (Plan4-2)
+      lastDataAt: 0,   // Zeitpunkt der letzten erfolgreichen Datenauffrischung (Plan4-21)
       // Zeitpunkte der letzten ECHTEN Messwerte (nicht forward-filled)
       lastSensorUpdate: { temp: null, humidity: null },
       // Rohdaten-Cache pro Standort für inkrementelles Nachladen (statt jedes Mal 8000 Einträge)
@@ -427,6 +428,7 @@
         ]);
 
         renderActiveView();
+        appState.lastDataAt = Date.now(); // fuer den Rueckkehr-Refresh (Plan4-21)
       } catch (error) {
         console.error('Error reloading data:', error);
         showNotification('Fehler beim Abrufen der Live-Daten.', 'error');
