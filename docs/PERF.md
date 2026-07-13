@@ -35,6 +35,7 @@ Punkte adressiert Phase A.
 |---|---|---|---|---|
 | Baseline (vor P4) | 5470 ms | 57 | 912 KB | init() awaitet vor dem View-Wechsel |
 | nach Plan4-2 | 4227 ms | 57 | 914 KB | Render-Gerüst vor dem ersten await |
+| nach Plan4-3 | 4227 ms | 57 | 915 KB | Briefing 2794 → 1965 ms (whoami+settings parallel) |
 
 **Harness-Hinweis:** Die CDP-Netzdrossel greift bei localhost-Auslieferung
 statischer Dateien nur schwach (load-Event ~600 ms trotz „Fast-3G"); das

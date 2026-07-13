@@ -353,13 +353,15 @@
       renderRoute();
       updateHubClock(); // Uhr/Begruessung ohne Profilnamen (Guard in getProfileDisplayName)
 
-      // Profil + Einstellungen laden, bevor Einstellungen gelesen werden
-      await Store.init();
+      // Profil/Einstellungen UND Zusatz-Standorte parallel laden (Plan4-3) —
+      // loadDynamicLocations braucht den Store nicht (nur apiFetch), also kein
+      // Grund, es hinter Store.init zu serialisieren.
+      await Promise.all([Store.init(), loadDynamicLocations()]);
       updateProfileBadge();
       applyTheme(getTheme()); // profilbezogenes Theme anwenden
-      // Zusatz-Standorte aus D1 ergänzen, bevor Tabs/Configs rendern
-      await loadDynamicLocations();
-      loadCalibrations(); // Sensor-Offsets laden (P3-6, best effort)
+      // Sensor-Offsets laden (P3-6, best effort). Trifft die Kalibrierung erst
+      // nach dem ersten Render ein, korrigiert der silente Reload die Anzeige.
+      loadCalibrations().then(() => { if (appState.climateLoaded) reloadData(true); });
 
       updateIcons();
       initConfigs();

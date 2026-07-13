@@ -170,28 +170,35 @@ const Store = (function () {
     localStorage.setItem(flag, '1');
   }
 
-  async function pullServer() {
+  // Wendet eine /api/settings-Antwort an (LWW ueber updatedAt). Vom Fetch
+  // getrennt, damit doInit den settings-Request PARALLEL zu whoami starten kann
+  // (Plan4-3) — angewandt wird aber erst NACH dem Setzen von state.profile.
+  function applySettings(data) {
     let changed = 0;
-    try {
-      const data = await apiFetch('/api/settings');
-      const settings = data.settings || {};
-      Object.entries(settings).forEach(([key, entry]) => {
-        const serverTs = entry.updatedAt || 0;
-        if (serverTs > localTs(key)) {
-          if (entry.value === null) {
-            localStorage.removeItem(phys(key));
-          } else {
-            localStorage.setItem(phys(key),
-              typeof entry.value === 'string' ? entry.value : JSON.stringify(entry.value));
-          }
-          localStorage.setItem(metaKey(key), String(serverTs));
-          changed++;
+    const settings = (data && data.settings) || {};
+    Object.entries(settings).forEach(([key, entry]) => {
+      const serverTs = entry.updatedAt || 0;
+      if (serverTs > localTs(key)) {
+        if (entry.value === null) {
+          localStorage.removeItem(phys(key));
+        } else {
+          localStorage.setItem(phys(key),
+            typeof entry.value === 'string' ? entry.value : JSON.stringify(entry.value));
         }
-      });
+        localStorage.setItem(metaKey(key), String(serverTs));
+        changed++;
+      }
+    });
+    return changed;
+  }
+
+  async function pullServer() {
+    try {
+      return applySettings(await apiFetch('/api/settings'));
     } catch (err) {
       if (!err.unavailable) console.warn('Einstellungen laden fehlgeschlagen:', err);
+      return 0;
     }
-    return changed;
   }
 
   // Öffentlicher Pull (periodisch / bei Tab-Fokus, Punkt 6). Dispatcht
@@ -206,8 +213,14 @@ const Store = (function () {
   };
 
   async function doInit() {
+    // whoami und settings PARALLEL anfragen (Plan4-3): der settings-Request
+    // haengt nicht vom whoami-Ergebnis ab (der Server kennt das Profil aus der
+    // Auth). So kostet der Start ~einen statt ~zwei serielle Roundtrips.
+    const whoP = apiFetch('/api/whoami');
+    const setP = apiFetch('/api/settings').catch(err => ({ __err: err }));
+
     try {
-      const who = await apiFetch('/api/whoami');
+      const who = await whoP;
       state.profile = (who.user || 'default').replace(/[^\w.-]/g, '_');
       state.isAdmin = !!who.isAdmin;
       state.profiles = who.profiles || null;
@@ -219,7 +232,14 @@ const Store = (function () {
     }
 
     migrateLegacy();
-    if (state.mode === 'server') { await pullServer(); flushSync(); }
+    // settings erst JETZT anwenden — state.profile steht fest, applySettings
+    // schreibt unter dem Praefix p_<profil>_.
+    if (state.mode === 'server') {
+      const data = await setP;
+      if (data && !data.__err) applySettings(data);
+      else if (data && data.__err && !data.__err.unavailable) console.warn('Einstellungen laden fehlgeschlagen:', data.__err);
+      flushSync();
+    }
     state.ready = true;
     try { window.dispatchEvent(new CustomEvent('store-ready', { detail: { profile: state.profile } })); }
     catch (e) { /* ältere Browser */ }
