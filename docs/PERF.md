@@ -56,5 +56,12 @@ sind daher v. a. die serielle Await-Kette (Briefing-Zeit), Request-Anzahl und
 Bytes sowie die MutationObserver-Reveal-Zeit; absolute Download-Millisekunden
 sind optimistisch.
 
+**Plan4-6 (ThingSpeak-Erst-Load):** Der erste Klima-Load fordert jetzt 4032
+statt 8000 ThingSpeak-Eintraege an (~14 Tage, ~50 % weniger Feed-Bytes/Parse);
+die volle Historie holt `ensureFullHistory` erst beim Klick auf „Alle". Das
+hub-fokussierte Perf-Skript misst den Klima-Feed-Load nicht (der Hub nutzt nur
+`results=400`-Vorschauen), daher steht der Effekt nicht in der Tabelle oben —
+verifiziert ueber den Code-Pfad und den `results`-Parameter im Feed-Mock.
+
 <!-- Nach Phase A (Punkt 8): hier die Vergleichstabelle Baseline ↔ Nachher. -->
 <!-- Final (Punkt 25): kompletter Verlauf Baseline → Phase A → final. -->

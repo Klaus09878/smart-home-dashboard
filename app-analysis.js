@@ -475,7 +475,7 @@
       appState.chartInstance = new Chart(ctx, config);
     }
 
-    function setChartTimeframe(hours) {
+    async function setChartTimeframe(hours) {
       appState.currentChartTimeframe = hours;
       const tfIds = { 24: 'btn-tf-24', 72: 'btn-tf-72', 168: 'btn-tf-168', '-1': 'btn-tf-all' };
       Object.keys(tfIds).forEach(k => {
@@ -485,6 +485,9 @@
       const active = document.getElementById(tfIds[hours.toString()]);
       if (active) active.className = 'px-3.5 py-1.5 rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 text-xs font-semibold transition-all';
 
+      // "Alle" braucht die komplette Historie — der Erst-Load holt nur 14 Tage
+      // (Plan4-6). Erst nachladen, dann zeichnen.
+      if (hours === -1) await ensureFullHistory();
       drawChart();
     }
 

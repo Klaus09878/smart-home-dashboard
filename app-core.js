@@ -462,8 +462,14 @@
         start = new Date(lastMs + 1000).toISOString().replace('T', ' ').substring(0, 19);
       }
 
+      // Erst-Load bewusst nur ~14 Tage (4032 Eintraege im 5-min-Takt) statt 8000
+      // — kleinerer Download/Parse auf dem Handy. Deckt Lueftungs-Tagebuch (14 d)
+      // ab; die komplette Historie holt ensureFullHistory erst bei "Alle" im Chart
+      // (Plan4-6). Der inkrementelle Refresh (start) laedt danach nur Neues.
+      const results = hasCache ? 8000 : 4032;
+
       try {
-        const data = await fetchFeeds(activeLoc, { results: 8000, start });
+        const data = await fetchFeeds(activeLoc, { results, start });
         const newFeeds = (data && Array.isArray(data.feeds)) ? data.feeds : [];
 
         let rawFeeds;
@@ -481,7 +487,9 @@
         if (processed.aligned.length === 0) throw new Error('Keine gültigen abgeglichenen Daten gefunden');
         processed.aligned = calibratedAligned(activeLoc.id, processed.aligned); // Kalibrierung (P3-6)
 
-        appState.feedCache[activeLoc.id] = { rawFeeds };
+        // Vollstaendigkeits-Flag erhalten: nach einem ensureFullHistory-Lauf
+        // (full=true) darf ein inkrementeller Refresh es nicht zuruecksetzen.
+        appState.feedCache[activeLoc.id] = { rawFeeds, full: hasCache ? !!cache.full : false };
         appState.insideData = processed.aligned;
         appState.lastSensorUpdate = { temp: processed.lastTempTime, humidity: processed.lastHumTime };
         appState.isDemoMode = false;
@@ -516,6 +524,28 @@
             activateDemoMode();
           }
         }
+      }
+    }
+
+    // Volle ThingSpeak-Historie (bis 8000 Eintraege) nachladen — nur wenn der
+    // Nutzer wirklich "Alle" im Klimaverlauf waehlt (Plan4-6). Ersetzt den
+    // 14-Tage-Cache des aktiven Standorts und aktualisiert die Anzeige-Daten.
+    async function ensureFullHistory() {
+      const activeLoc = LOCATIONS.find(l => l.id === appState.activeLocId);
+      const cache = appState.feedCache[activeLoc.id];
+      if (cache && cache.full) return; // schon vollstaendig geladen
+      showToast('Lade vollständige Historie …', 'info');
+      try {
+        const data = await fetchFeeds(activeLoc, { results: 8000 });
+        const rawFeeds = (data && Array.isArray(data.feeds)) ? data.feeds : [];
+        if (rawFeeds.length === 0) return;
+        const processed = processRawFeeds(rawFeeds, activeLoc.fields);
+        if (processed.aligned.length === 0) return;
+        appState.feedCache[activeLoc.id] = { rawFeeds, full: true };
+        appState.insideData = calibratedAligned(activeLoc.id, processed.aligned);
+        saveOfflineSnapshot(activeLoc.id, appState.insideData);
+      } catch (err) {
+        console.warn('Volle Historie laden fehlgeschlagen:', err);
       }
     }
 
