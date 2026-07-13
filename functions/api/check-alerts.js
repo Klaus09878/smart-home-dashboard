@@ -376,36 +376,48 @@ export async function onRequestGet(context) {
   if (env.DB) {
     try {
       const berlinHour = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/Berlin' }).format(new Date()));
-      if (berlinHour >= 6 && berlinHour <= 9) {
+      // Aeusseres Fenster weit (5-12 Uhr); die genaue Wunsch-Uhrzeit prueft der
+      // Empfaenger-Loop (Plan4-13). So kann jedes Profil seine Zeit waehlen.
+      if (berlinHour >= 5 && berlinHour < 12) {
         const berlinYmd = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/-/g, '');
         const vapid = vapidFromEnv(env);
         for (const rec of recipients) {
           if (rec.profile === '_global') continue;
           const cfg = typeCfg(rec.rules, 'digest');
           if (!cfg.on || isQuietNow(rec.rules)) continue;
+          // Wunsch-Uhrzeit (Plan4-13): 2-h-Fenster ab cfg.hour (Default 7). Der
+          // 20-h-Dedupe verhindert Doppelversand, falls der Cron mehrfach laeuft.
+          const fromH = (cfg.hour >= 5 && cfg.hour <= 10) ? cfg.hour : 7;
+          if (berlinHour < fromH || berlinHour >= fromH + 2) continue;
           if (!(await shouldSend(env.DB, `${rec.profile}:digest`, (cfg.dedupeH ?? 20) * 60 * 60 * 1000))) continue;
 
+          // Bausteine je Profil abwaehlbar (Plan4-13): cfg.parts.<name> === false blendet aus.
+          const pcfg = cfg.parts || {};
           const parts = [];
-          if (digestWeather) {
+          if (pcfg.weather !== false && digestWeather) {
             const w = [];
             if (digestWeather.min != null) w.push(`min ${digestWeather.min.toFixed(0)} °C`);
             if (digestWeather.max != null) w.push(`max ${digestWeather.max.toFixed(0)} °C`);
             if (w.length) parts.push(`Wetter: ${w.join(' / ')}`);
           }
-          if (digestClimate.length) parts.push('Innen: ' + digestClimate.map(c => `${c.label} ${c.temp.toFixed(1)} °C/${c.hum.toFixed(0)} %`).join(' · '));
-          try {
-            const { results } = await env.DB.prepare("SELECT text FROM todos WHERE (profile = ? OR shared = 1) AND done = 0 AND deleted = 0 AND due_ms IS NOT NULL AND due_ms < ? ORDER BY due_ms LIMIT 5")
-              .bind(rec.profile, Date.now() + 24 * 60 * 60 * 1000).all();
-            const todos = (results || []).map(r => r.text);
-            if (todos.length) parts.push(`To-dos: ${todos.join(', ')}`);
-          } catch (e) { /* optional */ }
-          try {
-            const s = await env.DB.prepare("SELECT value FROM user_settings WHERE profile = ? AND key = 'ical_url'").bind(rec.profile).first();
-            if (s && s.value && digestIcalAllowed(s.value)) {
-              const evs = await fetchTodayIcs(s.value, berlinYmd);
-              if (evs.length) parts.push(`Termine: ${evs.join(', ')}`);
-            }
-          } catch (e) { /* optional */ }
+          if (pcfg.climate !== false && digestClimate.length) parts.push('Innen: ' + digestClimate.map(c => `${c.label} ${c.temp.toFixed(1)} °C/${c.hum.toFixed(0)} %`).join(' · '));
+          if (pcfg.todos !== false) {
+            try {
+              const { results } = await env.DB.prepare("SELECT text FROM todos WHERE (profile = ? OR shared = 1) AND done = 0 AND deleted = 0 AND due_ms IS NOT NULL AND due_ms < ? ORDER BY due_ms LIMIT 5")
+                .bind(rec.profile, Date.now() + 24 * 60 * 60 * 1000).all();
+              const todos = (results || []).map(r => r.text);
+              if (todos.length) parts.push(`To-dos: ${todos.join(', ')}`);
+            } catch (e) { /* optional */ }
+          }
+          if (pcfg.events !== false) {
+            try {
+              const s = await env.DB.prepare("SELECT value FROM user_settings WHERE profile = ? AND key = 'ical_url'").bind(rec.profile).first();
+              if (s && s.value && digestIcalAllowed(s.value)) {
+                const evs = await fetchTodayIcs(s.value, berlinYmd);
+                if (evs.length) parts.push(`Termine: ${evs.join(', ')}`);
+              }
+            } catch (e) { /* optional */ }
+          }
 
           if (!parts.length) continue;
           const msg = { title: 'Guten Morgen – Tagesüberblick', body: parts.join('\n'), tags: 'sun_with_face', priority: 'default' };

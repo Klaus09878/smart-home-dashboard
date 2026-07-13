@@ -546,6 +546,10 @@
           ? `<span class="text-[11px] text-slate-400 flex items-center gap-1">${t.thLabel}
                <input type="number" id="nr-th-${t.key}" value="${cfg.threshold ?? t.thDef}" class="w-16 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200" data-onchange="saveNotifyRulesFromUI"></span>`
           : '';
+        // Digest-Feinconfig (Plan4-13): Button oeffnet Uhrzeit + Bausteine
+        const cfgBtn = t.key === 'digest'
+          ? `<button data-onclick="configureDigest" class="text-[11px] text-teal-300 hover:text-teal-200 transition-colors whitespace-nowrap" title="Uhrzeit und Bausteine">Anpassen</button>`
+          : '';
         // Entprell-Intervall pro Regel (Plan4-12): "max 1x / N h"
         const ddHtml = DEDUPE_EDITABLE.has(t.key)
           ? `<span class="text-[11px] text-slate-400 flex items-center gap-1" title="Mindestabstand gleicher Meldungen in Stunden">max&nbsp;1×/
@@ -557,7 +561,7 @@
             <i data-lucide="${t.icon}" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
             <span class="truncate">${t.label}</span>
           </label>
-          <div class="flex items-center gap-2 shrink-0">${thHtml}${ddHtml}</div>
+          <div class="flex items-center gap-2 shrink-0">${cfgBtn}${thHtml}${ddHtml}</div>
         `;
         wrap.appendChild(row);
       });
@@ -573,10 +577,17 @@
     }
 
     function saveNotifyRulesFromUI() {
+      const prev = Store.getJSON('notify_rules', {}) || {};
       const rules = { types: {}, quiet: {} };
       NOTIFY_TYPES.forEach(t => {
         const on = document.getElementById(`nr-on-${t.key}`);
         rules.types[t.key] = { on: on ? on.checked : true };
+        // Zusatzfelder (z. B. digest hour/parts, Plan4-13) aus dem gespeicherten
+        // Stand erhalten — die Checkbox-UI baut das Objekt sonst neu und wuerde
+        // sie verlieren.
+        const prevType = (prev.types || {})[t.key] || {};
+        if (prevType.hour != null) rules.types[t.key].hour = prevType.hour;
+        if (prevType.parts) rules.types[t.key].parts = prevType.parts;
         if (t.thLabel) {
           const thEl = document.getElementById(`nr-th-${t.key}`);
           const v = thEl ? parseFloat(thEl.value.toString().replace(',', '.')) : NaN;
@@ -600,6 +611,40 @@
         to: clampH(qTo && qTo.value, 7)
       };
       Store.setJSON('notify_rules', rules);
+    }
+
+    // Morgen-Digest anpassen (Plan4-13): Uhrzeit + Bausteine, in notify_rules
+    // gemergt (on-Zustand bleibt erhalten — den steuert die Regel-Checkbox).
+    async function configureDigest() {
+      const rules = getNotifyRules();
+      const d = rules.types.digest || {};
+      const parts = d.parts || {};
+      const vals = await modalPrompt({
+        title: 'Morgen-Digest anpassen',
+        description: 'Zeitfenster und Inhalte des taeglichen Ueberblicks (der Server sendet im 2-Stunden-Fenster ab dieser Uhrzeit).',
+        fields: [
+          { key: 'hour', label: 'Uhrzeit (ca.)', type: 'select', value: String(d.hour ?? 7), options: [
+            { value: '5', label: '05 Uhr' }, { value: '6', label: '06 Uhr' }, { value: '7', label: '07 Uhr' },
+            { value: '8', label: '08 Uhr' }, { value: '9', label: '09 Uhr' }, { value: '10', label: '10 Uhr' }
+          ] },
+          { key: 'weather', label: 'Wetter', type: 'checkbox', value: parts.weather !== false },
+          { key: 'climate', label: 'Innenklima', type: 'checkbox', value: parts.climate !== false },
+          { key: 'todos', label: 'Fällige To-dos', type: 'checkbox', value: parts.todos !== false },
+          { key: 'events', label: 'Termine', type: 'checkbox', value: parts.events !== false }
+        ],
+        submitLabel: 'Speichern'
+      });
+      if (!vals) return;
+      const stored = Store.getJSON('notify_rules', {}) || {};
+      stored.types = stored.types || {};
+      stored.types.digest = {
+        ...(stored.types.digest || {}), // on-Zustand erhalten
+        hour: Number(vals.hour),
+        parts: { weather: !!vals.weather, climate: !!vals.climate, todos: !!vals.todos, events: !!vals.events }
+      };
+      Store.setJSON('notify_rules', stored);
+      renderNotifyRules();
+      showNotification('Digest-Einstellungen gespeichert.');
     }
 
     function sendTestPush() {
