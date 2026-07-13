@@ -548,7 +548,7 @@
         // forecast_days=2: nötig, damit die Lüftungsfenster-Prognose immer
         // volle 24h in die Zukunft schauen kann.
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,relative_humidity_2m&timezone=auto&timeformat=unixtime&past_days=7&forecast_days=2`;
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url, {}, 10000);
         if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
         
         const data = await res.json();
@@ -568,7 +568,7 @@
     // Kostenlos, ohne Key. Ausserhalb Deutschlands leere Liste. Best effort.
     async function fetchDwdAlerts(lat, lon) {
       try {
-        const res = await fetch(`https://api.brightsky.dev/alerts?lat=${lat}&lon=${lon}`);
+        const res = await fetchWithTimeout(`https://api.brightsky.dev/alerts?lat=${lat}&lon=${lon}`, {}, 10000);
         if (!res.ok) return [];
         return (((await res.json()) || {}).alerts || []).filter(a => a && a.severity && a.severity !== 'minor');
       } catch (e) { return []; }
@@ -609,7 +609,7 @@
         const conf = appState.weatherConfig;
         if (!conf) { appState.airQuality = null; return; }
         const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${conf.lat}&longitude=${conf.lon}&current=european_aqi,pm2_5,pm10,ozone,birch_pollen,grass_pollen&timezone=auto`;
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url, {}, 10000);
         if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
         const data = await res.json();
         appState.airQuality = data && data.current ? data.current : null;

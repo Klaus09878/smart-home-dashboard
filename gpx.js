@@ -227,7 +227,7 @@ function removePendingDelete(uid) {
 async function pushActivityToCloud(activity) {
   if (state.cloud === 'local') return;
   try {
-    await apiFetch('/api/gpx', { method: 'POST', body: JSON.stringify(activityToPayload(activity)) });
+    await apiFetch('/api/gpx', { method: 'POST', body: JSON.stringify(activityToPayload(activity)), timeoutMs: 30000 });
     setCloudStatus('ok');
   } catch (err) {
     if (err.unavailable) setCloudStatus('local');

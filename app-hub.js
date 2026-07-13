@@ -419,7 +419,7 @@
         const conf = appState.weatherConfig;
         // Zusätzlich stündlich Temperatur + Regenwahrscheinlichkeit (Punkt 18)
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&daily=temperature_2m_max,temperature_2m_min,weather_code&hourly=temperature_2m,precipitation_probability,weather_code&forecast_days=3&timezone=auto&timeformat=unixtime`;
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url, {}, 10000);
         if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
         const data = await res.json();
         const daily = data.daily;

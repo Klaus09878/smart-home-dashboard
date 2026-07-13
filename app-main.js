@@ -153,7 +153,7 @@
       try {
         const conf = appState.weatherConfig;
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,weather_code&timezone=auto`;
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url, {}, 10000);
         if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
         const data = await res.json();
         el.innerText = `${data.current.temperature_2m.toFixed(1)} °C · ${getWeatherDescription(data.current.weather_code)} · ${conf.name}`;

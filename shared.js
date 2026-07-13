@@ -186,21 +186,60 @@ function modalPrompt(opts = {}) {
   });
 }
 
+// ============ fetch mit Timeout (Plan4-5) ============
+// Bricht haengende Verbindungen (typisch auf Mobilfunk) nach timeoutMs ab, statt
+// die aufrufende Logik minutenlang blockieren zu lassen. AbortError wird in einen
+// Fehler mit .timeout = true uebersetzt (NICHT .unavailable — ein Timeout heisst
+// nicht, dass die API fehlt).
+async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      const e = new Error('Zeitueberschreitung'); e.timeout = true; throw e;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ============ API-Schicht (/api/* → Cloudflare Pages Functions) ============
 // Wirft Error mit .unavailable = true, wenn die API (noch) nicht eingerichtet
 // ist (404: Functions fehlen, 503: Env-Var/D1-Binding nicht konfiguriert).
 // Aufrufer können dann auf Direktzugriff oder Nur-Lokal-Betrieb zurückfallen.
+// GET-Aufrufe werden bei Netzwerkfehler/Timeout EINMAL wiederholt (Plan4-5);
+// schreibende Methoden nie (Doppel-Schreiben vermeiden). timeoutMs pro Aufruf
+// ueberschreibbar (Default 8 s).
+function _wrapFetchErr(err) {
+  if (err && err.timeout) return err; // Timeout NICHT als „Feature fehlt" werten
+  const e = new Error('API nicht erreichbar');
+  e.unavailable = true;
+  return e;
+}
+
 async function apiFetch(path, options = {}) {
+  const { timeoutMs = 8000, ...fetchOpts } = options;
+  const method = (fetchOpts.method || 'GET').toUpperCase();
+  const canRetry = method === 'GET';
+  const doFetch = () => fetchWithTimeout(path, {
+    ...fetchOpts,
+    headers: { 'Content-Type': 'application/json', ...(fetchOpts.headers || {}) }
+  }, timeoutMs);
+
   let res;
   try {
-    res = await fetch(path, {
-      ...options,
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
-    });
-  } catch (networkErr) {
-    const e = new Error('API nicht erreichbar');
-    e.unavailable = true;
-    throw e;
+    res = await doFetch();
+  } catch (err) {
+    if (canRetry) {
+      await new Promise(r => setTimeout(r, 500));
+      try { res = await doFetch(); }
+      catch (err2) { throw _wrapFetchErr(err2); }
+    } else {
+      throw _wrapFetchErr(err);
+    }
   }
 
   if (res.status === 404 || res.status === 503 || res.status === 405) {
