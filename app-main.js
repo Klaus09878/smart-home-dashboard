@@ -56,7 +56,13 @@
         applyCfCollapse();    // gespeicherter Einklapp-/Kompakt-Zustand
         if (!appState.climateLoaded) {
           appState.climateLoaded = true;
+          // Bevorzugten Chart-Zeitraum anwenden (Plan4-10)
+          const cp = getChartPrefs();
+          appState.currentChartTimeframe = (cp.rememberLast && cp.lastTf) || cp.defaultTf;
+          highlightTfButton(appState.currentChartTimeframe);
           reloadData();
+          // "Alle" als Standard: volle Historie nachladen und neu zeichnen
+          if (appState.currentChartTimeframe === -1) ensureFullHistory().then(drawChart);
         } else if (appState.chartInstance) {
           // Chart neu dimensionieren, falls die View zwischenzeitlich versteckt war
           appState.chartInstance.resize();

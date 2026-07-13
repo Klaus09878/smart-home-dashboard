@@ -475,8 +475,9 @@
       appState.chartInstance = new Chart(ctx, config);
     }
 
-    async function setChartTimeframe(hours) {
-      appState.currentChartTimeframe = hours;
+    // Aktiven Zeitraum-Button hervorheben (aus setChartTimeframe extrahiert,
+    // Plan4-10 — wird auch beim Anwenden der Voreinstellung genutzt).
+    function highlightTfButton(hours) {
       const tfIds = { 24: 'btn-tf-24', 72: 'btn-tf-72', 168: 'btn-tf-168', '-1': 'btn-tf-all' };
       Object.keys(tfIds).forEach(k => {
         const btn = document.getElementById(tfIds[k]);
@@ -484,6 +485,16 @@
       });
       const active = document.getElementById(tfIds[hours.toString()]);
       if (active) active.className = 'px-3.5 py-1.5 rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 text-xs font-semibold transition-all';
+    }
+
+    async function setChartTimeframe(hours) {
+      appState.currentChartTimeframe = hours;
+      highlightTfButton(hours);
+
+      // Zuletzt gewaehlten Zeitraum merken (Plan4-10), wenn aktiviert.
+      if (getChartPrefs().rememberLast) {
+        const p = getChartPrefs(); p.lastTf = hours; Store.setJSON('chart_prefs', p);
+      }
 
       // "Alle" braucht die komplette Historie — der Erst-Load holt nur 14 Tage
       // (Plan4-6). Erst nachladen, dann zeichnen.

@@ -33,7 +33,7 @@ test('Einstellungen: Regeln + Theme-Umschalter', async ({ page }) => {
   await page.goto('/index.html#settings');
   await waitReady(page);
   await expect(page.locator('#settings-behavior')).toBeVisible(); // Verhalten & Anzeige (Plan4-9)
-  await expect(page.locator('#behavior-list select')).toHaveCount(2); // Intervall-Auswahlen
+  await expect(page.locator('#behavior-list select')).toHaveCount(3); // Intervalle + Chart-Standard (Plan4-10)
   await expect(page.locator('#notify-rules > div')).toHaveCount(13); // 13 Regeltypen (inkl. CO₂, DWD, Fenster, Digest)
   // Theme umschalten
   await page.click('button:has-text("umschalten")');

@@ -9,6 +9,15 @@
     const APP_PREFS_DEFAULTS = { refreshMin: 5, hubPreviewMin: 2 };
     function getAppPrefs() { return { ...APP_PREFS_DEFAULTS, ...(Store.getJSON('app_prefs', {}) || {}) }; }
 
+    // Chart-Voreinstellungen (Plan4-10): Standard-Zeitraum + "letzten merken".
+    const CHART_PREFS_DEFAULTS = { defaultTf: 24, rememberLast: false, lastTf: null };
+    function getChartPrefs() { return { ...CHART_PREFS_DEFAULTS, ...(Store.getJSON('chart_prefs', {}) || {}) }; }
+    function saveChartPref(key, value) {
+      const p = getChartPrefs();
+      p[key] = key === 'rememberLast' ? !!value : Number(value);
+      Store.setJSON('chart_prefs', p);
+    }
+
     // Baustein: eine beschriftete Auswahlzeile fuers Verhalten-Panel. handler ist
     // ein globaler Funktionsname (Delegation), der (key, $value) bekommt.
     function behaviorSelectRow(label, hint, handler, key, current, options) {
@@ -20,10 +29,19 @@
       </label>`;
     }
 
+    // Baustein: eine Checkbox-Zeile fuers Verhalten-Panel ($checked ans handler).
+    function behaviorCheckboxRow(label, hint, handler, key, checked) {
+      return `<label class="bg-slate-900/50 border border-slate-800/60 rounded-xl p-3 flex items-start gap-2 cursor-pointer">
+        <input type="checkbox" ${checked ? 'checked' : ''} data-onchange="${handler}|${key}|$checked" class="accent-teal-500 mt-0.5 shrink-0">
+        <span><span class="text-sm text-slate-200">${escapeHtml(label)}</span><span class="block text-[11px] text-slate-500">${hint ? escapeHtml(hint) : ''}</span></span>
+      </label>`;
+    }
+
     function renderBehaviorSettings() {
       const el = document.getElementById('behavior-list');
       if (!el) return;
       const p = getAppPrefs();
+      const cp = getChartPrefs();
       el.innerHTML = [
         behaviorSelectRow('Auto-Aktualisierung', 'Wie oft Daten still im Hintergrund neu geladen werden.', 'saveBehaviorSetting', 'refreshMin', p.refreshMin, [
           { value: 2, label: 'alle 2 Minuten' }, { value: 5, label: 'alle 5 Minuten' },
@@ -31,7 +49,12 @@
         ]),
         behaviorSelectRow('Hub-Vorschau-Drossel', 'Mindestabstand fuer die Live-Vorschau der Standorte.', 'saveBehaviorSetting', 'hubPreviewMin', p.hubPreviewMin, [
           { value: 1, label: '1 Minute' }, { value: 2, label: '2 Minuten' }, { value: 5, label: '5 Minuten' }
-        ])
+        ]),
+        behaviorSelectRow('Standard-Zeitraum im Klimaverlauf', 'Beim ersten Oeffnen von ClimateFlow.', 'saveChartPref', 'defaultTf', cp.defaultTf, [
+          { value: 24, label: '24 Stunden' }, { value: 72, label: '3 Tage' },
+          { value: 168, label: '7 Tage' }, { value: -1, label: 'Alle' }
+        ]),
+        behaviorCheckboxRow('Letzten Zeitraum merken', 'Ueberschreibt den Standard mit der zuletzt gewaehlten Auswahl.', 'saveChartPref', 'rememberLast', cp.rememberLast)
       ].join('');
       updateIcons();
     }
