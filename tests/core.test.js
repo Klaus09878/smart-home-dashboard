@@ -823,4 +823,23 @@ test('goalForecast: kein Ziel bzw. erste Jahreswoche → null (Plan4-18)', () =>
   assert.strictEqual(core.goalForecast({ goalKm: 2000, doneKm: 10, now: new Date(2026, 0, 3) }), null);
 });
 
+test('personalRecords: Gewinner + <5km-Ausschluss beim Schnitt (Plan4-19)', () => {
+  const acts = [
+    { id: 'a', name: 'A', startMs: new Date(2026, 6, 6).getTime(), distanceKm: 10, movingSec: 3600, ascent: 100 }, // 10 km/h
+    { id: 'b', name: 'B', startMs: new Date(2026, 6, 7).getTime(), distanceKm: 4, movingSec: 600, ascent: 300 },  // 24 km/h aber <5 km
+    { id: 'c', name: 'C', startMs: new Date(2026, 6, 8).getTime(), distanceKm: 20, movingSec: 3600, ascent: 50 }  // 20 km/h, laengste
+  ];
+  const r = core.personalRecords(acts);
+  assert.strictEqual(r.longest.id, 'c');
+  assert.strictEqual(r.mostAscent.id, 'b');
+  assert.strictEqual(r.fastest.id, 'c'); // B (<5 km) ausgeschlossen
+  assert.ok(r.biggestWeek && r.biggestWeek.value > 33);
+});
+test('personalRecords: leeres Array → alle null (Plan4-19)', () => {
+  const r = core.personalRecords([]);
+  assert.strictEqual(r.longest, null);
+  assert.strictEqual(r.fastest, null);
+  assert.strictEqual(r.biggestWeek, null);
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);

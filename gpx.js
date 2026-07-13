@@ -525,6 +525,8 @@ function renderSummary() {
   const hint = document.getElementById('goal-empty-hint');
   if (hint) hint.classList.toggle('hidden', !!(goals.weekKm || goals.yearKm));
 
+  renderRecords();
+
   // Zielprognose (Plan4-18)
   const fcEl = document.getElementById('goal-year-forecast');
   if (fcEl) {
@@ -538,6 +540,35 @@ function renderSummary() {
       fcEl.innerText = '';
     }
   }
+}
+
+// Persoenliche Rekorde (Plan4-19): aus den Aktivitaeten, klickbar zur Tour.
+function renderRecords() {
+  const el = document.getElementById('gpx-records');
+  if (!el) return;
+  const adapted = state.activities.map(a => ({
+    id: a.id, name: a.name, startMs: a.startTime || a.addedAt,
+    distanceKm: (a.distM || 0) / 1000, movingSec: a.movingSec || 0, ascent: a.elevGain || 0
+  }));
+  const rec = personalRecords(adapted);
+  const items = [
+    { icon: '🏅', title: 'Längste Tour', r: rec.longest },
+    { icon: '⛰️', title: 'Meiste Höhenmeter', r: rec.mostAscent },
+    { icon: '⚡', title: 'Schnellster Schnitt', r: rec.fastest },
+    { icon: '🔥', title: 'Stärkste Woche', r: rec.biggestWeek }
+  ].filter(it => it.r);
+  if (!items.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  el.classList.remove('hidden');
+  el.innerHTML = '';
+  items.forEach(it => {
+    const card = document.createElement('div');
+    card.className = 'bg-slate-900/60 border border-slate-800/60 rounded-xl p-2' + (it.r.id ? ' cursor-pointer hover:border-slate-600 transition-colors' : '');
+    card.innerHTML = `<p class="text-[10px] text-slate-500 uppercase font-semibold">${it.icon} ${it.title}</p>`
+      + `<p class="text-sm font-bold text-white mt-0.5">${it.r.label}</p>`
+      + `<p class="text-[10px] text-slate-400 truncate">${escapeHtml(it.r.name || '')}</p>`;
+    if (it.r.id) card.onclick = () => selectActivity(it.r.id);
+    el.appendChild(card);
+  });
 }
 
 // ============ Kalender & Streaks ============
