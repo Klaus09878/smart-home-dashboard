@@ -18,6 +18,20 @@
       Store.setJSON('chart_prefs', p);
     }
 
+    // Widget-Feinkonfiguration (Plan4-11): Vorschau-Tage, Kalenderfenster,
+    // Termin-Anzahl, Ausblenden erledigter To-dos.
+    const WIDGET_PREFS_DEFAULTS = { forecastDays: 3, calHorizonDays: 14, calMax: 6, todoHideDoneDays: 0 };
+    function getWidgetPrefs() { return { ...WIDGET_PREFS_DEFAULTS, ...(Store.getJSON('widget_prefs', {}) || {}) }; }
+    function saveWidgetPref(key, value) {
+      const p = getWidgetPrefs();
+      p[key] = Number(value);
+      Store.setJSON('widget_prefs', p);
+      // Betroffenes Widget sofort neu aufbauen (aktualisiert auch versteckte Views).
+      if (key === 'forecastDays' && typeof loadHubForecast === 'function') loadHubForecast();
+      else if ((key === 'calHorizonDays' || key === 'calMax') && typeof loadHubCalendar === 'function') loadHubCalendar(true);
+      else if (key === 'todoHideDoneDays' && typeof renderTodos === 'function') renderTodos();
+    }
+
     // Baustein: eine beschriftete Auswahlzeile fuers Verhalten-Panel. handler ist
     // ein globaler Funktionsname (Delegation), der (key, $value) bekommt.
     function behaviorSelectRow(label, hint, handler, key, current, options) {
@@ -42,6 +56,7 @@
       if (!el) return;
       const p = getAppPrefs();
       const cp = getChartPrefs();
+      const wp = getWidgetPrefs();
       el.innerHTML = [
         behaviorSelectRow('Auto-Aktualisierung', 'Wie oft Daten still im Hintergrund neu geladen werden.', 'saveBehaviorSetting', 'refreshMin', p.refreshMin, [
           { value: 2, label: 'alle 2 Minuten' }, { value: 5, label: 'alle 5 Minuten' },
@@ -54,7 +69,19 @@
           { value: 24, label: '24 Stunden' }, { value: 72, label: '3 Tage' },
           { value: 168, label: '7 Tage' }, { value: -1, label: 'Alle' }
         ]),
-        behaviorCheckboxRow('Letzten Zeitraum merken', 'Ueberschreibt den Standard mit der zuletzt gewaehlten Auswahl.', 'saveChartPref', 'rememberLast', cp.rememberLast)
+        behaviorCheckboxRow('Letzten Zeitraum merken', 'Ueberschreibt den Standard mit der zuletzt gewaehlten Auswahl.', 'saveChartPref', 'rememberLast', cp.rememberLast),
+        behaviorSelectRow('Wetter-Vorschau', 'Anzahl Tage im 3-Tage-Widget.', 'saveWidgetPref', 'forecastDays', wp.forecastDays, [
+          { value: 3, label: '3 Tage' }, { value: 5, label: '5 Tage' }, { value: 7, label: '7 Tage' }
+        ]),
+        behaviorSelectRow('Kalender-Fenster', 'Wie weit der Termin-Ausblick reicht.', 'saveWidgetPref', 'calHorizonDays', wp.calHorizonDays, [
+          { value: 7, label: '7 Tage' }, { value: 14, label: '14 Tage' }, { value: 30, label: '30 Tage' }
+        ]),
+        behaviorSelectRow('Termine im Widget', 'Wie viele Termine angezeigt werden.', 'saveWidgetPref', 'calMax', wp.calMax, [
+          { value: 6, label: '6 Termine' }, { value: 10, label: '10 Termine' }
+        ]),
+        behaviorSelectRow('Erledigte To-dos ausblenden', 'Wann erledigte Aufgaben aus der Liste verschwinden (Daten bleiben).', 'saveWidgetPref', 'todoHideDoneDays', wp.todoHideDoneDays, [
+          { value: 0, label: 'nie' }, { value: 1, label: 'nach 1 Tag' }, { value: 7, label: 'nach 7 Tagen' }, { value: 30, label: 'nach 30 Tagen' }
+        ])
       ].join('');
       updateIcons();
     }

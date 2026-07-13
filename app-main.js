@@ -158,8 +158,9 @@
       if (!el || !appState.weatherConfig) return;
       try {
         const conf = appState.weatherConfig;
-        // Gebuendelter Abruf (Plan4-8): teilt sich den Cache mit der 3-Tage-Vorschau.
-        const data = await getHubWeather(conf.lat, conf.lon);
+        // Gebuendelter Abruf (Plan4-8): teilt sich den Cache mit der Vorschau —
+        // gleiche forecastDays wie das Vorschau-Widget nutzen (Plan4-11).
+        const data = await getHubWeather(conf.lat, conf.lon, getWidgetPrefs().forecastDays);
         el.innerText = `${data.current.temperature_2m.toFixed(1)} °C · ${getWeatherDescription(data.current.weather_code)} · ${conf.name}`;
       } catch (err) {
         console.warn('Hub-Wetter fehlgeschlagen:', err);

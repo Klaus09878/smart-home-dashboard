@@ -267,12 +267,19 @@
         }
       } catch (e) { /* Badging nur in installierter PWA / sicherem Kontext */ }
 
+      // Anzeige-Filter (Plan4-11): erledigte Aufgaben aelter als N Tage
+      // ausblenden — nur die ANZEIGE, die Daten (Sync/Backup) bleiben unberuehrt.
+      const hideDays = getWidgetPrefs().todoHideDoneDays;
+      const visible = hideDays > 0
+        ? todos.filter(t => !(t.done && t.updatedAt && t.updatedAt < Date.now() - hideDays * DAY_MS))
+        : todos;
+
       listEl.innerHTML = '';
-      if (todos.length === 0) {
+      if (visible.length === 0) {
         listEl.innerHTML = '<p class="text-xs text-slate-500">Nichts zu tun 🎉</p>';
         return;
       }
-      todos.forEach(t => {
+      visible.forEach(t => {
         const isOverdue = !t.done && t.dueMs && t.dueMs < Date.now();
         const row = document.createElement('div');
         row.className = 'flex items-center gap-1.5 group/todo';
@@ -417,13 +424,15 @@
       if (!el || !appState.weatherConfig) return;
       try {
         const conf = appState.weatherConfig;
-        // Gebuendelter Abruf (Plan4-8): teilt sich den Cache mit dem Uhr-Wetter;
-        // liefert current/daily/hourly (inkl. Regenwahrscheinlichkeit, Punkt 18).
-        const data = await getHubWeather(conf.lat, conf.lon, 3);
+        // Anzahl Vorschautage einstellbar (Plan4-11). Gebuendelter Abruf (Plan4-8):
+        // teilt sich den Cache mit dem Uhr-Wetter (gleiche forecastDays).
+        const days = getWidgetPrefs().forecastDays;
+        const data = await getHubWeather(conf.lat, conf.lon, days);
         const daily = data.daily;
         if (!daily || !daily.time) throw new Error('keine Tagesdaten');
         appState.hourlyWeather = data.hourly || null;
 
+        el.style.gridTemplateColumns = `repeat(${days}, minmax(0, 1fr))`;
         el.innerHTML = '';
         daily.time.forEach((day, i) => {
           // daily.time ist unixtime (timeformat=unixtime) → *1000 (fixte den
@@ -446,6 +455,7 @@
         getDwdAlerts(conf.lat, conf.lon).then(alerts => { appState.dwdAlerts = alerts; renderDwdBanner(document.getElementById('hub-dwd'), alerts); });
       } catch (err) {
         console.warn('Hub-Vorschau fehlgeschlagen:', err);
+        el.style.gridTemplateColumns = ''; // zurueck auf die Klassen-Spalten
         el.innerHTML = '<p class="text-xs text-slate-500 col-span-3">Vorschau nicht verfügbar.</p>';
       }
     }
@@ -535,7 +545,8 @@
       if (!el) return;
       const now = Date.now();
       const from = now - 24 * 60 * 60 * 1000;
-      const horizon = now + 14 * 24 * 60 * 60 * 1000;
+      const wp = getWidgetPrefs(); // Fenster + Anzahl einstellbar (Plan4-11)
+      const horizon = now + wp.calHorizonDays * 24 * 60 * 60 * 1000;
       const colors = ['bg-orange-400', 'bg-indigo-400'];
       const feeds = [Store.get('ical_url'), Store.get('ical_url2')].filter(Boolean);
 
@@ -566,14 +577,14 @@
       if (all.length === 0) {
         if (feeds.length === 0 && !ownAvailable) el.innerHTML = 'Kein Kalender verbunden — über das Zahnrad eine .ics-URL hinterlegen oder mit „+" einen eigenen Termin anlegen.';
         else if (proxyMissing) el.innerHTML = 'Kalender-Proxy (/api/ical) noch nicht deployt — erscheint nach dem nächsten Cloudflare-Deploy automatisch.';
-        else el.innerHTML = 'Keine Termine in den nächsten 14 Tagen.';
+        else el.innerHTML = `Keine Termine in den nächsten ${wp.calHorizonDays} Tagen.`;
         return;
       }
 
       const upcoming = all
         .filter(e => e.startMs >= now - (e.allDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000))
         .sort((a, b) => a.startMs - b.startMs)
-        .slice(0, 6);
+        .slice(0, wp.calMax);
       el.innerHTML = '';
       upcoming.forEach(e => {
         const d = new Date(e.startMs);
