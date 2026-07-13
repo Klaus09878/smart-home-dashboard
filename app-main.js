@@ -351,20 +351,27 @@
       updateIcons();
     }
 
+    // Die aktuell sichtbare View still auffrischen (Plan4-20: aus dem Auto-Refresh
+    // extrahiert, damit auch die Netz-Rueckkehr und der App-Wiedereintritt sie nutzen).
+    function refreshVisibleView(silent = true) {
+      const climateView = document.getElementById('view-climate');
+      const homeView = document.getElementById('view-home');
+      if (appState.climateLoaded && climateView && !climateView.classList.contains('hidden')) {
+        reloadData(silent);
+      } else if (homeView && !homeView.classList.contains('hidden')) {
+        loadHubPreviews(true);
+      }
+    }
+
     // Auto-Refresh-Timer (Plan4-9): still im Hintergrund, Intervall aus
     // app_prefs.refreshMin. Startet den Timer bei Bedarf neu (Intervall geaendert).
     function startAutoRefresh() {
       if (appState._refreshTimer) clearInterval(appState._refreshTimer);
       const ms = getAppPrefs().refreshMin * 60 * 1000;
       appState._refreshTimer = setInterval(() => {
+        if (!navigator.onLine) return; // offline: nicht sinnlos abfragen (Plan4-20)
         if (window.Store) Store.pull();
-        const climateView = document.getElementById('view-climate');
-        const homeView = document.getElementById('view-home');
-        if (appState.climateLoaded && climateView && !climateView.classList.contains('hidden')) {
-          reloadData(true);
-        } else if (homeView && !homeView.classList.contains('hidden')) {
-          loadHubPreviews(true);
-        }
+        refreshVisibleView(true);
       }, ms);
     }
 
@@ -421,6 +428,9 @@
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && window.Store) Store.pull();
       });
+
+      // Netz-Rueckkehr (Plan4-20): sofort die sichtbare View auffrischen.
+      window.addEventListener('net-online', () => refreshVisibleView(true));
 
       // Auto-Refresh still im Hintergrund (kein Lade-Overlay). Intervall pro
       // Profil einstellbar (Plan4-9, app_prefs.refreshMin).

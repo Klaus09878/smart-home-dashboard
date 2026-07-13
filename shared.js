@@ -438,6 +438,22 @@ function _delegatedArg(raw, el, event) {
 function openPicker(id) { const el = document.getElementById(id); if (el) el.click(); }
 window.openPicker = openPicker;
 
+// ============ Offline-Status (Plan4-20) ============
+// Zeigt/versteckt den Offline-Banner und stoesst bei Netz-Rueckkehr eine
+// Synchronisation an. navigator.onLine ist nur heuristisch → reiner Hinweis,
+// keine Feature-Sperre. Seiten reagieren auf das 'net-online'-CustomEvent.
+function updateOfflineBanner() {
+  const el = document.getElementById('offline-banner');
+  if (el) el.classList.toggle('hidden', navigator.onLine);
+}
+window.addEventListener('offline', updateOfflineBanner);
+window.addEventListener('online', () => {
+  updateOfflineBanner();
+  try { if (window.Store && window.Store.flush) window.Store.flush(); } catch (e) { /* best effort */ }
+  try { window.dispatchEvent(new CustomEvent('net-online')); } catch (e) { /* alte Browser */ }
+});
+updateOfflineBanner();
+
 // Skript bei Bedarf nachladen (Promise-gecacht, P2-19: Vendor-Lazy-Loading).
 const _scriptCache = {};
 function loadScript(src) {

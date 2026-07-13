@@ -1549,6 +1549,8 @@ async function init() {
   });
 
   registerServiceWorker();
+  // Netz-Rueckkehr (Plan4-20): Cloud-Abgleich nachholen
+  window.addEventListener('net-online', () => { syncWithCloud().catch(() => {}); });
   handleSharedGpx();          // via Share-Target geteilte Datei (P2-14)
   handleLaunchQueueFiles();   // via File-Handler geoeffnete .gpx-Datei (P2-14)
 

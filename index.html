@@ -36,6 +36,10 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
 
+  <!-- Offline-Hinweis (Plan4-20): erscheint bei navigator.offline, verschwindet
+       bei Netz-Rueckkehr; dann wird automatisch nachsynchronisiert. -->
+  <div id="offline-banner" class="hidden sticky top-0 z-[900] bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-xs text-center px-3 py-1.5">Offline — Daten können veraltet sein; Änderungen werden nachsynchronisiert.</div>
+
   <!-- Loading Overlay (Shown during data load) -->
   <div id="loading-overlay" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 transition-all duration-300">
     <div class="relative w-16 h-16 flex items-center justify-center">

@@ -115,6 +115,16 @@ test('Hub: Status-Briefing rendert', async ({ page }) => {
   await expect(page.locator('#briefing-list > *').first()).toBeVisible({ timeout: 15000 });
 });
 
+test('Offline-Banner erscheint und verschwindet (Plan4-20)', async ({ page, context }) => {
+  await page.goto('/index.html#home');
+  await waitReady(page);
+  await expect(page.locator('#offline-banner')).toBeHidden();
+  await context.setOffline(true);
+  await expect(page.locator('#offline-banner')).toBeVisible();
+  await context.setOffline(false);
+  await expect(page.locator('#offline-banner')).toBeHidden();
+});
+
 test('GPX-Viewer lädt ohne Fehler', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
