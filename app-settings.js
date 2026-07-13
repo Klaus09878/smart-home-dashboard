@@ -3,6 +3,47 @@
 // Klassische Skripte teilen den globalen Scope; Reihenfolge in index.html
 // entspricht der urspruenglichen Dateireihenfolge (app-main.js zuletzt).
 
+    // ============ Verhalten & Anzeige (Plan4-9 ff.) ============
+    // Profilbezogene App-Praeferenzen. IMMER ueber getAppPrefs lesen (Defaults-
+    // Merge), nie roh — so bleiben neue Schluessel abwaertskompatibel.
+    const APP_PREFS_DEFAULTS = { refreshMin: 5, hubPreviewMin: 2 };
+    function getAppPrefs() { return { ...APP_PREFS_DEFAULTS, ...(Store.getJSON('app_prefs', {}) || {}) }; }
+
+    // Baustein: eine beschriftete Auswahlzeile fuers Verhalten-Panel. handler ist
+    // ein globaler Funktionsname (Delegation), der (key, $value) bekommt.
+    function behaviorSelectRow(label, hint, handler, key, current, options) {
+      const os = options.map(o => `<option value="${escapeHtml(String(o.value))}" ${String(o.value) === String(current) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+      return `<label class="bg-slate-900/50 border border-slate-800/60 rounded-xl p-3 block">
+        <span class="text-sm text-slate-200">${escapeHtml(label)}</span>
+        <span class="block text-[11px] text-slate-500 mb-1.5">${hint ? escapeHtml(hint) : ''}</span>
+        <select data-onchange="${handler}|${key}|$value" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:border-teal-500/50 focus:outline-none">${os}</select>
+      </label>`;
+    }
+
+    function renderBehaviorSettings() {
+      const el = document.getElementById('behavior-list');
+      if (!el) return;
+      const p = getAppPrefs();
+      el.innerHTML = [
+        behaviorSelectRow('Auto-Aktualisierung', 'Wie oft Daten still im Hintergrund neu geladen werden.', 'saveBehaviorSetting', 'refreshMin', p.refreshMin, [
+          { value: 2, label: 'alle 2 Minuten' }, { value: 5, label: 'alle 5 Minuten' },
+          { value: 10, label: 'alle 10 Minuten' }, { value: 15, label: 'alle 15 Minuten' }
+        ]),
+        behaviorSelectRow('Hub-Vorschau-Drossel', 'Mindestabstand fuer die Live-Vorschau der Standorte.', 'saveBehaviorSetting', 'hubPreviewMin', p.hubPreviewMin, [
+          { value: 1, label: '1 Minute' }, { value: 2, label: '2 Minuten' }, { value: 5, label: '5 Minuten' }
+        ])
+      ].join('');
+      updateIcons();
+    }
+
+    function saveBehaviorSetting(key, value) {
+      const p = getAppPrefs();
+      p[key] = Number(value);
+      Store.setJSON('app_prefs', p);
+      // Auto-Refresh-Timer mit neuem Intervall neu starten (Funktion in app-main.js)
+      if (key === 'refreshMin' && typeof startAutoRefresh === 'function') startAutoRefresh();
+    }
+
     // ============ Einstellungsseite (P1) ============
     function renderSettings() {
       // Profil
@@ -34,6 +75,7 @@
       const tEl = document.getElementById('settings-ntfy-topic');
       if (tEl) tEl.innerText = topic || 'nicht gesetzt';
 
+      renderBehaviorSettings(); // Verhalten & Anzeige (Plan4-9)
       renderNotifyRules();
       initWebPushUI(); // Web-Push-Button je nach Server-/Geraete-Faehigkeit
       renderServerBackups(); // R2-Server-Backups (nur Admin, P3-1)

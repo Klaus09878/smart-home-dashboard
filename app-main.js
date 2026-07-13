@@ -164,7 +164,8 @@
     // Kompakte Live-Vorschau beider Standorte auf der ClimateFlow-Kachel.
     // Lädt nur die letzten 400 Einträge pro Kanal und ist auf 2 Minuten gedrosselt.
     async function loadHubPreviews(force = false) {
-      if (!force && Date.now() - appState.hubPreviewAt < 2 * 60 * 1000) return;
+      // Drossel-Abstand pro Profil einstellbar (Plan4-9, app_prefs.hubPreviewMin).
+      if (!force && Date.now() - appState.hubPreviewAt < getAppPrefs().hubPreviewMin * 60 * 1000) return;
       appState.hubPreviewAt = Date.now();
 
       loadHubWeather();
@@ -343,6 +344,23 @@
       updateIcons();
     }
 
+    // Auto-Refresh-Timer (Plan4-9): still im Hintergrund, Intervall aus
+    // app_prefs.refreshMin. Startet den Timer bei Bedarf neu (Intervall geaendert).
+    function startAutoRefresh() {
+      if (appState._refreshTimer) clearInterval(appState._refreshTimer);
+      const ms = getAppPrefs().refreshMin * 60 * 1000;
+      appState._refreshTimer = setInterval(() => {
+        if (window.Store) Store.pull();
+        const climateView = document.getElementById('view-climate');
+        const homeView = document.getElementById('view-home');
+        if (appState.climateLoaded && climateView && !climateView.classList.contains('hidden')) {
+          reloadData(true);
+        } else if (homeView && !homeView.classList.contains('hidden')) {
+          loadHubPreviews(true);
+        }
+      }, ms);
+    }
+
     // App Initialization
     async function init() {
       // Geruest SOFORT sichtbar machen — VOR jedem await, damit der Nutzer beim
@@ -390,25 +408,16 @@
       window.addEventListener('store-updated', () => {
         updateProfileBadge();
         applyWidgetLayout();
+        startAutoRefresh(); // Intervall koennte per Sync geaendert worden sein (Plan4-9)
         handleRoute();
       });
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && window.Store) Store.pull();
       });
 
-      // Auto-refresh every 5 minutes: still im Hintergrund (kein Lade-Overlay),
-      // im Klima-Dashboard inkl. Wetter, auf dem Hub nur die Kachel-Vorschau
-      setInterval(() => {
-        if (window.Store) Store.pull();
-        const climateView = document.getElementById('view-climate');
-        const homeView = document.getElementById('view-home');
-        if (appState.climateLoaded && climateView && !climateView.classList.contains('hidden')) {
-          console.log('[Interval] Auto-refresh data (silent)...');
-          reloadData(true);
-        } else if (homeView && !homeView.classList.contains('hidden')) {
-          loadHubPreviews(true);
-        }
-      }, 5 * 60 * 1000);
+      // Auto-Refresh still im Hintergrund (kein Lade-Overlay). Intervall pro
+      // Profil einstellbar (Plan4-9, app_prefs.refreshMin).
+      startAutoRefresh();
 
       // "vor X Min."-Labels laufend aktuell halten
       setInterval(updateTimestampLabels, 60 * 1000);
