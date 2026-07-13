@@ -117,6 +117,39 @@ test('detectVentilationEvents: langsamer Abfall über Stunden ist KEIN Lüften',
   assert.strictEqual(core.detectVentilationEvents(aligned).length, 0);
 });
 
+test('ventilationImpact: mittlere Feuchte-Senkung und Anzahl (Plan4-14)', () => {
+  const day = (h, m) => new Date(2026, 6, 1, h, m, 0); // lokale Zeit → getHours() stabil
+  const mk = (d, temp, hum) => ({ time: d, temp, humidity: hum });
+  const aligned = [
+    mk(day(7, 0), 22, 60), mk(day(7, 20), 20, 50),   // Event 1: −10 %
+    mk(day(8, 0), 22, 58), mk(day(8, 20), 20, 50)    // Event 2: −8 %
+  ];
+  const r = core.ventilationImpact(aligned);
+  assert.strictEqual(r.count, 2);
+  assert.ok(Math.abs(r.avgDropRh - 9) < 0.001, `avgDropRh=${r.avgDropRh}`);
+  assert.ok(Math.abs(r.avgDurationMin - 20) < 0.001, `avgDurationMin=${r.avgDurationMin}`);
+});
+
+test('ventilationImpact: null ohne Ereignisse (Plan4-14)', () => {
+  const day = (h, m) => new Date(2026, 6, 1, h, m, 0);
+  const aligned = [{ time: day(7, 0), temp: 22, humidity: 60 }, { time: day(7, 20), temp: 22, humidity: 60 }];
+  assert.strictEqual(core.ventilationImpact(aligned), null);
+});
+
+test('ventilationImpact: bestes 3-h-Fenster bei Morgen-Lueftungen (Plan4-14)', () => {
+  const day = (h, m) => new Date(2026, 6, 1, h, m, 0);
+  const mk = (d, temp, hum) => ({ time: d, temp, humidity: hum });
+  const aligned = [
+    mk(day(7, 0), 22, 60), mk(day(7, 20), 20, 50),
+    mk(day(8, 0), 22, 60), mk(day(8, 20), 20, 50),
+    mk(day(9, 0), 22, 60), mk(day(9, 20), 20, 50)
+  ];
+  const r = core.ventilationImpact(aligned);
+  assert.strictEqual(r.count, 3);
+  assert.strictEqual(r.bestHourFrom, 7);
+  assert.strictEqual(r.bestHourTo, 10);
+});
+
 test('heatingDemandIndex: heute vs. gestern inkl. Prozent-Änderung', () => {
   const now = Date.UTC(2026, 6, 2, 12, 0, 0);
   const h = 60 * 60 * 1000;

@@ -86,6 +86,19 @@
           : `${stats.count}× · Ø ${stats.perDay.toFixed(1)}/Tag${stats.avgHumDrop ? ` · −${stats.avgHumDrop.toFixed(0)} %` : ''}${stats.topHour != null ? ` · meist ${stats.topHour}–${(stats.topHour + 1) % 24} Uhr` : ''}`;
       }
 
+      // Wirkungsanalyse (Plan4-14): was bringt das Lueften typischerweise?
+      const impactEl = document.getElementById('vent-impact');
+      if (impactEl) {
+        const imp = ventilationImpact(recent);
+        if (imp) {
+          impactEl.classList.remove('hidden');
+          impactEl.innerHTML = `<i data-lucide="trending-down" class="w-3.5 h-3.5 text-teal-400 shrink-0"></i> Ø −${imp.avgDropRh.toFixed(1).replace('.', ',')} % Feuchte pro Stoßlüften · ~${Math.round(imp.avgDurationMin)} min · meist ${imp.bestHourFrom}–${imp.bestHourTo} Uhr`;
+          updateIcons();
+        } else {
+          impactEl.classList.add('hidden');
+        }
+      }
+
       const max = Math.max(1, ...stats.dailyCounts.map(d => d.count));
       barsEl.innerHTML = '';
       stats.dailyCounts.forEach(d => {
