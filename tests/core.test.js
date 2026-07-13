@@ -150,6 +150,32 @@ test('ventilationImpact: bestes 3-h-Fenster bei Morgen-Lueftungen (Plan4-14)', (
   assert.strictEqual(r.bestHourTo, 10);
 });
 
+function monthDays(ym, count, tAvg, hAvg) {
+  const out = [];
+  for (let d = 1; d <= count; d++) out.push({ day: `${ym}-${String(d).padStart(2, '0')}`, t_avg: tAvg, t_min: tAvg - 3, t_max: tAvg + 3, h_avg: hAvg });
+  return out;
+}
+test('monthlyInsights: Vormonat + Vorjahr → zwei Saetze (Plan4-15)', () => {
+  const rows = [
+    ...monthDays('2025-06', 12, 19, 58),
+    ...monthDays('2026-05', 12, 18, 60),
+    ...monthDays('2026-06', 12, 20, 55)
+  ];
+  const r = core.monthlyInsights(rows, new Date(2026, 6, 15)); // Juli 2026
+  assert.strictEqual(r.month, '2026-06');
+  assert.strictEqual(r.sentences.length, 2);
+  assert.ok(/wärmer/.test(r.sentences[0]), r.sentences[0]);
+  assert.ok(/2025/.test(r.sentences[1]), r.sentences[1]);
+});
+test('monthlyInsights: ohne Vorjahresmonat nur ein Satz (Plan4-15)', () => {
+  const rows = [...monthDays('2026-05', 12, 18, 60), ...monthDays('2026-06', 12, 20, 55)];
+  const r = core.monthlyInsights(rows, new Date(2026, 6, 15));
+  assert.strictEqual(r.sentences.length, 1);
+});
+test('monthlyInsights: leeres Archiv → null (Plan4-15)', () => {
+  assert.strictEqual(core.monthlyInsights([], new Date(2026, 6, 15)), null);
+});
+
 test('heatingDemandIndex: heute vs. gestern inkl. Prozent-Änderung', () => {
   const now = Date.UTC(2026, 6, 2, 12, 0, 0);
   const h = 60 * 60 * 1000;

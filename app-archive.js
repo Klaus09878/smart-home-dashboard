@@ -85,6 +85,7 @@
         emptyEl.classList.add('hidden');
         wrap.classList.remove('hidden');
         drawArchiveChart(rows);
+        renderArchiveInsights(rows); // Monats-Insights (Plan4-15)
         renderArchiveRecords(rows);
       } catch (err) {
         appState.archiveLoadedFor = null;
@@ -94,6 +95,19 @@
           showMessage(`Archiv konnte nicht geladen werden: ${err.message}`);
         }
       }
+    }
+
+    // Monats-Insights (Plan4-15): 2-3 Saetze zum juengsten vollstaendigen Monat
+    // im Vergleich zu Vor- und Vorjahresmonat. Versteckt, wenn zu wenig Daten.
+    function renderArchiveInsights(rows) {
+      const el = document.getElementById('archive-insights');
+      if (!el) return;
+      const ins = monthlyInsights(rows);
+      if (!ins) { el.classList.add('hidden'); return; }
+      el.classList.remove('hidden');
+      el.innerHTML = `<p class="text-[10px] uppercase font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5"><i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-400"></i> Monats-Einblick</p>`
+        + ins.sentences.map(s => `<p class="text-slate-300 leading-relaxed">${escapeHtml(s)}</p>`).join('');
+      updateIcons();
     }
 
     // Rekorde & Monatsvergleich aus dem Tages-Archiv (P6)
