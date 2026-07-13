@@ -417,18 +417,18 @@
       if (!el || !appState.weatherConfig) return;
       try {
         const conf = appState.weatherConfig;
-        // Zusätzlich stündlich Temperatur + Regenwahrscheinlichkeit (Punkt 18)
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&daily=temperature_2m_max,temperature_2m_min,weather_code&hourly=temperature_2m,precipitation_probability,weather_code&forecast_days=3&timezone=auto&timeformat=unixtime`;
-        const res = await fetchWithTimeout(url, {}, 10000);
-        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
-        const data = await res.json();
+        // Gebuendelter Abruf (Plan4-8): teilt sich den Cache mit dem Uhr-Wetter;
+        // liefert current/daily/hourly (inkl. Regenwahrscheinlichkeit, Punkt 18).
+        const data = await getHubWeather(conf.lat, conf.lon, 3);
         const daily = data.daily;
         if (!daily || !daily.time) throw new Error('keine Tagesdaten');
         appState.hourlyWeather = data.hourly || null;
 
         el.innerHTML = '';
         daily.time.forEach((day, i) => {
-          const label = i === 0 ? 'Heute' : new Date(`${day}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short' });
+          // daily.time ist unixtime (timeformat=unixtime) → *1000 (fixte den
+          // "Invalid Date"-Bug fuer Tag 2/3, Plan4-8).
+          const label = i === 0 ? 'Heute' : new Date(day * 1000).toLocaleDateString('de-DE', { weekday: 'short' });
           const cell = document.createElement('div');
           cell.className = 'bg-slate-900/60 border border-slate-800/60 rounded-xl p-2 text-center cursor-pointer hover:border-slate-700 transition-colors';
           cell.title = getWeatherDescription(daily.weather_code[i]) + ' — für Stunden antippen';
@@ -442,8 +442,8 @@
         });
         renderRainHint();
         updateIcons();
-        // Amtliche Unwetterwarnungen als Banner (P2-11)
-        fetchDwdAlerts(conf.lat, conf.lon).then(alerts => { appState.dwdAlerts = alerts; renderDwdBanner(document.getElementById('hub-dwd'), alerts); });
+        // Amtliche Unwetterwarnungen als Banner (P2-11); gecacht (Plan4-8)
+        getDwdAlerts(conf.lat, conf.lon).then(alerts => { appState.dwdAlerts = alerts; renderDwdBanner(document.getElementById('hub-dwd'), alerts); });
       } catch (err) {
         console.warn('Hub-Vorschau fehlgeschlagen:', err);
         el.innerHTML = '<p class="text-xs text-slate-500 col-span-3">Vorschau nicht verfügbar.</p>';

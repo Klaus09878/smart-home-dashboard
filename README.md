@@ -162,8 +162,15 @@ Die Middleware lässt dann nur noch Anfragen mit Access-JWT durch; Basic Auth is
 npm test          # Kernlogik (lib/core.js) + Smoke-Test (Seiten-Konsistenz)
 npm run test:e2e  # Playwright-Browsertests (einmalig: npm ci && npx playwright install chromium)
 npm run build:css # Tailwind neu bauen — nach jeder Klassen-Änderung in HTML/JS nötig
+npm run perf      # Erststart-Messung (Fast-3G/CPU-4x, gemockte APIs) → siehe docs/PERF.md
 npm run build     # test + build:css (das führt auch der Cloudflare-Build aus)
 ```
+
+**Performance des mobilen Erststarts** ([docs/PERF.md](docs/PERF.md)): Runde 4
+(Phase A) macht das Hub-Gerüst sofort sichtbar (Skeleton statt Footer-Blitzer),
+lädt die Schrift lokal (kein render-blockendes Google Fonts), parallelisiert die
+Startsequenz, bündelt die Wetterabrufe und begrenzt den Erst-Feed-Load. Für
+startzeit-relevante Änderungen `npm run perf` vorher/nachher laufen lassen.
 
 Bei jedem Push/PR läuft die [CI](.github/workflows/ci.yml): Unit-/Smoke-Tests,
 E2E-Tests und eine Prüfung, dass das committete `tailwind.css` aktuell ist.

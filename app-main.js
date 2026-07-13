@@ -152,10 +152,8 @@
       if (!el || !appState.weatherConfig) return;
       try {
         const conf = appState.weatherConfig;
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,weather_code&timezone=auto`;
-        const res = await fetchWithTimeout(url, {}, 10000);
-        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
-        const data = await res.json();
+        // Gebuendelter Abruf (Plan4-8): teilt sich den Cache mit der 3-Tage-Vorschau.
+        const data = await getHubWeather(conf.lat, conf.lon);
         el.innerText = `${data.current.temperature_2m.toFixed(1)} °C · ${getWeatherDescription(data.current.weather_code)} · ${conf.name}`;
       } catch (err) {
         console.warn('Hub-Wetter fehlgeschlagen:', err);
@@ -207,8 +205,9 @@
             const th = getThresholds(loc.id);
             let outTemp = null;
             try {
-              const w = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.defaultWeather.lat}&longitude=${loc.defaultWeather.lon}&current=temperature_2m&timezone=auto`);
-              if (w.ok) outTemp = (await w.json()).current.temperature_2m;
+              // Gebuendelter Wetterabruf (Plan4-8) statt eigenem fetch je Standort.
+              const w = await getHubWeather(loc.defaultWeather.lat, loc.defaultWeather.lon);
+              outTemp = w.current.temperature_2m;
             } catch (e) { /* Aussentemperatur optional */ }
             if (outTemp != null) {
               const { surfaceRhRaw, surfaceRh } = surfaceHumidity(last.temp, last.humidity, outTemp);

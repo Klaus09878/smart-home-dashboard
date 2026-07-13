@@ -587,9 +587,9 @@
         console.warn('Open-Meteo laden fehlgeschlagen, generiere Wetter-Dummy:', err);
         appState.outsideData = generateMockWeather();
       }
-      // Amtliche Unwetterwarnungen fuer die ClimateFlow-Wetterkarte (P2-11)
+      // Amtliche Unwetterwarnungen fuer die ClimateFlow-Wetterkarte (P2-11); gecacht (Plan4-8)
       if (appState.weatherConfig) {
-        fetchDwdAlerts(appState.weatherConfig.lat, appState.weatherConfig.lon)
+        getDwdAlerts(appState.weatherConfig.lat, appState.weatherConfig.lon)
           .then(alerts => { appState.dwdAlerts = alerts; renderDwdBanner(document.getElementById('cf-dwd'), alerts); });
       }
     }
@@ -602,6 +602,37 @@
         if (!res.ok) return [];
         return (((await res.json()) || {}).alerts || []).filter(a => a && a.severity && a.severity !== 'minor');
       } catch (e) { return []; }
+    }
+
+    // Ein gebuendelter Open-Meteo-Abruf je Koordinate fuer ALLE Hub-Widgets
+    // (Uhr-Wetter, 3-Tage-Vorschau, Schimmel-Aussentemperatur) statt bis zu vier
+    // Einzelabrufe (Plan4-8). Promise-Cache mit 10-min-TTL dedupliziert gleiche
+    // Koordinaten automatisch. NICHT fuer loadOutdoorWeather (braucht past_days=7,
+    // eigenes Format). forecastDays gehoert in den Cache-Key (Plan4-11).
+    const _hubWeatherCache = new Map();
+    function getHubWeather(lat, lon, forecastDays = 3) {
+      const key = `${(+lat).toFixed(3)},${(+lon).toFixed(3)},${forecastDays}`;
+      const hit = _hubWeatherCache.get(key);
+      if (hit && Date.now() - hit.ts < 10 * 60 * 1000) return hit.p;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&hourly=temperature_2m,precipitation_probability,weather_code&forecast_days=${forecastDays}&timezone=auto&timeformat=unixtime`;
+      const p = fetchWithTimeout(url, {}, 10000).then(res => {
+        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
+        return res.json();
+      }).catch(err => { _hubWeatherCache.delete(key); throw err; }); // Fehler nicht cachen
+      _hubWeatherCache.set(key, { ts: Date.now(), p });
+      return p;
+    }
+
+    // TTL-Cache-Wrapper fuer die DWD-Warnungen (Plan4-8): eine Abfrage je
+    // Koordinate statt je Widget. fetchDwdAlerts liefert bei Fehlern [] (resolved).
+    const _dwdCache = new Map();
+    function getDwdAlerts(lat, lon) {
+      const key = `${(+lat).toFixed(3)},${(+lon).toFixed(3)}`;
+      const hit = _dwdCache.get(key);
+      if (hit && Date.now() - hit.ts < 10 * 60 * 1000) return hit.p;
+      const p = fetchDwdAlerts(lat, lon);
+      _dwdCache.set(key, { ts: Date.now(), p });
+      return p;
     }
     // Chart.js-Stack (Chart + Hammer + Zoom-Plugin) erst bei Bedarf laden (P2-19).
     // Reihenfolge zwingend: Chart + Hammer als Globals, dann registriert sich das

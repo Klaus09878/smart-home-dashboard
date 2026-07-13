@@ -63,5 +63,39 @@ hub-fokussierte Perf-Skript misst den Klima-Feed-Load nicht (der Hub nutzt nur
 `results=400`-Vorschauen), daher steht der Effekt nicht in der Tabelle oben —
 verifiziert ueber den Code-Pfad und den `results`-Parameter im Feed-Mock.
 
-<!-- Nach Phase A (Punkt 8): hier die Vergleichstabelle Baseline ↔ Nachher. -->
+## Bilanz Phase A (Plan4-1 bis Plan4-8)
+
+Was am mobilen Erststart konkret verbessert wurde (code-verifizierbar, unabhängig
+von der Mess-Streuung des localhost-Harness):
+
+1. **Reveal vor den API-Roundtrips (Plan4-2/3):** Das Hub-Gerüst wird beim
+   init-Start sichtbar (≈ DOMContentLoaded), nicht mehr erst nach der seriellen
+   Kette whoami → settings → locations. E2E-Beleg: Gerüst nach ~300 ms trotz 5 s
+   künstlicher API-Latenz. whoami+settings laufen zusätzlich parallel
+   (Briefing-Zeit im Harness 2728 → ~1800 ms).
+2. **Kein render-blockierender Fremd-Request mehr (Plan4-4):** Google Fonts
+   (2 Preconnects + 1 blockierendes CSS + gstatic-woff2) entfernt → lokale
+   Outfit-woff2 mit Preload. Vendor-Skripte (lucide; auf gpx.html zusätzlich
+   Chart+Leaflet) auf `defer`. Im Harness sank das Hub-load-Event von ~590 ms
+   auf < 200 ms (wenn die Drossel localhost nicht greift).
+3. **Weniger/kleinere Requests (Plan4-6/8):** Erst-Feed-Load 8000 → 4032
+   Einträge (~50 % weniger); Hub-Wetter je Koordinate ein gebündelter Abruf
+   statt bis zu vier (Uhr-Wetter, 3-Tage-Vorschau, Schimmel-Außentemperatur,
+   DWD teilen sich einen 10-min-Cache). Request-Zahl im Harness ~57 → ~28.
+4. **Robustheit (Plan4-5/7):** apiFetch/Wetter-fetches brechen nach 8–10 s ab
+   (GET-Retry), der SW weicht nach 2,5 s auf den Cache aus, und der erste
+   SW-Install löst keinen Voll-Reload mehr aus.
+
+**Mess-Streuung (ehrlich):** Der CDP-Netzdrossel greift bei localhost je nach
+Lauf unterschiedlich stark. Greift sie, liegen DOMContentLoaded und Gerüst-Reveal
+gemeinsam bei ~4,3 s (die App-Skripte brauchen unter Fast-3G real ~4 s zum
+Laden) — der Reveal passiert dann trotzdem GENAU bei DCL (init-Start), nicht
+danach. Greift sie nicht, liegt beides bei ~150 ms. In beiden Fällen ist die
+Kernaussage dieselbe: das Gerüst erscheint mit dem init-Start, nicht nach der
+Await-Kette. Verlässlich sind Request-Zahl, Bytes und die eliminierten
+Fremd-Requests; die absoluten Download-Millisekunden schwanken.
+
+Die faire Baseline-Neumessung mit dem korrigierten (MutationObserver-)Harness
+gegen den ausgecheckten Baseline-Commit steht in Punkt 25 (finale Verifikation).
+
 <!-- Final (Punkt 25): kompletter Verlauf Baseline → Phase A → final. -->
