@@ -176,6 +176,21 @@ test('monthlyInsights: leeres Archiv → null (Plan4-15)', () => {
   assert.strictEqual(core.monthlyInsights([], new Date(2026, 6, 15)), null);
 });
 
+test('alignYearSeries: filtert Jahr, sortiert nach MM-TT (Plan4-17)', () => {
+  const rows = [
+    { day: '2025-03-02', t_avg: 8 }, { day: '2025-03-01', t_avg: 7 },
+    { day: '2026-03-01', t_avg: 12 }
+  ];
+  const s = core.alignYearSeries(rows, 2025);
+  assert.deepStrictEqual(s.map(e => e.md), ['03-01', '03-02']);
+  assert.strictEqual(s[0].t_avg, 7);
+});
+test('alignYearSeries: ueberspringt den 29.02. (Plan4-17)', () => {
+  const rows = [{ day: '2024-02-28', t_avg: 3 }, { day: '2024-02-29', t_avg: 4 }, { day: '2024-03-01', t_avg: 5 }];
+  const s = core.alignYearSeries(rows, 2024);
+  assert.deepStrictEqual(s.map(e => e.md), ['02-28', '03-01']);
+});
+
 test('hourlyPattern: mittelt je Wochentag/Stunde (Plan4-16)', () => {
   const d1 = new Date(2026, 6, 6, 8, 0);   // lokale Zeit; getDay bestimmt Zeile
   const d2 = new Date(2026, 6, 6, 8, 30);
