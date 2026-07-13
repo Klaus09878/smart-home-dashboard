@@ -514,6 +514,16 @@
       quiet: { on: false, from: 22, to: 7 }
     };
 
+    // Kopie der Server-Entprell-Defaults in Stunden (s. functions/_notify.js
+    // DEFAULT_RULES) — nur zur Vorbelegung des UI (Plan4-12). Wird kein dedupeH
+    // gesendet, greift serverseitig typeCfg mit genau diesen Werten.
+    const DEDUPE_DEFAULTS = {
+      sensor: 6, mold: 12, frost: 18, heat: 18, co2: 6, dwd: 12, window: 3,
+      digest: 20, vent: 20, errors: 6, weekly: 120, monthly: 480, todo: 24
+    };
+    // Typen mit sinnvollem Intervall-Feld (<= 24 h). weekly/monthly bleiben fix.
+    const DEDUPE_EDITABLE = new Set(['sensor', 'mold', 'frost', 'heat', 'co2', 'dwd', 'window', 'digest', 'vent', 'errors', 'todo']);
+
     function getNotifyRules() {
       const r = Store.getJSON('notify_rules', {}) || {};
       const merged = { types: {}, quiet: { ...NOTIFY_DEFAULTS.quiet, ...(r.quiet || {}) } };
@@ -536,13 +546,18 @@
           ? `<span class="text-[11px] text-slate-400 flex items-center gap-1">${t.thLabel}
                <input type="number" id="nr-th-${t.key}" value="${cfg.threshold ?? t.thDef}" class="w-16 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200" data-onchange="saveNotifyRulesFromUI"></span>`
           : '';
+        // Entprell-Intervall pro Regel (Plan4-12): "max 1x / N h"
+        const ddHtml = DEDUPE_EDITABLE.has(t.key)
+          ? `<span class="text-[11px] text-slate-400 flex items-center gap-1" title="Mindestabstand gleicher Meldungen in Stunden">max&nbsp;1×/
+               <input type="number" min="1" max="168" id="nr-dd-${t.key}" value="${cfg.dedupeH ?? DEDUPE_DEFAULTS[t.key]}" class="w-14 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200" data-onchange="saveNotifyRulesFromUI"> h</span>`
+          : '';
         row.innerHTML = `
           <label class="flex items-center gap-2 text-sm text-slate-200 cursor-pointer min-w-0">
             <input type="checkbox" id="nr-on-${t.key}" class="accent-teal-500 shrink-0" ${cfg.on ? 'checked' : ''} data-onchange="saveNotifyRulesFromUI">
             <i data-lucide="${t.icon}" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
             <span class="truncate">${t.label}</span>
           </label>
-          ${thHtml}
+          <div class="flex items-center gap-2 shrink-0">${thHtml}${ddHtml}</div>
         `;
         wrap.appendChild(row);
       });
@@ -566,6 +581,13 @@
           const thEl = document.getElementById(`nr-th-${t.key}`);
           const v = thEl ? parseFloat(thEl.value.toString().replace(',', '.')) : NaN;
           rules.types[t.key].threshold = isNaN(v) ? t.thDef : v;
+        }
+        // Entprell-Intervall (Plan4-12): nur gueltige Werte 1..168 speichern,
+        // sonst weglassen → Server-Default (typeCfg) greift.
+        if (DEDUPE_EDITABLE.has(t.key)) {
+          const ddEl = document.getElementById(`nr-dd-${t.key}`);
+          const dv = ddEl ? parseInt(ddEl.value, 10) : NaN;
+          if (!isNaN(dv) && dv >= 1 && dv <= 168) rules.types[t.key].dedupeH = dv;
         }
       });
       const qOn = document.getElementById('quiet-on');
