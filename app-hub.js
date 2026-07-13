@@ -31,15 +31,24 @@
             document.getElementById('hub-gpx-week').innerText = `${weekKm.toFixed(1)} km`;
             document.getElementById('hub-gpx-count').innerText = `${weekActs.length} diese Woche · ${acts.length} gesamt`;
 
-            // Wochenziel-Fortschritt (gpx_goals aus dem GPX-Viewer)
+            // Wochenziel-Fortschritt (gpx_goals aus dem GPX-Viewer) + Jahres-
+            // Prognose (Plan4-18).
             try {
               const goals = Store.getJSON('gpx_goals', null);
               const wrap = document.getElementById('hub-gpx-goal-wrap');
-              if (wrap && goals && goals.weekKm > 0) {
-                const pct = Math.min(100, (weekKm / goals.weekKm) * 100);
-                document.getElementById('hub-gpx-goal-bar').style.width = `${pct}%`;
-                document.getElementById('hub-gpx-goal-label').innerText = `Wochenziel: ${Math.round(pct)} % von ${goals.weekKm} km`;
+              const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime();
+              const yearKm = acts.filter(a => (a.startTime || a.addedAt) >= yearStart).reduce((s, a) => s + (a.distM || 0), 0) / 1000;
+              const fc = (goals && goals.yearKm > 0) ? goalForecast({ goalKm: goals.yearKm, doneKm: yearKm }) : null;
+              const fcNote = fc ? (fc.onTrack ? ' · auf Kurs' : ` · +${Math.round(fc.requiredPerWeekKm)} km/Wo`) : '';
+              const setGoal = (label, pct) => {
+                document.getElementById('hub-gpx-goal-bar').style.width = `${Math.min(100, pct)}%`;
+                document.getElementById('hub-gpx-goal-label').innerText = label;
                 wrap.classList.remove('hidden');
+              };
+              if (wrap && goals && goals.weekKm > 0) {
+                setGoal(`Wochenziel: ${Math.round(Math.min(100, (weekKm / goals.weekKm) * 100))} % von ${goals.weekKm} km${fcNote}`, (weekKm / goals.weekKm) * 100);
+              } else if (wrap && goals && goals.yearKm > 0) {
+                setGoal(`Jahresziel: ${Math.round(Math.min(100, (yearKm / goals.yearKm) * 100))} % von ${goals.yearKm} km${fcNote}`, (yearKm / goals.yearKm) * 100);
               } else if (wrap) {
                 wrap.classList.add('hidden');
               }

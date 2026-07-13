@@ -808,4 +808,19 @@ test('expandSimpleRepeat: none nur im Fenster', () => {
   assert.strictEqual(core.expandSimpleRepeat([{ id: 'c', startMs: start, repeat: 'none' }], start + 100, start + 200).length, 0);
 });
 
+test('goalForecast: auf Kurs zur Jahresmitte (Plan4-18)', () => {
+  const r = core.goalForecast({ goalKm: 2000, doneKm: 1010, now: new Date(2026, 6, 2) });
+  assert.ok(r.projectedKm > 1900 && r.projectedKm < 2150, `projected=${r.projectedKm}`);
+  assert.strictEqual(r.onTrack, true);
+});
+test('goalForecast: Rueckstand → benoetigte km/Woche > 0 (Plan4-18)', () => {
+  const r = core.goalForecast({ goalKm: 2000, doneKm: 100, now: new Date(2026, 6, 2) });
+  assert.strictEqual(r.onTrack, false);
+  assert.ok(r.requiredPerWeekKm > 0, `req=${r.requiredPerWeekKm}`);
+});
+test('goalForecast: kein Ziel bzw. erste Jahreswoche → null (Plan4-18)', () => {
+  assert.strictEqual(core.goalForecast({ goalKm: 0, doneKm: 50 }), null);
+  assert.strictEqual(core.goalForecast({ goalKm: 2000, doneKm: 10, now: new Date(2026, 0, 3) }), null);
+});
+
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);

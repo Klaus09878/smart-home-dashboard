@@ -519,10 +519,25 @@ function renderSummary() {
   document.getElementById('sum-year').innerText = `${km(yearActs).toFixed(km(yearActs) >= 100 ? 0 : 1)} km`;
 
   const goals = getGoals();
+  const yearKmDone = km(yearActs);
   renderGoalBar('goal-week-bar', 'goal-week-label', 'goal-week-wrap', km(weekActs), goals.weekKm);
-  renderGoalBar('goal-year-bar', 'goal-year-label', 'goal-year-wrap', km(yearActs), goals.yearKm);
+  renderGoalBar('goal-year-bar', 'goal-year-label', 'goal-year-wrap', yearKmDone, goals.yearKm);
   const hint = document.getElementById('goal-empty-hint');
   if (hint) hint.classList.toggle('hidden', !!(goals.weekKm || goals.yearKm));
+
+  // Zielprognose (Plan4-18)
+  const fcEl = document.getElementById('goal-year-forecast');
+  if (fcEl) {
+    const fc = goalForecast({ goalKm: goals.yearKm, doneKm: yearKmDone });
+    if (fc) {
+      const proj = fc.projectedKm.toLocaleString('de-DE', { maximumFractionDigits: 0 });
+      fcEl.innerText = fc.onTrack
+        ? `Prognose: ~${proj} km · auf Kurs ✅`
+        : `Prognose: ~${proj} km · ~${fc.requiredPerWeekKm.toLocaleString('de-DE', { maximumFractionDigits: 0 })} km/Woche nötig`;
+    } else {
+      fcEl.innerText = '';
+    }
+  }
 }
 
 // ============ Kalender & Streaks ============
