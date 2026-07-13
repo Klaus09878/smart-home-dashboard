@@ -59,6 +59,7 @@
       archiveLoadedFor: null,
       currentChartTimeframe: 24, // hours
       climateLoaded: false,
+      initDone: false, // true, sobald init() Store+Standorte geladen hat (Plan4-2)
       // Zeitpunkte der letzten ECHTEN Messwerte (nicht forward-filled)
       lastSensorUpdate: { temp: null, humidity: null },
       // Rohdaten-Cache pro Standort für inkrementelles Nachladen (statt jedes Mal 8000 Einträge)

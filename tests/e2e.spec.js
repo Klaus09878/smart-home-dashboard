@@ -18,6 +18,17 @@ test('Hub lädt: Widgets, Uhr, keine JS-Fehler', async ({ page }) => {
   expect(errors, errors.join('\n')).toHaveLength(0);
 });
 
+test('Erststart zeigt Geruest sofort, auch bei langsamen APIs', async ({ page }) => {
+  // APIs kuenstlich stark verzoegern; das Render-Geruest darf NICHT darauf
+  // warten (Plan4-2). Vor dem Split blieb #view-home bis zum whoami-Ende hidden.
+  await page.route('**/api/**', async route => { await new Promise(r => setTimeout(r, 5000)); route.abort(); });
+  await page.route(/open-meteo\.com|brightsky\.dev|thingspeak\.com|openstreetmap\.org/,
+    async route => { await new Promise(r => setTimeout(r, 5000)); route.abort(); });
+  await page.goto('/index.html#home', { waitUntil: 'commit' });
+  await expect(page.locator('#view-home')).toBeVisible({ timeout: 2500 });
+  await expect(page.locator('#hub-widgets')).toBeVisible();
+});
+
 test('Einstellungen: Regeln + Theme-Umschalter', async ({ page }) => {
   await page.goto('/index.html#settings');
   await waitReady(page);

@@ -29,5 +29,19 @@ schon DOMContentLoaded (5284 ms) durch die synchron im `<head>` geladenen
 Vendor-Skripte (chart.umd.js, leaflet.js, lucide) blockiert. Genau diese beiden
 Punkte adressiert Phase A.
 
+## Verlauf während Phase A (Hub „Gerüst sichtbar", Median)
+
+| Stand | Gerüst sichtbar | Requests | Transfer | Bemerkung |
+|---|---|---|---|---|
+| Baseline (vor P4) | 5470 ms | 57 | 912 KB | init() awaitet vor dem View-Wechsel |
+| nach Plan4-2 | 4227 ms | 57 | 914 KB | Render-Gerüst vor dem ersten await |
+
+**Harness-Hinweis:** Die CDP-Netzdrossel greift bei localhost-Auslieferung
+statischer Dateien nur schwach (load-Event ~600 ms trotz „Fast-3G"); das
+Messgeschirr erfasst v. a. die serielle Await-Kette, Request-Anzahl und Bytes
+verlässlich. Der E2E-Test „Erststart zeigt Geruest sofort" belegt die reine
+Render-Logik direkt: Gerüst nach ~300 ms trotz 5 s künstlicher API-Latenz.
+Absolute Millisekunden daher als grober Richtwert lesen, die Deltas als Trend.
+
 <!-- Nach Phase A (Punkt 8): hier die Vergleichstabelle Baseline ↔ Nachher. -->
 <!-- Final (Punkt 25): kompletter Verlauf Baseline → Phase A → final. -->

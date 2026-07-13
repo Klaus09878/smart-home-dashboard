@@ -14,13 +14,17 @@
       }
     }
 
-    function handleRoute() {
+    // Synchroner View-Wechsel — KEIN Store-Zugriff, kein await, keine Datenlader.
+    // Wird beim Start VOR jedem await aufgerufen, damit das Geruest schon beim
+    // ersten Paint sichtbar ist (Plan4-2, behebt den Footer-Blitzer). Liefert den
+    // aufgeloesten View-Namen zurueck (null bei #gpx-Umleitung).
+    function renderRoute() {
       let view = (location.hash || '').replace('#', '');
 
       // Der GPX-Viewer ist eine eigenständige Seite (alte #gpx-Links umleiten)
       if (view === 'gpx') {
         location.replace('gpx.html');
-        return;
+        return null;
       }
 
       if (!HUB_VIEWS.includes(view)) view = 'home';
@@ -40,7 +44,12 @@
       document.title = view === 'climate' ? 'ClimateFlow | Smart Home Hub' : 'Smart Home Hub';
 
       updateIcons();
+      return view;
+    }
 
+    // Datenlader je View — liest Einstellungen und ruft Netz-Loader, laeuft daher
+    // erst NACH Store.init (appState.initDone). Vom Geruest-Rendern getrennt.
+    function loadRouteData(view) {
       // Klimadaten erst beim ersten Öffnen des Dashboards laden (Performance)
       if (view === 'climate') {
         applyClimateLayout(); // gespeicherte Karten-Reihenfolge/-Sichtbarkeit
@@ -67,6 +76,14 @@
       }
 
       if (view === 'settings') renderSettings();
+    }
+
+    // hashchange- und Navigations-Handler: rendert das Geruest immer sofort;
+    // die Datenlader laufen erst, wenn init() fertig ist (sonst lesen sie
+    // Einstellungen, bevor der Store bereit ist).
+    function handleRoute() {
+      const view = renderRoute();
+      if (view && appState.initDone) loadRouteData(view);
     }
 
     // Uhr, Datum & Begrüßung auf dem Hub-Homescreen
@@ -329,7 +346,14 @@
 
     // App Initialization
     async function init() {
-      // Profil + Einstellungen laden, bevor irgendetwas gelesen wird
+      // Geruest SOFORT sichtbar machen — VOR jedem await, damit der Nutzer beim
+      // mobilen Erststart nicht erst den Footer und dann ~5 s Leere sieht
+      // (Plan4-2). Der hashchange-Handler ist bis initDone reines Rendern.
+      window.addEventListener('hashchange', handleRoute);
+      renderRoute();
+      updateHubClock(); // Uhr/Begruessung ohne Profilnamen (Guard in getProfileDisplayName)
+
+      // Profil + Einstellungen laden, bevor Einstellungen gelesen werden
       await Store.init();
       updateProfileBadge();
       applyTheme(getTheme()); // profilbezogenes Theme anwenden
@@ -354,8 +378,11 @@
         });
       });
 
-      window.addEventListener('hashchange', handleRoute);
-      handleRoute();
+      // Einstellungen sind jetzt geladen → Datenlader der aktuellen View starten.
+      // (Der hashchange-Handler ist bereits ganz oben in init registriert.)
+      appState.initDone = true;
+      const currentView = renderRoute();
+      if (currentView) loadRouteData(currentView);
 
       // Einstellungs-Sync auch während der Sitzung (Punkt 6): Änderungen vom
       // anderen Gerät kommen ohne Reload an — periodisch + bei Tab-Fokus.
