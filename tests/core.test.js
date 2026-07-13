@@ -176,6 +176,25 @@ test('monthlyInsights: leeres Archiv → null (Plan4-15)', () => {
   assert.strictEqual(core.monthlyInsights([], new Date(2026, 6, 15)), null);
 });
 
+test('hourlyPattern: mittelt je Wochentag/Stunde (Plan4-16)', () => {
+  const d1 = new Date(2026, 6, 6, 8, 0);   // lokale Zeit; getDay bestimmt Zeile
+  const d2 = new Date(2026, 6, 6, 8, 30);
+  const row = (d1.getDay() + 6) % 7;
+  const r = core.hourlyPattern([{ time: d1, humidity: 55, temp: 20 }, { time: d2, humidity: 65, temp: 22 }]);
+  assert.ok(Math.abs(r.grid[row][8] - 60) < 0.001, `cell=${r.grid[row][8]}`);
+  assert.strictEqual(r.min, 60);
+  assert.strictEqual(r.max, 60);
+});
+test('hourlyPattern: leeres Array → null (Plan4-16)', () => {
+  assert.strictEqual(core.hourlyPattern([]), null);
+});
+test('hourlyPattern: Feld temp (Plan4-16)', () => {
+  const d = new Date(2026, 6, 7, 14, 0);
+  const row = (d.getDay() + 6) % 7;
+  const r = core.hourlyPattern([{ time: d, temp: 25, humidity: 40 }], 'temp');
+  assert.ok(Math.abs(r.grid[row][14] - 25) < 0.001, `cell=${r.grid[row][14]}`);
+});
+
 test('heatingDemandIndex: heute vs. gestern inkl. Prozent-Änderung', () => {
   const now = Date.UTC(2026, 6, 2, 12, 0, 0);
   const h = 60 * 60 * 1000;

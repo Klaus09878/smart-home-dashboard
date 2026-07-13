@@ -958,6 +958,11 @@
           console.error('Fehler beim Heizindikator:', e);
         }
         try {
+          renderHourlyPattern(); // Wochen-Muster (Plan4-16)
+        } catch (e) {
+          console.error('Fehler beim Wochen-Muster:', e);
+        }
+        try {
           checkWeatherWarnings();
         } catch (e) {
           console.error('Fehler bei den Wetterwarnungen:', e);

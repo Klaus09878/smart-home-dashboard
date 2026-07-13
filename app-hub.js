@@ -175,6 +175,7 @@
     const CF_CARD_META = {
       'cf-kpi': 'Messwerte & Wetter',
       'cf-analytics': 'Lüftungsberater & 24h-Statistik',
+      'cf-pattern': 'Wochen-Muster',
       'cf-chart': 'Klimaverlauf',
       'cf-archive': 'Langzeit-Archiv',
       'cf-table': 'Rohdaten-Tabelle'

@@ -589,11 +589,12 @@
     // im Store (cf_collapsed); die Kernkarten (Messwerte, Analyse) bleiben immer
     // sichtbar. Kompakt-Modus klappt alle Detailkarten auf einmal ein.
     const CF_COLLAPSIBLE = {
+      'cf-pattern': { body: 'pattern-collapse-body', arrow: 'pattern-arrow', onOpen: () => renderHourlyPattern() },
       'cf-chart':   { body: 'chart-collapse-body', arrow: 'chart-arrow' },
       'cf-archive': { body: 'archive-container',   arrow: 'archive-arrow', onOpen: () => loadArchiveView() },
       'cf-table':   { body: 'table-container',     arrow: 'table-arrow' }
     };
-    const CF_COLLAPSED_DEFAULT = ['cf-archive', 'cf-table']; // wie bisher: Archiv/Tabelle zu
+    const CF_COLLAPSED_DEFAULT = ['cf-pattern', 'cf-archive', 'cf-table']; // Muster/Archiv/Tabelle starten zu
     function getCfCollapsed() {
       const c = Store.getJSON('cf_collapsed', null);
       return Array.isArray(c) ? c : CF_COLLAPSED_DEFAULT.slice();
@@ -626,6 +627,50 @@
     }
     // Header-Buttons in index.html rufen weiterhin diese Namen auf
     function toggleTableCollapse() { toggleCfCard('cf-table'); }
+
+    // ============ Wochen-Muster-Heatmap (Plan4-16) ============
+    let _patternField = 'humidity';
+    function setPatternField(field) { _patternField = field === 'temp' ? 'temp' : 'humidity'; renderHourlyPattern(); }
+    function renderHourlyPattern() {
+      const el = document.getElementById('pattern-grid');
+      if (!el) return;
+      // Umschalter-Status
+      ['temp', 'humidity'].forEach(f => {
+        const b = document.getElementById(`pattern-btn-${f}`);
+        if (b) b.className = f === _patternField
+          ? 'px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30'
+          : 'px-2 py-0.5 rounded text-[10px] font-semibold text-slate-400 border border-slate-800 hover:text-slate-200';
+      });
+      const pat = hourlyPattern(appState.insideData, _patternField);
+      if (!pat) { el.innerHTML = '<p class="text-xs text-slate-500">Noch keine Daten für das Wochen-Muster.</p>'; return; }
+      const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+      const unit = _patternField === 'temp' ? ' °C' : ' %';
+      const cellStyle = v => {
+        if (v == null) return 'background:rgba(30,41,59,0.4)';
+        const t = pat.max > pat.min ? (v - pat.min) / (pat.max - pat.min) : 0.5;
+        if (_patternField === 'temp') {
+          const r = Math.round(59 + t * (239 - 59)), g = Math.round(130 - t * 70), b = Math.round(246 - t * 200);
+          return `background:rgb(${r},${g},${b})`;
+        }
+        return `background:rgba(59,130,246,${(0.12 + t * 0.75).toFixed(2)})`;
+      };
+      const cols = 'grid-template-columns:1.6rem repeat(24,1fr)';
+      let html = `<div class="grid gap-0.5" style="${cols}">`;
+      pat.grid.forEach((rowVals, ri) => {
+        html += `<span class="text-[9px] text-slate-500 flex items-center">${days[ri]}</span>`;
+        rowVals.forEach((v, hi) => {
+          const title = v == null ? `${days[ri]} ${hi}:00 – keine Daten`
+            : `${days[ri]} ${hi}:00 – ${v.toFixed(1).replace('.', ',')}${unit}`;
+          html += `<span class="rounded-sm" style="${cellStyle(v)};height:12px" title="${title}"></span>`;
+        });
+      });
+      html += '</div>';
+      // Stunden-Achse (0/6/12/18)
+      html += `<div class="grid gap-0.5 mt-1" style="${cols}"><span></span>`
+        + Array.from({ length: 24 }, (_, h) => `<span class="text-[8px] text-slate-600 text-center">${h % 6 === 0 ? h : ''}</span>`).join('')
+        + '</div>';
+      el.innerHTML = html;
+    }
 
     // Populate data table (Extra-Felder aus dem Kanal-Schema erscheinen als eigene Spalten)
     function populateTable(feeds) {
