@@ -77,5 +77,13 @@ module.exports = [
     files: ['tests/**/*.js', 'eslint.config.js', 'playwright.config.js'],
     languageOptions: { ecmaVersion: 2022, sourceType: 'commonjs', globals: { ...globals.node, ...globals.browser } },
     rules: { 'no-undef': 'error', 'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none' }] }
+  },
+
+  // Node-Skripte (ESM, .mjs) — z. B. das Perf-Audit; enthaelt Browser-Callbacks
+  // in page.evaluate/waitForFunction (performance, document).
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: { ...globals.node, ...globals.browser } },
+    rules: { 'no-undef': 'error', 'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none' }] }
   }
 ];
