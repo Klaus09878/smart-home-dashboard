@@ -14,7 +14,7 @@
   Cache-Control: public, max-age=604800
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-eLZhyzXdu32xZFF/i0jEbzBcH5z949HuC9z7s5q31EY='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self' https://ntfy.sh https://api.open-meteo.com https://archive-api.open-meteo.com https://geocoding-api.open-meteo.com https://air-quality-api.open-meteo.com https://api.brightsky.dev https://nominatim.openstreetmap.org; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-eLZhyzXdu32xZFF/i0jEbzBcH5z949HuC9z7s5q31EY='; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self' https://ntfy.sh https://api.open-meteo.com https://archive-api.open-meteo.com https://geocoding-api.open-meteo.com https://air-quality-api.open-meteo.com https://api.brightsky.dev https://nominatim.openstreetmap.org; manifest-src 'self'; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY

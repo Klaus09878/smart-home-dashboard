@@ -2,7 +2,7 @@
 // Strategie: Network-first für alles Eigene (damit Deployments sofort ankommen),
 // Cache als Offline-Fallback. API-Aufrufe (ThingSpeak, Open-Meteo, CDNs) gehen
 // immer direkt ans Netz und werden nicht gecacht.
-const CACHE_NAME = 'smarthub-v46';
+const CACHE_NAME = 'smarthub-v47';
 const APP_SHELL = [
   './',
   './gpx.html',
@@ -28,7 +28,13 @@ const APP_SHELL = [
   './vendor/lucide.min.js',
   './vendor/exifr.lite.umd.js',
   './vendor/leaflet/leaflet.js',
-  './vendor/leaflet/leaflet.css'
+  './vendor/leaflet/leaflet.css',
+  // Outfit-Schrift lokal (Plan4-4) — offline-faehig, kein Google-Fonts-Request
+  './vendor/fonts/outfit-300.woff2',
+  './vendor/fonts/outfit-400.woff2',
+  './vendor/fonts/outfit-500.woff2',
+  './vendor/fonts/outfit-600.woff2',
+  './vendor/fonts/outfit-700.woff2'
 ];
 
 self.addEventListener('install', event => {

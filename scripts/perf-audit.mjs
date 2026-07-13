@@ -130,21 +130,39 @@ async function measurePage(browser, url, opts = {}) {
 
   await installRoutes(page);
 
+  // Reveal-Zeitpunkte per MutationObserver erfassen (VOR der Navigation
+  // injiziert). Ein rAF-Poll wuerde unter CPU-Drossel erst feuern, wenn der
+  // Main-Thread nach der gesamten init-Arbeit frei ist, und damit „Geruest
+  // sichtbar" massiv ueberschaetzen. Der Observer haelt den Moment fest, in dem
+  // #view-home die hidden-Klasse verliert bzw. das Briefing-Badge sich fuellt.
+  if (opts.hub) {
+    await page.addInitScript(() => {
+      window.__perf = { geruest: null, briefing: null };
+      const check = () => {
+        const v = document.getElementById('view-home');
+        if (v && !v.classList.contains('hidden') && window.__perf.geruest == null) window.__perf.geruest = performance.now();
+        const b = document.getElementById('briefing-badge');
+        if (b && !/gepr/i.test(b.textContent || '') && window.__perf.briefing == null) window.__perf.briefing = performance.now();
+        return window.__perf.geruest != null && window.__perf.briefing != null;
+      };
+      const mo = new MutationObserver(() => { if (check()) mo.disconnect(); });
+      // document (nicht documentElement): in addInitScript existiert <html> evtl.
+      // noch nicht → observe(null) wuerde werfen. document existiert immer.
+      mo.observe(document, { subtree: true, attributes: true, attributeFilter: ['class'], childList: true, characterData: true });
+    });
+  }
+
   await page.goto(url, { waitUntil: 'commit' });
 
   const result = { requests: 0, bytes: 0 };
 
   if (opts.hub) {
-    // performance.now() ist relativ zum Navigationsstart der Seite.
-    result.tGeruest = await page.waitForFunction(() => {
-      const el = document.getElementById('view-home');
-      return el && !el.classList.contains('hidden') ? performance.now() : false;
-    }, null, { timeout: 25000 }).then(h => h.jsonValue()).catch(() => null);
-
-    result.tBriefing = await page.waitForFunction(() => {
-      const b = document.getElementById('briefing-badge');
-      return b && !/gepr/i.test(b.textContent || '') ? performance.now() : false;
-    }, null, { timeout: 25000 }).then(h => h.jsonValue()).catch(() => null);
+    // Warten, bis der Observer beide Werte hat (oder Timeout), dann auslesen.
+    await page.waitForFunction(() => window.__perf && window.__perf.geruest != null, null, { timeout: 25000 }).catch(() => {});
+    await page.waitForFunction(() => window.__perf && window.__perf.briefing != null, null, { timeout: 25000 }).catch(() => {});
+    const perf = await page.evaluate(() => window.__perf || {}).catch(() => ({}));
+    result.tGeruest = perf.geruest ?? null;
+    result.tBriefing = perf.briefing ?? null;
   } else {
     await page.waitForLoadState('load', { timeout: 25000 }).catch(() => {});
   }

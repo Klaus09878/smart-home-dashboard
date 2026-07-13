@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============ Outfit-Schrift lokal (Plan4-4) ============ */
+/* Frueher von Google Fonts render-blockend nachgeladen — jetzt aus vendor/fonts
+   (latin-Subset, woff2). font-display: swap zeigt sofort die Fallback-Schrift.
+   Bei Font-Upgrade die Dateien in vendor/fonts ersetzen. */
+@font-face { font-family: 'Outfit'; font-style: normal; font-weight: 300; font-display: swap; src: url('vendor/fonts/outfit-300.woff2') format('woff2'); }
+@font-face { font-family: 'Outfit'; font-style: normal; font-weight: 400; font-display: swap; src: url('vendor/fonts/outfit-400.woff2') format('woff2'); }
+@font-face { font-family: 'Outfit'; font-style: normal; font-weight: 500; font-display: swap; src: url('vendor/fonts/outfit-500.woff2') format('woff2'); }
+@font-face { font-family: 'Outfit'; font-style: normal; font-weight: 600; font-display: swap; src: url('vendor/fonts/outfit-600.woff2') format('woff2'); }
+@font-face { font-family: 'Outfit'; font-style: normal; font-weight: 700; font-display: swap; src: url('vendor/fonts/outfit-700.woff2') format('woff2'); }
+
 /* ============ Gemeinsame Custom-Styles aller Hub-Seiten ============ */
 
 /* Custom Scrollbar */

@@ -11,21 +11,23 @@
   <link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
+  <!-- Outfit-Schrift lokal (Plan4-4): @font-face in tailwind.css statt Google Fonts. -->
+  <link rel="preload" href="vendor/fonts/outfit-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="vendor/fonts/outfit-600.woff2" as="font" type="font/woff2" crossorigin>
+
   <!-- Tailwind CSS (statischer Build, siehe tailwind.config.js / npm run build:css) -->
   <link rel="stylesheet" href="tailwind.css">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-  <script src="vendor/chart.umd.js"></script>
-  <script src="vendor/lucide.min.js"></script>
+  <!-- Vendor-Skripte defer (Plan4-4): nicht render-blockend; laufen vor
+       DOMContentLoaded und damit vor gpx.js init(). Reihenfolge bleibt erhalten. -->
+  <script defer src="vendor/chart.umd.js"></script>
+  <script defer src="vendor/lucide.min.js"></script>
   <!-- EXIF-Leser fuer Foto-Geotags (P2-15, lokal gepinnt) -->
   <script defer src="vendor/exifr.lite.umd.js"></script>
 
   <!-- Leaflet (Karten, lokal gepinnt) -->
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <script src="vendor/leaflet/leaflet.js"></script>
+  <script defer src="vendor/leaflet/leaflet.js"></script>
 
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">

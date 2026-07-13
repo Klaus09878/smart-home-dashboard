@@ -18,18 +18,20 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SmartHub">
 
+  <!-- Outfit-Schrift lokal (Plan4-4): @font-face in tailwind.css, Font-Preload
+       fuer die zwei haeufigsten Gewichte — kein render-blockender Google-Fonts-
+       Request mehr. crossorigin ist bei Font-Preloads Pflicht (sonst Doppel-Load). -->
+  <link rel="preload" href="vendor/fonts/outfit-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="vendor/fonts/outfit-600.woff2" as="font" type="font/woff2" crossorigin>
+
   <!-- Tailwind CSS (statischer Build, siehe tailwind.config.js / npm run build:css) -->
   <link rel="stylesheet" href="tailwind.css">
 
-  <!-- Google Fonts (Outfit) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
   <!-- Chart.js + Zoom/Pan-Plugin werden erst bei Bedarf nachgeladen (P2-19,
        ensureChartJs) — der Hub-Start braucht sie nicht. Bleiben in der SW-Shell. -->
-  <!-- Lucide Icons (lokal gepinnt) -->
-  <script src="vendor/lucide.min.js"></script>
+  <!-- Lucide Icons (lokal gepinnt) — defer: nicht render-blockend (Plan4-4);
+       laeuft vor DOMContentLoaded, also vor init()/updateIcons(). -->
+  <script defer src="vendor/lucide.min.js"></script>
 
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
