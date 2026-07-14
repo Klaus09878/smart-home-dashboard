@@ -98,4 +98,39 @@ Fremd-Requests; die absoluten Download-Millisekunden schwanken.
 Die faire Baseline-Neumessung mit dem korrigierten (MutationObserver-)Harness
 gegen den ausgecheckten Baseline-Commit steht in Punkt 25 (finale Verifikation).
 
-<!-- Final (Punkt 25): kompletter Verlauf Baseline → Phase A → final. -->
+## Abschlussmessung Runde 4 (Plan4-25) — 2026-07-13
+
+Beide Stände mit **demselben, korrigierten Messgeschirr** gemessen: der
+Baseline-Commit (`0a57063`) wurde dafür temporär ausgecheckt.
+
+| Metrik | Baseline (vor Runde 4) | nach Runde 4 |
+|---|---|---|
+| DOMContentLoaded | 335 ms | 4627 ms* |
+| **Gerüst sichtbar** | **1719 ms** | **4624 ms*** |
+| **⇒ Wartezeit NACH fertigem DOM** | **+1384 ms** | **≈ 0 ms** |
+| Requests (Hub) | 57 | **28** |
+| Transfer (Hub) | 938 KB | 916 KB |
+
+\* In diesem Lauf griff die CDP-Drossel auf die localhost-Auslieferung, im
+Baseline-Lauf nicht — die **absoluten** ms sind deshalb nicht direkt
+vergleichbar (siehe Harness-Hinweis). Vergleichbar und aussagekräftig ist die
+**Differenz Gerüst − DOMContentLoaded**: Sie misst genau das, was der Nutzer als
+„leere Seite" erlebt, und ist von der Download-Geschwindigkeit unabhängig.
+
+### Das Ergebnis in einem Satz
+
+**Vorher** erschien das Dashboard erst **1,4 Sekunden nachdem das DOM fertig
+war** — bis dahin sah man nur den Footer, weil `init()` erst die serielle Kette
+whoami → settings → locations abwartete. **Jetzt** erscheint das Gerüst
+**zusammen mit dem DOM** (Gerüst = DCL, in drei aufeinanderfolgenden Läufen
+4624/4632/4612 ms bei DCL 4627/4633/4613 ms). Zusätzlich halbiert sich die
+Request-Zahl (57 → 28), und es gibt keinen render-blockierenden
+Google-Fonts-Request mehr.
+
+Auf echtem Mobilfunk addiert sich die eingesparte Wartezeit weiter: Die 1384 ms
+im Harness entstehen aus drei simulierten 400-ms-Roundtrips; bei realer
+Mobilfunk-Latenz (oft 200–500 ms pro Roundtrip, dazu die Cloudflare-Function-
+Laufzeit) fällt der Gewinn entsprechend größer aus. Die vom Nutzer berichteten
+„bis zu ~10 Sekunden" setzten sich aus genau diesen Bausteinen zusammen:
+Await-Kette + render-blockende Fonts + 8000-Einträge-Feed + Erstbesuch-Reload
+des Service Workers — alle vier sind adressiert.

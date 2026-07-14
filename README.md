@@ -187,6 +187,24 @@ DWD-Warnungen, Live-Aufzeichnung, Nutzerverwaltung u. v. m.) sind vollständig u
 - **B — Klima-Intelligenz:** Fenster-offen-Erkennung, Morgen-Digest-Push, Sensor-Kalibrierung, Tagesnotizen im Archiv
 - **C — Hub/GPX/PWA:** eigene Termine (D1-Kalender), Aufzeichnung 2.0 (Pause + Foto unterwegs), PWA-Shortcuts/App-Badge/Cache-Header
 
+**Runde 4** ([PLAN4.md](PLAN4.md), 25 Punkte) ist vollständig umgesetzt:
+
+- **A — Mobiler Erststart (Priorität):** Render-Gerüst sofort sichtbar statt
+  Footer-Blitzer, parallele Startsequenz, Outfit-Schrift lokal (kein
+  render-blockendes Google Fonts), `defer` für Vendor-Skripte, apiFetch mit
+  Timeout + GET-Retry, Erst-Feed-Load auf 14 Tage begrenzt, SW-Cache-Fallback
+  ohne Erstbesuch-Reload, gebündelte Wetterabrufe — Messwerte in
+  [docs/PERF.md](docs/PERF.md)
+- **B — Einstellbarkeit:** neue Karte „Verhalten & Anzeige" (Aktualisierungs-
+  intervalle, Chart-Standardzeitraum, Widget-Feinkonfiguration), Entprell-
+  Intervall je Warnregel, konfigurierbarer Morgen-Digest (Uhrzeit + Bausteine)
+- **C — Tiefe:** Lüftungs-Wirkungsanalyse, Monats-Insights im Archiv,
+  Wochen-Muster-Heatmap (Stunde × Wochentag), Jahresvergleich im Archiv-Chart,
+  GPX-Zielprognose und persönliche Rekorde
+- **D — Alltagstauglichkeit:** Offline-Banner mit Auto-Sync, Auffrischung bei
+  App-Rückkehr, einheitliche Leer-/Fehlerzustände mit Retry, größere
+  Touch-Ziele + Safe-Area, schnellerer GPX-Start
+
 ## Deployment
 
 Push auf `main` → Cloudflare Pages deployt automatisch.

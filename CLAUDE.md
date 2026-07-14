@@ -19,18 +19,22 @@ Multi-Projekt-SPA auf Cloudflare Pages (statisch + Functions), Mehrbenutzer-Logi
 - `functions/_auth.js` — Nutzerliste/Identität; `functions/_notify.js` — Push-Verteiler (Profile+Regeln aus D1, Ruhezeiten `Europe/Berlin`, per-Profil-Dedupe, Fallback `NTFY_TOPIC`).
 - `functions/api/` — `whoami`, `settings` (D1 `user_settings`), `feeds/[locId]` (Proxy, löst auch D1-`locations`), `gpx`, `climate`, `todos`, `locations` (Admin), `health`, `error-log`, `ical`, `config`, `check-alerts`/`weekly-report`/`monthly-report` (Cron). D1-Binding `DB`, Schema zur Laufzeit. Magnus-/Komfort-Formeln dort bewusst inline dupliziert — bei Formel-Änderungen beide Stellen anfassen.
 - `tests/core.test.js` + `tests/smoke.test.js` — `npm test`; Smoke-Test prüft ID-/Handler-/Dateiverweise über alle Seiten. `tests/e2e.spec.js` (Playwright, `npm run test:e2e`) läuft separat, nicht im Deploy-Build.
+- `scripts/perf-audit.mjs` (`npm run perf`) — misst den mobilen Erststart (Fast-3G/CPU-4x, gemockte APIs, MutationObserver-Reveal); Ergebnisse + Methodik in `docs/PERF.md`.
+- `vendor/fonts/outfit-*.woff2` — lokale Outfit-Schrift (`@font-face` in `tailwind.input.css`).
 - Dialoge über `modalPrompt`/`modalConfirm` (shared.js), nie `prompt()`/`confirm()`. Theme via `applyTheme`/`getTheme` (raw `localStorage.theme` + profilbezogen im Store). Icon-Buttons brauchen nur `title` — `updateIcons` setzt `aria-label` automatisch.
 - `tailwind.css` — GEBAUT, nie von Hand editieren.
 
 ## Nicht-offensichtliche Regeln
 1. **Nach jeder Klassen-Änderung in HTML/app.js/gpx.js/shared.js:** `npm run build:css` und `tailwind.css` mitcommitten (Tailwind scannt auch JS-Template-Strings).
-2. **Bei Änderungen an gecachten Dateien:** `CACHE_NAME` in `sw.js` hochzählen (aktuell `smarthub-v9`; Shell-Liste dort pflegen).
-3. **Profilbezogene Einstellungen** immer über `Store` (siehe oben), nie roh.
+2. **Bei Änderungen an gecachten Dateien:** `CACHE_NAME` in `sw.js` hochzählen (aktuell `smarthub-v67`; Shell-Liste dort pflegen).
+3. **Profilbezogene Einstellungen** immer über `Store` (siehe oben), nie roh. Die Pref-Bündel `app_prefs`, `chart_prefs`, `widget_prefs` (Plan4-9/10/11) NUR über ihre Getter `getAppPrefs()` / `getChartPrefs()` / `getWidgetPrefs()` lesen — die mergen die Defaults, damit neue Schlüssel abwärtskompatibel bleiben.
 4. **ThingSpeak-Daten:** Komma-Dezimal, Felder asynchron (field1=Temp, field2=Feuchte). Immer über `processRawFeeds`; nie annehmen, dass ein Eintrag beide Felder hat.
 5. **Open-Meteo:** immer `timeformat=unixtime`; `past_days=7&forecast_days=2` für Chart + Prognose.
 6. **GPX-Sync:** Identität `uid`, Konflikt `updatedAt`, Löschungen als Tombstones + Queue `gpx_pending_deletes`. Punkte auf max. 5000 downsamplen.
 7. **Serverseitige Warnungen** laufen über `_notify.js` (pro Profil). Neuer Warntyp → in `DEFAULT_RULES` (core-Regeln), `NOTIFY_TYPES` (app.js UI) und den auslösenden Endpunkt eintragen.
 8. Commits/Pushes direkt auf `main` sind gewollt (Auto-Deploy). Commit-Messages ohne Umlaute via `-F <datei>` (PowerShell-Quoting!).
+9. **Schriften sind lokal** (`vendor/fonts`, Plan4-4) — NIE wieder externe Font-/CSS-Links einbauen: die CSP erlaubt `style-src`/`font-src` nur noch `'self'`, und externe Fonts blockieren den ersten Paint.
+10. **Startzeit-relevante Änderungen** (init-Reihenfolge, `<head>`, Service Worker) mit `npm run perf` vorher/nachher belegen; Methodik und Messwerte in `docs/PERF.md`. Faustregel aus Runde 4: das Render-Gerüst darf NIE auf einen `await` warten — `renderRoute()` läuft vor allem anderen, Datenlader erst nach `appState.initDone`.
 
 ## Kanäle (Referenz)
 - Gillian: ThingSpeak 3417815, Default Stuttgart (48.7758, 9.1829)

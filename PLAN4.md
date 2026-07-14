@@ -1,9 +1,34 @@
 # Umsetzungsplan Runde 4 — 25 Punkte
 
-> **Status: ⏳ offen** (kein Punkt umgesetzt).
-> Schwerpunkt: **Phase A behebt den langsamen mobilen Erststart** (Nutzerproblem:
-> beim Öffnen erscheint zuerst nur der Footer, das Dashboard braucht bis zu ~10 s).
-> Danach: Einstellbarkeit (B), Tiefe/Insights (C), Robustheit & Mobile-UX (D).
+> **Status: ✅ vollständig umgesetzt** (Commits `Plan4-1` … `Plan4-25`).
+> Verifiziert: `npm run lint` (0 Fehler), `npm test` (80 Core + 3 Web-Push + 13 API
+> + 9 Smoke), `npm run test:e2e` (9 Browser-Tests) — alles grün; Service-Worker v67.
+>
+> **Ergebnis Priorität 1 (mobiler Erststart):** Das Render-Gerüst erscheint jetzt
+> zusammen mit dem DOM statt 1384 ms danach; Request-Zahl 57 → 28, keine
+> render-blockenden Google-Fonts mehr. Vorher-/Nachher-Messung gegen den
+> ausgecheckten Baseline-Commit steht in `docs/PERF.md`.
+>
+> **Abweichungen gegenüber der ursprünglichen Planung (ehrlich dokumentiert):**
+> - **Punkt 1/4:** Das Perf-Geschirr maß „Gerüst sichtbar" anfangs per rAF-Poll,
+>   was unter CPU-Drossel „Main-Thread frei" statt den Reveal misst (scheinbare
+>   ~4200 ms). Ab Plan4-4 erfasst ein MutationObserver den echten Zeitpunkt; die
+>   irreführenden Zwischenwerte sind in `docs/PERF.md` als solche gekennzeichnet.
+>   Die CDP-Netzdrossel greift bei localhost je nach Lauf unterschiedlich — die
+>   belastbare Kennzahl ist deshalb **Gerüst − DOMContentLoaded**.
+> - **Punkt 8:** Zusätzlich zum Plan wurde ein vorbestehender Bug behoben — die
+>   3-Tage-Vorschau zeigte für Tag 2/3 „Invalid Date" (`daily.time` ist unixtime).
+> - **Punkt 22:** Zusätzlich zum Plan unterscheidet das Kalender-Widget jetzt
+>   einen echten Ladefehler von „keine Termine" (zeigte vorher irreführend
+>   „Keine Termine in den nächsten N Tagen", wenn der Feed gar nicht lud).
+> - **Punkt 23:** Die To-do-Checkbox bekam `w-4 h-4` statt der geplanten `w-5 h-5`
+>   (kompakte Zeilenhöhe); `.tap-target` wirkt bewusst NICHT auf `<input>`, da
+>   `::after` auf Replaced Elements nicht rendert.
+> - **Punkt 12/13:** Die E2E-Regelanzahl blieb wie geplant bei 13 (kein neuer
+>   Warntyp); die Behavior-Karte hat am Ende 7 Selects + 1 Checkbox.
+> - Der lokale Browser-Preview lieferte wiederholt veraltete Service-Worker-Caches;
+>   maßgeblich verifiziert wurde daher über E2E (frische Kontexte), Lint und
+>   gezielte curl-/Node-Checks.
 
 Für die schrittweise Umsetzung durch ein KI-Modell (oder einen Menschen) geschrieben:
 pro Punkt Ziel, Dateien mit Funktionsankern, konkrete Schritte, Abnahme und Fallstricke.
