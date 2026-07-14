@@ -59,6 +59,8 @@
       archiveLoadedFor: null,
       currentChartTimeframe: 24, // hours
       climateLoaded: false,
+      initDone: false, // true, sobald init() Store+Standorte geladen hat (Plan4-2)
+      lastDataAt: 0,   // Zeitpunkt der letzten erfolgreichen Datenauffrischung (Plan4-21)
       // Zeitpunkte der letzten ECHTEN Messwerte (nicht forward-filled)
       lastSensorUpdate: { temp: null, humidity: null },
       // Rohdaten-Cache pro Standort für inkrementelles Nachladen (statt jedes Mal 8000 Einträge)
@@ -426,6 +428,7 @@
         ]);
 
         renderActiveView();
+        appState.lastDataAt = Date.now(); // fuer den Rueckkehr-Refresh (Plan4-21)
       } catch (error) {
         console.error('Error reloading data:', error);
         showNotification('Fehler beim Abrufen der Live-Daten.', 'error');
@@ -461,8 +464,14 @@
         start = new Date(lastMs + 1000).toISOString().replace('T', ' ').substring(0, 19);
       }
 
+      // Erst-Load bewusst nur ~14 Tage (4032 Eintraege im 5-min-Takt) statt 8000
+      // — kleinerer Download/Parse auf dem Handy. Deckt Lueftungs-Tagebuch (14 d)
+      // ab; die komplette Historie holt ensureFullHistory erst bei "Alle" im Chart
+      // (Plan4-6). Der inkrementelle Refresh (start) laedt danach nur Neues.
+      const results = hasCache ? 8000 : 4032;
+
       try {
-        const data = await fetchFeeds(activeLoc, { results: 8000, start });
+        const data = await fetchFeeds(activeLoc, { results, start });
         const newFeeds = (data && Array.isArray(data.feeds)) ? data.feeds : [];
 
         let rawFeeds;
@@ -480,7 +489,9 @@
         if (processed.aligned.length === 0) throw new Error('Keine gültigen abgeglichenen Daten gefunden');
         processed.aligned = calibratedAligned(activeLoc.id, processed.aligned); // Kalibrierung (P3-6)
 
-        appState.feedCache[activeLoc.id] = { rawFeeds };
+        // Vollstaendigkeits-Flag erhalten: nach einem ensureFullHistory-Lauf
+        // (full=true) darf ein inkrementeller Refresh es nicht zuruecksetzen.
+        appState.feedCache[activeLoc.id] = { rawFeeds, full: hasCache ? !!cache.full : false };
         appState.insideData = processed.aligned;
         appState.lastSensorUpdate = { temp: processed.lastTempTime, humidity: processed.lastHumTime };
         appState.isDemoMode = false;
@@ -518,6 +529,28 @@
       }
     }
 
+    // Volle ThingSpeak-Historie (bis 8000 Eintraege) nachladen — nur wenn der
+    // Nutzer wirklich "Alle" im Klimaverlauf waehlt (Plan4-6). Ersetzt den
+    // 14-Tage-Cache des aktiven Standorts und aktualisiert die Anzeige-Daten.
+    async function ensureFullHistory() {
+      const activeLoc = LOCATIONS.find(l => l.id === appState.activeLocId);
+      const cache = appState.feedCache[activeLoc.id];
+      if (cache && cache.full) return; // schon vollstaendig geladen
+      showToast('Lade vollständige Historie …', 'info');
+      try {
+        const data = await fetchFeeds(activeLoc, { results: 8000 });
+        const rawFeeds = (data && Array.isArray(data.feeds)) ? data.feeds : [];
+        if (rawFeeds.length === 0) return;
+        const processed = processRawFeeds(rawFeeds, activeLoc.fields);
+        if (processed.aligned.length === 0) return;
+        appState.feedCache[activeLoc.id] = { rawFeeds, full: true };
+        appState.insideData = calibratedAligned(activeLoc.id, processed.aligned);
+        saveOfflineSnapshot(activeLoc.id, appState.insideData);
+      } catch (err) {
+        console.warn('Volle Historie laden fehlgeschlagen:', err);
+      }
+    }
+
     // Kompakter Offline-Snapshot (letzte ~1000 Messpaare) im localStorage —
     // gerätelokal, nicht profil-synchron. Ermöglicht KPI/Chart auch offline.
     function saveOfflineSnapshot(locId, aligned) {
@@ -547,7 +580,7 @@
         // forecast_days=2: nötig, damit die Lüftungsfenster-Prognose immer
         // volle 24h in die Zukunft schauen kann.
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,relative_humidity_2m,weather_code&hourly=temperature_2m,relative_humidity_2m&timezone=auto&timeformat=unixtime&past_days=7&forecast_days=2`;
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url, {}, 10000);
         if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
         
         const data = await res.json();
@@ -556,9 +589,9 @@
         console.warn('Open-Meteo laden fehlgeschlagen, generiere Wetter-Dummy:', err);
         appState.outsideData = generateMockWeather();
       }
-      // Amtliche Unwetterwarnungen fuer die ClimateFlow-Wetterkarte (P2-11)
+      // Amtliche Unwetterwarnungen fuer die ClimateFlow-Wetterkarte (P2-11); gecacht (Plan4-8)
       if (appState.weatherConfig) {
-        fetchDwdAlerts(appState.weatherConfig.lat, appState.weatherConfig.lon)
+        getDwdAlerts(appState.weatherConfig.lat, appState.weatherConfig.lon)
           .then(alerts => { appState.dwdAlerts = alerts; renderDwdBanner(document.getElementById('cf-dwd'), alerts); });
       }
     }
@@ -567,10 +600,41 @@
     // Kostenlos, ohne Key. Ausserhalb Deutschlands leere Liste. Best effort.
     async function fetchDwdAlerts(lat, lon) {
       try {
-        const res = await fetch(`https://api.brightsky.dev/alerts?lat=${lat}&lon=${lon}`);
+        const res = await fetchWithTimeout(`https://api.brightsky.dev/alerts?lat=${lat}&lon=${lon}`, {}, 10000);
         if (!res.ok) return [];
         return (((await res.json()) || {}).alerts || []).filter(a => a && a.severity && a.severity !== 'minor');
       } catch (e) { return []; }
+    }
+
+    // Ein gebuendelter Open-Meteo-Abruf je Koordinate fuer ALLE Hub-Widgets
+    // (Uhr-Wetter, 3-Tage-Vorschau, Schimmel-Aussentemperatur) statt bis zu vier
+    // Einzelabrufe (Plan4-8). Promise-Cache mit 10-min-TTL dedupliziert gleiche
+    // Koordinaten automatisch. NICHT fuer loadOutdoorWeather (braucht past_days=7,
+    // eigenes Format). forecastDays gehoert in den Cache-Key (Plan4-11).
+    const _hubWeatherCache = new Map();
+    function getHubWeather(lat, lon, forecastDays = 3) {
+      const key = `${(+lat).toFixed(3)},${(+lon).toFixed(3)},${forecastDays}`;
+      const hit = _hubWeatherCache.get(key);
+      if (hit && Date.now() - hit.ts < 10 * 60 * 1000) return hit.p;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,weather_code&hourly=temperature_2m,precipitation_probability,weather_code&forecast_days=${forecastDays}&timezone=auto&timeformat=unixtime`;
+      const p = fetchWithTimeout(url, {}, 10000).then(res => {
+        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
+        return res.json();
+      }).catch(err => { _hubWeatherCache.delete(key); throw err; }); // Fehler nicht cachen
+      _hubWeatherCache.set(key, { ts: Date.now(), p });
+      return p;
+    }
+
+    // TTL-Cache-Wrapper fuer die DWD-Warnungen (Plan4-8): eine Abfrage je
+    // Koordinate statt je Widget. fetchDwdAlerts liefert bei Fehlern [] (resolved).
+    const _dwdCache = new Map();
+    function getDwdAlerts(lat, lon) {
+      const key = `${(+lat).toFixed(3)},${(+lon).toFixed(3)}`;
+      const hit = _dwdCache.get(key);
+      if (hit && Date.now() - hit.ts < 10 * 60 * 1000) return hit.p;
+      const p = fetchDwdAlerts(lat, lon);
+      _dwdCache.set(key, { ts: Date.now(), p });
+      return p;
     }
     // Chart.js-Stack (Chart + Hammer + Zoom-Plugin) erst bei Bedarf laden (P2-19).
     // Reihenfolge zwingend: Chart + Hammer als Globals, dann registriert sich das
@@ -608,7 +672,7 @@
         const conf = appState.weatherConfig;
         if (!conf) { appState.airQuality = null; return; }
         const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${conf.lat}&longitude=${conf.lon}&current=european_aqi,pm2_5,pm10,ozone,birch_pollen,grass_pollen&timezone=auto`;
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url, {}, 10000);
         if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
         const data = await res.json();
         appState.airQuality = data && data.current ? data.current : null;
@@ -894,6 +958,11 @@
           renderHeatingIndicator(feeds);
         } catch (e) {
           console.error('Fehler beim Heizindikator:', e);
+        }
+        try {
+          renderHourlyPattern(); // Wochen-Muster (Plan4-16)
+        } catch (e) {
+          console.error('Fehler beim Wochen-Muster:', e);
         }
         try {
           checkWeatherWarnings();

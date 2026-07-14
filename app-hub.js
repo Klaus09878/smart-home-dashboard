@@ -31,15 +31,24 @@
             document.getElementById('hub-gpx-week').innerText = `${weekKm.toFixed(1)} km`;
             document.getElementById('hub-gpx-count').innerText = `${weekActs.length} diese Woche · ${acts.length} gesamt`;
 
-            // Wochenziel-Fortschritt (gpx_goals aus dem GPX-Viewer)
+            // Wochenziel-Fortschritt (gpx_goals aus dem GPX-Viewer) + Jahres-
+            // Prognose (Plan4-18).
             try {
               const goals = Store.getJSON('gpx_goals', null);
               const wrap = document.getElementById('hub-gpx-goal-wrap');
-              if (wrap && goals && goals.weekKm > 0) {
-                const pct = Math.min(100, (weekKm / goals.weekKm) * 100);
-                document.getElementById('hub-gpx-goal-bar').style.width = `${pct}%`;
-                document.getElementById('hub-gpx-goal-label').innerText = `Wochenziel: ${Math.round(pct)} % von ${goals.weekKm} km`;
+              const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime();
+              const yearKm = acts.filter(a => (a.startTime || a.addedAt) >= yearStart).reduce((s, a) => s + (a.distM || 0), 0) / 1000;
+              const fc = (goals && goals.yearKm > 0) ? goalForecast({ goalKm: goals.yearKm, doneKm: yearKm }) : null;
+              const fcNote = fc ? (fc.onTrack ? ' · auf Kurs' : ` · +${Math.round(fc.requiredPerWeekKm)} km/Wo`) : '';
+              const setGoal = (label, pct) => {
+                document.getElementById('hub-gpx-goal-bar').style.width = `${Math.min(100, pct)}%`;
+                document.getElementById('hub-gpx-goal-label').innerText = label;
                 wrap.classList.remove('hidden');
+              };
+              if (wrap && goals && goals.weekKm > 0) {
+                setGoal(`Wochenziel: ${Math.round(Math.min(100, (weekKm / goals.weekKm) * 100))} % von ${goals.weekKm} km${fcNote}`, (weekKm / goals.weekKm) * 100);
+              } else if (wrap && goals && goals.yearKm > 0) {
+                setGoal(`Jahresziel: ${Math.round(Math.min(100, (yearKm / goals.yearKm) * 100))} % von ${goals.yearKm} km${fcNote}`, (yearKm / goals.yearKm) * 100);
               } else if (wrap) {
                 wrap.classList.add('hidden');
               }
@@ -175,6 +184,7 @@
     const CF_CARD_META = {
       'cf-kpi': 'Messwerte & Wetter',
       'cf-analytics': 'Lüftungsberater & 24h-Statistik',
+      'cf-pattern': 'Wochen-Muster',
       'cf-chart': 'Klimaverlauf',
       'cf-archive': 'Langzeit-Archiv',
       'cf-table': 'Rohdaten-Tabelle'
@@ -267,12 +277,19 @@
         }
       } catch (e) { /* Badging nur in installierter PWA / sicherem Kontext */ }
 
+      // Anzeige-Filter (Plan4-11): erledigte Aufgaben aelter als N Tage
+      // ausblenden — nur die ANZEIGE, die Daten (Sync/Backup) bleiben unberuehrt.
+      const hideDays = getWidgetPrefs().todoHideDoneDays;
+      const visible = hideDays > 0
+        ? todos.filter(t => !(t.done && t.updatedAt && t.updatedAt < Date.now() - hideDays * DAY_MS))
+        : todos;
+
       listEl.innerHTML = '';
-      if (todos.length === 0) {
+      if (visible.length === 0) {
         listEl.innerHTML = '<p class="text-xs text-slate-500">Nichts zu tun 🎉</p>';
         return;
       }
-      todos.forEach(t => {
+      visible.forEach(t => {
         const isOverdue = !t.done && t.dueMs && t.dueMs < Date.now();
         const row = document.createElement('div');
         row.className = 'flex items-center gap-1.5 group/todo';
@@ -280,7 +297,9 @@
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.checked = !!t.done;
-        cb.className = 'accent-teal-500 shrink-0 cursor-pointer';
+        // Groesserer Touch-Punkt (Plan4-23): ::after wirkt auf <input> nicht,
+        // daher echte Groesse statt tap-target.
+        cb.className = 'accent-teal-500 shrink-0 cursor-pointer w-4 h-4';
         cb.onchange = () => toggleTodo(t.id, cb.checked);
 
         // Kategorie-Farbpunkt (Punkt 19)
@@ -301,13 +320,13 @@
         mid.innerHTML = `<span class="block truncate text-xs ${t.done ? 'line-through text-slate-600' : 'text-slate-300'}">${t.shared ? '<i data-lucide=\'users\' class=\'w-2.5 h-2.5 inline text-indigo-400\'></i> ' : ''}${escapeHtml(t.text)}</span>${dueBadge}`;
 
         const opts = document.createElement('button');
-        opts.className = 'p-0.5 rounded text-slate-600 hover:text-teal-300 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
+        opts.className = 'tap-target-sm p-0.5 rounded text-slate-600 hover:text-teal-300 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
         opts.title = 'Fällig/Wiederholung/geteilt';
         opts.innerHTML = '<i data-lucide="sliders-horizontal" class="w-3 h-3"></i>';
         opts.onclick = () => editTodo(t.id);
 
         const del = document.createElement('button');
-        del.className = 'p-0.5 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
+        del.className = 'tap-target-sm p-0.5 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
         del.title = 'Löschen';
         del.innerHTML = '<i data-lucide="x" class="w-3 h-3"></i>';
         del.onclick = () => deleteTodo(t.id);
@@ -417,18 +436,20 @@
       if (!el || !appState.weatherConfig) return;
       try {
         const conf = appState.weatherConfig;
-        // Zusätzlich stündlich Temperatur + Regenwahrscheinlichkeit (Punkt 18)
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&daily=temperature_2m_max,temperature_2m_min,weather_code&hourly=temperature_2m,precipitation_probability,weather_code&forecast_days=3&timezone=auto&timeformat=unixtime`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
-        const data = await res.json();
+        // Anzahl Vorschautage einstellbar (Plan4-11). Gebuendelter Abruf (Plan4-8):
+        // teilt sich den Cache mit dem Uhr-Wetter (gleiche forecastDays).
+        const days = getWidgetPrefs().forecastDays;
+        const data = await getHubWeather(conf.lat, conf.lon, days);
         const daily = data.daily;
         if (!daily || !daily.time) throw new Error('keine Tagesdaten');
         appState.hourlyWeather = data.hourly || null;
 
+        el.style.gridTemplateColumns = `repeat(${days}, minmax(0, 1fr))`;
         el.innerHTML = '';
         daily.time.forEach((day, i) => {
-          const label = i === 0 ? 'Heute' : new Date(`${day}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short' });
+          // daily.time ist unixtime (timeformat=unixtime) → *1000 (fixte den
+          // "Invalid Date"-Bug fuer Tag 2/3, Plan4-8).
+          const label = i === 0 ? 'Heute' : new Date(day * 1000).toLocaleDateString('de-DE', { weekday: 'short' });
           const cell = document.createElement('div');
           cell.className = 'bg-slate-900/60 border border-slate-800/60 rounded-xl p-2 text-center cursor-pointer hover:border-slate-700 transition-colors';
           cell.title = getWeatherDescription(daily.weather_code[i]) + ' — für Stunden antippen';
@@ -442,13 +463,25 @@
         });
         renderRainHint();
         updateIcons();
-        // Amtliche Unwetterwarnungen als Banner (P2-11)
-        fetchDwdAlerts(conf.lat, conf.lon).then(alerts => { appState.dwdAlerts = alerts; renderDwdBanner(document.getElementById('hub-dwd'), alerts); });
+        // Amtliche Unwetterwarnungen als Banner (P2-11); gecacht (Plan4-8)
+        getDwdAlerts(conf.lat, conf.lon).then(alerts => { appState.dwdAlerts = alerts; renderDwdBanner(document.getElementById('hub-dwd'), alerts); });
       } catch (err) {
         console.warn('Hub-Vorschau fehlgeschlagen:', err);
-        el.innerHTML = '<p class="text-xs text-slate-500 col-span-3">Vorschau nicht verfügbar.</p>';
+        // Einheitlicher Fehlerzustand mit Retry (Plan4-22). Eine Spalte, damit
+        // der Platzhalter die volle Breite bekommt.
+        el.style.gridTemplateColumns = '1fr';
+        el.innerHTML = emptyStateHtml({
+          icon: 'cloud-off',
+          text: 'Wetter-Vorschau nicht verfügbar.',
+          actionLabel: 'Erneut versuchen',
+          actionFn: 'retryHubForecast'
+        });
+        updateIcons();
       }
     }
+
+    // Retry-Aktion des Vorschau-Fehlerzustands (Plan4-22, via data-onclick).
+    function retryHubForecast() { loadHubForecast(); }
 
     // Stunden-Leiste für einen Tag im Vorschau-Widget (Punkt 18)
     function showHourlyForecast(dayIndex) {
@@ -535,13 +568,15 @@
       if (!el) return;
       const now = Date.now();
       const from = now - 24 * 60 * 60 * 1000;
-      const horizon = now + 14 * 24 * 60 * 60 * 1000;
+      const wp = getWidgetPrefs(); // Fenster + Anzahl einstellbar (Plan4-11)
+      const horizon = now + wp.calHorizonDays * 24 * 60 * 60 * 1000;
       const colors = ['bg-orange-400', 'bg-indigo-400'];
       const feeds = [Store.get('ical_url'), Store.get('ical_url2')].filter(Boolean);
 
       let all = [];
       let ownAvailable = false;
       let proxyMissing = false;
+      let feedError = false; // echter Ladefehler (nicht "Proxy fehlt"), Plan4-22
 
       // Eigene Termine aus D1 (P3-8) — expandiert ueber das Fenster
       try {
@@ -557,23 +592,32 @@
           const evs = await fetchIcalEvents(feeds[i], from, horizon);
           evs.forEach(e => all.push({ ...e, cal: i }));
         } catch (err) {
-          if (err.unavailable) proxyMissing = true; else console.warn('Kalender-Feed fehlgeschlagen:', err);
+          if (err.unavailable) proxyMissing = true;
+          else { feedError = true; console.warn('Kalender-Feed fehlgeschlagen:', err); }
         }
       }
 
       appState.calEvents = all; // fuers Status-Briefing (heutige Termine)
 
       if (all.length === 0) {
-        if (feeds.length === 0 && !ownAvailable) el.innerHTML = 'Kein Kalender verbunden — über das Zahnrad eine .ics-URL hinterlegen oder mit „+" einen eigenen Termin anlegen.';
+        // Echter Ladefehler zuerst (Plan4-22): sonst stand hier irrefuehrend
+        // "Keine Termine", obwohl der Feed gar nicht geladen werden konnte.
+        if (feedError) {
+          el.innerHTML = emptyStateHtml({
+            icon: 'calendar-x', text: 'Kalender konnte nicht geladen werden.',
+            actionLabel: 'Erneut versuchen', actionFn: 'refreshHubCalendar'
+          });
+          updateIcons();
+        } else if (feeds.length === 0 && !ownAvailable) el.innerHTML = 'Kein Kalender verbunden — über das Zahnrad eine .ics-URL hinterlegen oder mit „+" einen eigenen Termin anlegen.';
         else if (proxyMissing) el.innerHTML = 'Kalender-Proxy (/api/ical) noch nicht deployt — erscheint nach dem nächsten Cloudflare-Deploy automatisch.';
-        else el.innerHTML = 'Keine Termine in den nächsten 14 Tagen.';
+        else el.innerHTML = `Keine Termine in den nächsten ${wp.calHorizonDays} Tagen.`;
         return;
       }
 
       const upcoming = all
         .filter(e => e.startMs >= now - (e.allDay ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000))
         .sort((a, b) => a.startMs - b.startMs)
-        .slice(0, 6);
+        .slice(0, wp.calMax);
       el.innerHTML = '';
       upcoming.forEach(e => {
         const d = new Date(e.startMs);

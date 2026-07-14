@@ -227,7 +227,7 @@ function removePendingDelete(uid) {
 async function pushActivityToCloud(activity) {
   if (state.cloud === 'local') return;
   try {
-    await apiFetch('/api/gpx', { method: 'POST', body: JSON.stringify(activityToPayload(activity)) });
+    await apiFetch('/api/gpx', { method: 'POST', body: JSON.stringify(activityToPayload(activity)), timeoutMs: 30000 });
     setCloudStatus('ok');
   } catch (err) {
     if (err.unavailable) setCloudStatus('local');
@@ -519,10 +519,56 @@ function renderSummary() {
   document.getElementById('sum-year').innerText = `${km(yearActs).toFixed(km(yearActs) >= 100 ? 0 : 1)} km`;
 
   const goals = getGoals();
+  const yearKmDone = km(yearActs);
   renderGoalBar('goal-week-bar', 'goal-week-label', 'goal-week-wrap', km(weekActs), goals.weekKm);
-  renderGoalBar('goal-year-bar', 'goal-year-label', 'goal-year-wrap', km(yearActs), goals.yearKm);
+  renderGoalBar('goal-year-bar', 'goal-year-label', 'goal-year-wrap', yearKmDone, goals.yearKm);
   const hint = document.getElementById('goal-empty-hint');
   if (hint) hint.classList.toggle('hidden', !!(goals.weekKm || goals.yearKm));
+
+  renderRecords();
+
+  // Zielprognose (Plan4-18)
+  const fcEl = document.getElementById('goal-year-forecast');
+  if (fcEl) {
+    const fc = goalForecast({ goalKm: goals.yearKm, doneKm: yearKmDone });
+    if (fc) {
+      const proj = fc.projectedKm.toLocaleString('de-DE', { maximumFractionDigits: 0 });
+      fcEl.innerText = fc.onTrack
+        ? `Prognose: ~${proj} km · auf Kurs ✅`
+        : `Prognose: ~${proj} km · ~${fc.requiredPerWeekKm.toLocaleString('de-DE', { maximumFractionDigits: 0 })} km/Woche nötig`;
+    } else {
+      fcEl.innerText = '';
+    }
+  }
+}
+
+// Persoenliche Rekorde (Plan4-19): aus den Aktivitaeten, klickbar zur Tour.
+function renderRecords() {
+  const el = document.getElementById('gpx-records');
+  if (!el) return;
+  const adapted = state.activities.map(a => ({
+    id: a.id, name: a.name, startMs: a.startTime || a.addedAt,
+    distanceKm: (a.distM || 0) / 1000, movingSec: a.movingSec || 0, ascent: a.elevGain || 0
+  }));
+  const rec = personalRecords(adapted);
+  const items = [
+    { icon: '🏅', title: 'Längste Tour', r: rec.longest },
+    { icon: '⛰️', title: 'Meiste Höhenmeter', r: rec.mostAscent },
+    { icon: '⚡', title: 'Schnellster Schnitt', r: rec.fastest },
+    { icon: '🔥', title: 'Stärkste Woche', r: rec.biggestWeek }
+  ].filter(it => it.r);
+  if (!items.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  el.classList.remove('hidden');
+  el.innerHTML = '';
+  items.forEach(it => {
+    const card = document.createElement('div');
+    card.className = 'bg-slate-900/60 border border-slate-800/60 rounded-xl p-2' + (it.r.id ? ' cursor-pointer hover:border-slate-600 transition-colors' : '');
+    card.innerHTML = `<p class="text-[10px] text-slate-500 uppercase font-semibold">${it.icon} ${it.title}</p>`
+      + `<p class="text-sm font-bold text-white mt-0.5">${it.r.label}</p>`
+      + `<p class="text-[10px] text-slate-400 truncate">${escapeHtml(it.r.name || '')}</p>`;
+    if (it.r.id) card.onclick = () => selectActivity(it.r.id);
+    el.appendChild(card);
+  });
 }
 
 // ============ Kalender & Streaks ============
@@ -576,6 +622,16 @@ function renderCalendar() {
 function renderActivityList() {
   const list = document.getElementById('activity-list');
   list.innerHTML = '';
+
+  // Leerzustand (Plan4-22): statt leerer Flaeche ein Hinweis, was zu tun ist.
+  if (state.activities.length === 0) {
+    list.innerHTML = emptyStateHtml({
+      icon: 'route',
+      text: 'Noch keine Touren — GPX-Datei hierher ziehen oder eine Aufzeichnung starten.'
+    });
+    updateIcons();
+    return;
+  }
 
   state.activities.forEach(act => {
     const type = ACTIVITY_TYPES[act.type] || ACTIVITY_TYPES.ride;
@@ -1488,12 +1544,20 @@ async function deleteActivity() {
 
 // ============ Init ============
 async function init() {
-  // Profil + Einstellungen laden, bevor Ziele/Notizen gelesen werden
-  await Store.init();
-  applyTheme(getTheme());
-  updateIcons();
-  await refreshActivities();
+  // Profil/Einstellungen parallel starten, aber NICHT darauf warten (Plan4-24):
+  // die Tourenliste kommt aus IndexedDB und braucht weder Netz noch Store.
+  const storeP = Store.init();
+  updateIcons(); // Shell-Icons sofort — brauchen keinen Store
+
+  await refreshActivities();  // IndexedDB → Liste ist sofort sichtbar
   if (state.activities.length > 0) selectActivity(state.activities[0].id);
+
+  // Ab hier Store-Abhaengiges. renderSummary lief in refreshActivities bereits
+  // einmal mit Default-Zielen (getGoals ohne aktives Profil) — nach Store.init
+  // erneut rendern, damit Ziele/Prognose des echten Profils erscheinen.
+  await storeP;
+  applyTheme(getTheme());
+  renderSummary();
 
   // Cloud-Abgleich im Hintergrund (holt Touren von anderen Geräten)
   syncWithCloud().then(() => {
@@ -1503,6 +1567,8 @@ async function init() {
   });
 
   registerServiceWorker();
+  // Netz-Rueckkehr (Plan4-20): Cloud-Abgleich nachholen
+  window.addEventListener('net-online', () => { syncWithCloud().catch(() => {}); });
   handleSharedGpx();          // via Share-Target geteilte Datei (P2-14)
   handleLaunchQueueFiles();   // via File-Handler geoeffnete .gpx-Datei (P2-14)
 
@@ -1520,8 +1586,9 @@ async function init() {
     }
     if (sessionStorage.getItem('gpx_autostart') === '1' && !(state.rec && state.rec.active)) {
       startRecording();
-      // Flag erst nach dem SW-Reload-Fenster loeschen (der erste SW-Install
-      // reloadt die Seite via controllerchange) — so ueberlebt der Autostart.
+      // Flag nach kurzer Frist loeschen. Seit Plan4-7 reloadt der erste
+      // SW-Install nicht mehr, der Autostart laeuft also genau einmal direkt;
+      // die Frist deckt den Fall ab, dass doch ein Reload dazwischenkommt.
       setTimeout(() => sessionStorage.removeItem('gpx_autostart'), 4000);
     }
   }

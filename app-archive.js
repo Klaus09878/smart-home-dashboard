@@ -85,6 +85,7 @@
         emptyEl.classList.add('hidden');
         wrap.classList.remove('hidden');
         drawArchiveChart(rows);
+        renderArchiveInsights(rows); // Monats-Insights (Plan4-15)
         renderArchiveRecords(rows);
       } catch (err) {
         appState.archiveLoadedFor = null;
@@ -94,6 +95,19 @@
           showMessage(`Archiv konnte nicht geladen werden: ${err.message}`);
         }
       }
+    }
+
+    // Monats-Insights (Plan4-15): 2-3 Saetze zum juengsten vollstaendigen Monat
+    // im Vergleich zu Vor- und Vorjahresmonat. Versteckt, wenn zu wenig Daten.
+    function renderArchiveInsights(rows) {
+      const el = document.getElementById('archive-insights');
+      if (!el) return;
+      const ins = monthlyInsights(rows);
+      if (!ins) { el.classList.add('hidden'); return; }
+      el.classList.remove('hidden');
+      el.innerHTML = `<p class="text-[10px] uppercase font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5"><i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-400"></i> Monats-Einblick</p>`
+        + ins.sentences.map(s => `<p class="text-slate-300 leading-relaxed">${escapeHtml(s)}</p>`).join('');
+      updateIcons();
     }
 
     // Rekorde & Monatsvergleich aus dem Tages-Archiv (P6)
@@ -352,10 +366,63 @@
       updateIcons();
     }
 
+    // Vergleichsjahr-Select mit den vorhandenen Jahren befuellen (Plan4-17).
+    function populateArchiveYears(rows) {
+      const sel = document.getElementById('archive-compare-year');
+      if (!sel) return;
+      const years = [...new Set((rows || []).filter(r => r.t_avg != null).map(r => r.day.slice(0, 4)))].sort();
+      const cur = appState.archiveCompareYear || '';
+      sel.innerHTML = '<option value="">Vergleich: aus</option>'
+        + years.map(y => `<option value="${y}" ${String(cur) === y ? 'selected' : ''}>${y}</option>`).join('');
+    }
+
+    function setArchiveCompareYear(value) {
+      appState.archiveCompareYear = value || null;
+      if (appState.archiveRows) drawArchiveChart(appState.archiveRows);
+    }
+
     async function drawArchiveChart(rows) {
       await ensureChartJs(); // Chart-Stack bei Bedarf nachladen (P2-19)
       appState.archiveRows = rows; // für den Tages-Detail-Klick (Punkt 21)
+      populateArchiveYears(rows);
       const ctx = document.getElementById('archiveChart').getContext('2d');
+
+      // Jahresvergleich-Modus (Plan4-17): zwei Jahres-Mitteltemperaturen auf der
+      // gemeinsamen MM-TT-Achse. Basisjahr = juengstes vorhandenes Jahr.
+      if (appState.archiveCompareYear) {
+        const years = [...new Set(rows.filter(r => r.t_avg != null).map(r => r.day.slice(0, 4)))].sort();
+        const baseYear = years[years.length - 1];
+        const base = alignYearSeries(rows, baseYear);
+        const cmp = alignYearSeries(rows, appState.archiveCompareYear);
+        const cmpMap = {}; cmp.forEach(e => { cmpMap[e.md] = e.t_avg; });
+        const fmtMd = md => `${md.slice(3)}.${md.slice(0, 2)}.`;
+        const cfg = {
+          type: 'line',
+          data: {
+            labels: base.map(e => fmtMd(e.md)),
+            datasets: [
+              { label: `${baseYear} (Ø °C)`, data: base.map(e => e.t_avg), borderColor: '#f8fafc', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false, spanGaps: true },
+              { label: `${appState.archiveCompareYear} (Ø °C)`, data: base.map(e => cmpMap[e.md] ?? null), borderColor: '#14b8a6', borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, spanGaps: true }
+            ]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: true, labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12 } },
+              tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.95)', titleColor: '#f8fafc', bodyColor: '#cbd5e1' }
+            },
+            scales: {
+              x: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 12 } },
+              y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#94a3b8', callback: v => `${v}°` } }
+            }
+          }
+        };
+        if (appState.archiveChart) appState.archiveChart.destroy();
+        appState.archiveChart = new Chart(ctx, cfg);
+        return;
+      }
+
       const labels = rows.map(r => {
         const parts = r.day.split('-');
         return `${parts[2]}.${parts[1]}.`;

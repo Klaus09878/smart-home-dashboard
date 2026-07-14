@@ -14,13 +14,17 @@
       }
     }
 
-    function handleRoute() {
+    // Synchroner View-Wechsel — KEIN Store-Zugriff, kein await, keine Datenlader.
+    // Wird beim Start VOR jedem await aufgerufen, damit das Geruest schon beim
+    // ersten Paint sichtbar ist (Plan4-2, behebt den Footer-Blitzer). Liefert den
+    // aufgeloesten View-Namen zurueck (null bei #gpx-Umleitung).
+    function renderRoute() {
       let view = (location.hash || '').replace('#', '');
 
       // Der GPX-Viewer ist eine eigenständige Seite (alte #gpx-Links umleiten)
       if (view === 'gpx') {
         location.replace('gpx.html');
-        return;
+        return null;
       }
 
       if (!HUB_VIEWS.includes(view)) view = 'home';
@@ -40,14 +44,25 @@
       document.title = view === 'climate' ? 'ClimateFlow | Smart Home Hub' : 'Smart Home Hub';
 
       updateIcons();
+      return view;
+    }
 
+    // Datenlader je View — liest Einstellungen und ruft Netz-Loader, laeuft daher
+    // erst NACH Store.init (appState.initDone). Vom Geruest-Rendern getrennt.
+    function loadRouteData(view) {
       // Klimadaten erst beim ersten Öffnen des Dashboards laden (Performance)
       if (view === 'climate') {
         applyClimateLayout(); // gespeicherte Karten-Reihenfolge/-Sichtbarkeit
         applyCfCollapse();    // gespeicherter Einklapp-/Kompakt-Zustand
         if (!appState.climateLoaded) {
           appState.climateLoaded = true;
+          // Bevorzugten Chart-Zeitraum anwenden (Plan4-10)
+          const cp = getChartPrefs();
+          appState.currentChartTimeframe = (cp.rememberLast && cp.lastTf) || cp.defaultTf;
+          highlightTfButton(appState.currentChartTimeframe);
           reloadData();
+          // "Alle" als Standard: volle Historie nachladen und neu zeichnen
+          if (appState.currentChartTimeframe === -1) ensureFullHistory().then(drawChart);
         } else if (appState.chartInstance) {
           // Chart neu dimensionieren, falls die View zwischenzeitlich versteckt war
           appState.chartInstance.resize();
@@ -67,6 +82,14 @@
       }
 
       if (view === 'settings') renderSettings();
+    }
+
+    // hashchange- und Navigations-Handler: rendert das Geruest immer sofort;
+    // die Datenlader laufen erst, wenn init() fertig ist (sonst lesen sie
+    // Einstellungen, bevor der Store bereit ist).
+    function handleRoute() {
+      const view = renderRoute();
+      if (view && appState.initDone) loadRouteData(view);
     }
 
     // Uhr, Datum & Begrüßung auf dem Hub-Homescreen
@@ -135,10 +158,9 @@
       if (!el || !appState.weatherConfig) return;
       try {
         const conf = appState.weatherConfig;
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${conf.lat}&longitude=${conf.lon}&current=temperature_2m,weather_code&timezone=auto`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP-Fehler: ${res.status}`);
-        const data = await res.json();
+        // Gebuendelter Abruf (Plan4-8): teilt sich den Cache mit der Vorschau —
+        // gleiche forecastDays wie das Vorschau-Widget nutzen (Plan4-11).
+        const data = await getHubWeather(conf.lat, conf.lon, getWidgetPrefs().forecastDays);
         el.innerText = `${data.current.temperature_2m.toFixed(1)} °C · ${getWeatherDescription(data.current.weather_code)} · ${conf.name}`;
       } catch (err) {
         console.warn('Hub-Wetter fehlgeschlagen:', err);
@@ -149,7 +171,8 @@
     // Kompakte Live-Vorschau beider Standorte auf der ClimateFlow-Kachel.
     // Lädt nur die letzten 400 Einträge pro Kanal und ist auf 2 Minuten gedrosselt.
     async function loadHubPreviews(force = false) {
-      if (!force && Date.now() - appState.hubPreviewAt < 2 * 60 * 1000) return;
+      // Drossel-Abstand pro Profil einstellbar (Plan4-9, app_prefs.hubPreviewMin).
+      if (!force && Date.now() - appState.hubPreviewAt < getAppPrefs().hubPreviewMin * 60 * 1000) return;
       appState.hubPreviewAt = Date.now();
 
       loadHubWeather();
@@ -190,8 +213,9 @@
             const th = getThresholds(loc.id);
             let outTemp = null;
             try {
-              const w = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${loc.defaultWeather.lat}&longitude=${loc.defaultWeather.lon}&current=temperature_2m&timezone=auto`);
-              if (w.ok) outTemp = (await w.json()).current.temperature_2m;
+              // Gebuendelter Wetterabruf (Plan4-8) statt eigenem fetch je Standort.
+              const w = await getHubWeather(loc.defaultWeather.lat, loc.defaultWeather.lon);
+              outTemp = w.current.temperature_2m;
             } catch (e) { /* Aussentemperatur optional */ }
             if (outTemp != null) {
               const { surfaceRhRaw, surfaceRh } = surfaceHumidity(last.temp, last.humidity, outTemp);
@@ -278,6 +302,7 @@
       } catch (e) { /* Health/D1 evtl. nicht verfuegbar */ }
 
       renderBriefing(signals);
+      appState.lastDataAt = Date.now(); // fuer den Rueckkehr-Refresh (Plan4-21)
     }
 
     // ============ Hub-Widget: Status-Briefing (Plan-Punkt 5) ============
@@ -327,15 +352,48 @@
       updateIcons();
     }
 
+    // Die aktuell sichtbare View still auffrischen (Plan4-20: aus dem Auto-Refresh
+    // extrahiert, damit auch die Netz-Rueckkehr und der App-Wiedereintritt sie nutzen).
+    function refreshVisibleView(silent = true) {
+      const climateView = document.getElementById('view-climate');
+      const homeView = document.getElementById('view-home');
+      if (appState.climateLoaded && climateView && !climateView.classList.contains('hidden')) {
+        reloadData(silent);
+      } else if (homeView && !homeView.classList.contains('hidden')) {
+        loadHubPreviews(true);
+      }
+    }
+
+    // Auto-Refresh-Timer (Plan4-9): still im Hintergrund, Intervall aus
+    // app_prefs.refreshMin. Startet den Timer bei Bedarf neu (Intervall geaendert).
+    function startAutoRefresh() {
+      if (appState._refreshTimer) clearInterval(appState._refreshTimer);
+      const ms = getAppPrefs().refreshMin * 60 * 1000;
+      appState._refreshTimer = setInterval(() => {
+        if (!navigator.onLine) return; // offline: nicht sinnlos abfragen (Plan4-20)
+        if (window.Store) Store.pull();
+        refreshVisibleView(true);
+      }, ms);
+    }
+
     // App Initialization
     async function init() {
-      // Profil + Einstellungen laden, bevor irgendetwas gelesen wird
-      await Store.init();
+      // Geruest SOFORT sichtbar machen — VOR jedem await, damit der Nutzer beim
+      // mobilen Erststart nicht erst den Footer und dann ~5 s Leere sieht
+      // (Plan4-2). Der hashchange-Handler ist bis initDone reines Rendern.
+      window.addEventListener('hashchange', handleRoute);
+      renderRoute();
+      updateHubClock(); // Uhr/Begruessung ohne Profilnamen (Guard in getProfileDisplayName)
+
+      // Profil/Einstellungen UND Zusatz-Standorte parallel laden (Plan4-3) —
+      // loadDynamicLocations braucht den Store nicht (nur apiFetch), also kein
+      // Grund, es hinter Store.init zu serialisieren.
+      await Promise.all([Store.init(), loadDynamicLocations()]);
       updateProfileBadge();
       applyTheme(getTheme()); // profilbezogenes Theme anwenden
-      // Zusatz-Standorte aus D1 ergänzen, bevor Tabs/Configs rendern
-      await loadDynamicLocations();
-      loadCalibrations(); // Sensor-Offsets laden (P3-6, best effort)
+      // Sensor-Offsets laden (P3-6, best effort). Trifft die Kalibrierung erst
+      // nach dem ersten Render ein, korrigiert der silente Reload die Anzeige.
+      loadCalibrations().then(() => { if (appState.climateLoaded) reloadData(true); });
 
       updateIcons();
       initConfigs();
@@ -354,33 +412,35 @@
         });
       });
 
-      window.addEventListener('hashchange', handleRoute);
-      handleRoute();
+      // Einstellungen sind jetzt geladen → Datenlader der aktuellen View starten.
+      // (Der hashchange-Handler ist bereits ganz oben in init registriert.)
+      appState.initDone = true;
+      const currentView = renderRoute();
+      if (currentView) loadRouteData(currentView);
 
       // Einstellungs-Sync auch während der Sitzung (Punkt 6): Änderungen vom
       // anderen Gerät kommen ohne Reload an — periodisch + bei Tab-Fokus.
       window.addEventListener('store-updated', () => {
         updateProfileBadge();
         applyWidgetLayout();
+        startAutoRefresh(); // Intervall koennte per Sync geaendert worden sein (Plan4-9)
         handleRoute();
       });
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && window.Store) Store.pull();
+        if (document.visibilityState !== 'visible') return;
+        if (window.Store) Store.pull();
+        // Nach laengerer Abwesenheit (> Refresh-Intervall) sofort auffrischen
+        // statt bis zum naechsten Timer-Tick zu warten (Plan4-21).
+        const maxAgeMs = getAppPrefs().refreshMin * 60 * 1000;
+        if (navigator.onLine && Date.now() - appState.lastDataAt > maxAgeMs) refreshVisibleView(true);
       });
 
-      // Auto-refresh every 5 minutes: still im Hintergrund (kein Lade-Overlay),
-      // im Klima-Dashboard inkl. Wetter, auf dem Hub nur die Kachel-Vorschau
-      setInterval(() => {
-        if (window.Store) Store.pull();
-        const climateView = document.getElementById('view-climate');
-        const homeView = document.getElementById('view-home');
-        if (appState.climateLoaded && climateView && !climateView.classList.contains('hidden')) {
-          console.log('[Interval] Auto-refresh data (silent)...');
-          reloadData(true);
-        } else if (homeView && !homeView.classList.contains('hidden')) {
-          loadHubPreviews(true);
-        }
-      }, 5 * 60 * 1000);
+      // Netz-Rueckkehr (Plan4-20): sofort die sichtbare View auffrischen.
+      window.addEventListener('net-online', () => refreshVisibleView(true));
+
+      // Auto-Refresh still im Hintergrund (kein Lade-Overlay). Intervall pro
+      // Profil einstellbar (Plan4-9, app_prefs.refreshMin).
+      startAutoRefresh();
 
       // "vor X Min."-Labels laufend aktuell halten
       setInterval(updateTimestampLabels, 60 * 1000);

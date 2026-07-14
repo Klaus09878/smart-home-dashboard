@@ -162,8 +162,15 @@ Die Middleware lässt dann nur noch Anfragen mit Access-JWT durch; Basic Auth is
 npm test          # Kernlogik (lib/core.js) + Smoke-Test (Seiten-Konsistenz)
 npm run test:e2e  # Playwright-Browsertests (einmalig: npm ci && npx playwright install chromium)
 npm run build:css # Tailwind neu bauen — nach jeder Klassen-Änderung in HTML/JS nötig
+npm run perf      # Erststart-Messung (Fast-3G/CPU-4x, gemockte APIs) → siehe docs/PERF.md
 npm run build     # test + build:css (das führt auch der Cloudflare-Build aus)
 ```
+
+**Performance des mobilen Erststarts** ([docs/PERF.md](docs/PERF.md)): Runde 4
+(Phase A) macht das Hub-Gerüst sofort sichtbar (Skeleton statt Footer-Blitzer),
+lädt die Schrift lokal (kein render-blockendes Google Fonts), parallelisiert die
+Startsequenz, bündelt die Wetterabrufe und begrenzt den Erst-Feed-Load. Für
+startzeit-relevante Änderungen `npm run perf` vorher/nachher laufen lassen.
 
 Bei jedem Push/PR läuft die [CI](.github/workflows/ci.yml): Unit-/Smoke-Tests,
 E2E-Tests und eine Prüfung, dass das committete `tailwind.css` aktuell ist.
@@ -179,6 +186,24 @@ DWD-Warnungen, Live-Aufzeichnung, Nutzerverwaltung u. v. m.) sind vollständig u
 - **A — Vervollständigen:** R2-Backup-Restore, Warnungs-Protokoll (alert_log), Standorte bearbeiten/löschen
 - **B — Klima-Intelligenz:** Fenster-offen-Erkennung, Morgen-Digest-Push, Sensor-Kalibrierung, Tagesnotizen im Archiv
 - **C — Hub/GPX/PWA:** eigene Termine (D1-Kalender), Aufzeichnung 2.0 (Pause + Foto unterwegs), PWA-Shortcuts/App-Badge/Cache-Header
+
+**Runde 4** ([PLAN4.md](PLAN4.md), 25 Punkte) ist vollständig umgesetzt:
+
+- **A — Mobiler Erststart (Priorität):** Render-Gerüst sofort sichtbar statt
+  Footer-Blitzer, parallele Startsequenz, Outfit-Schrift lokal (kein
+  render-blockendes Google Fonts), `defer` für Vendor-Skripte, apiFetch mit
+  Timeout + GET-Retry, Erst-Feed-Load auf 14 Tage begrenzt, SW-Cache-Fallback
+  ohne Erstbesuch-Reload, gebündelte Wetterabrufe — Messwerte in
+  [docs/PERF.md](docs/PERF.md)
+- **B — Einstellbarkeit:** neue Karte „Verhalten & Anzeige" (Aktualisierungs-
+  intervalle, Chart-Standardzeitraum, Widget-Feinkonfiguration), Entprell-
+  Intervall je Warnregel, konfigurierbarer Morgen-Digest (Uhrzeit + Bausteine)
+- **C — Tiefe:** Lüftungs-Wirkungsanalyse, Monats-Insights im Archiv,
+  Wochen-Muster-Heatmap (Stunde × Wochentag), Jahresvergleich im Archiv-Chart,
+  GPX-Zielprognose und persönliche Rekorde
+- **D — Alltagstauglichkeit:** Offline-Banner mit Auto-Sync, Auffrischung bei
+  App-Rückkehr, einheitliche Leer-/Fehlerzustände mit Retry, größere
+  Touch-Ziele + Safe-Area, schnellerer GPX-Start
 
 ## Deployment
 

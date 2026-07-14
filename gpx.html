@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <script>(function(){try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.remove('dark');document.documentElement.classList.add('light');}}catch(e){}})();</script>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- viewport-fit=cover (Plan4-23): Safe-Area-Insets nutzbar -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>GPX-Viewer | Smart Home Hub</title>
   <meta name="description" content="GPX-Dateien von Touren hochladen und Route, Höhenprofil und Statistiken visualisieren.">
   <meta name="theme-color" content="#0f172a">
@@ -11,24 +12,29 @@
   <link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
+  <!-- Outfit-Schrift lokal (Plan4-4): @font-face in tailwind.css statt Google Fonts. -->
+  <link rel="preload" href="vendor/fonts/outfit-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="vendor/fonts/outfit-600.woff2" as="font" type="font/woff2" crossorigin>
+
   <!-- Tailwind CSS (statischer Build, siehe tailwind.config.js / npm run build:css) -->
   <link rel="stylesheet" href="tailwind.css">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-  <script src="vendor/chart.umd.js"></script>
-  <script src="vendor/lucide.min.js"></script>
+  <!-- Vendor-Skripte defer (Plan4-4): nicht render-blockend; laufen vor
+       DOMContentLoaded und damit vor gpx.js init(). Reihenfolge bleibt erhalten. -->
+  <script defer src="vendor/chart.umd.js"></script>
+  <script defer src="vendor/lucide.min.js"></script>
   <!-- EXIF-Leser fuer Foto-Geotags (P2-15, lokal gepinnt) -->
   <script defer src="vendor/exifr.lite.umd.js"></script>
 
   <!-- Leaflet (Karten, lokal gepinnt) -->
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <script src="vendor/leaflet/leaflet.js"></script>
+  <script defer src="vendor/leaflet/leaflet.js"></script>
 
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
+
+  <!-- Offline-Hinweis (Plan4-20) -->
+  <div id="offline-banner" class="hidden sticky top-0 z-[900] bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-xs text-center px-3 py-1.5">Offline — Daten können veraltet sein; Änderungen werden nachsynchronisiert.</div>
 
   <!-- Background Glows -->
   <div class="absolute top-0 left-1/4 w-96 h-96 bg-orange-500/10 rounded-full blur-[100px] pointer-events-none -z-10"></div>
@@ -124,6 +130,9 @@
           </div>
         </div>
 
+        <!-- Persoenliche Rekorde (Plan4-19): auto aus den Aktivitaeten -->
+        <div id="gpx-records" class="hidden px-1 mb-3 grid grid-cols-2 gap-2"></div>
+
         <!-- Jahres-/Wochenziele mit Fortschrittsbalken (editGoals) -->
         <div class="px-1 mb-3">
           <div class="flex items-center justify-between mb-1.5">
@@ -150,6 +159,8 @@
             <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
               <div class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-orange-500 to-rose-500" id="goal-year-bar" style="width: 0%"></div>
             </div>
+            <!-- Zielprognose (Plan4-18): Hochrechnung + noetige km/Woche -->
+            <p class="text-[10px] text-slate-500" id="goal-year-forecast"></p>
           </div>
         </div>
 

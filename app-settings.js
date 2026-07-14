@@ -3,6 +3,97 @@
 // Klassische Skripte teilen den globalen Scope; Reihenfolge in index.html
 // entspricht der urspruenglichen Dateireihenfolge (app-main.js zuletzt).
 
+    // ============ Verhalten & Anzeige (Plan4-9 ff.) ============
+    // Profilbezogene App-Praeferenzen. IMMER ueber getAppPrefs lesen (Defaults-
+    // Merge), nie roh — so bleiben neue Schluessel abwaertskompatibel.
+    const APP_PREFS_DEFAULTS = { refreshMin: 5, hubPreviewMin: 2 };
+    function getAppPrefs() { return { ...APP_PREFS_DEFAULTS, ...(Store.getJSON('app_prefs', {}) || {}) }; }
+
+    // Chart-Voreinstellungen (Plan4-10): Standard-Zeitraum + "letzten merken".
+    const CHART_PREFS_DEFAULTS = { defaultTf: 24, rememberLast: false, lastTf: null };
+    function getChartPrefs() { return { ...CHART_PREFS_DEFAULTS, ...(Store.getJSON('chart_prefs', {}) || {}) }; }
+    function saveChartPref(key, value) {
+      const p = getChartPrefs();
+      p[key] = key === 'rememberLast' ? !!value : Number(value);
+      Store.setJSON('chart_prefs', p);
+    }
+
+    // Widget-Feinkonfiguration (Plan4-11): Vorschau-Tage, Kalenderfenster,
+    // Termin-Anzahl, Ausblenden erledigter To-dos.
+    const WIDGET_PREFS_DEFAULTS = { forecastDays: 3, calHorizonDays: 14, calMax: 6, todoHideDoneDays: 0 };
+    function getWidgetPrefs() { return { ...WIDGET_PREFS_DEFAULTS, ...(Store.getJSON('widget_prefs', {}) || {}) }; }
+    function saveWidgetPref(key, value) {
+      const p = getWidgetPrefs();
+      p[key] = Number(value);
+      Store.setJSON('widget_prefs', p);
+      // Betroffenes Widget sofort neu aufbauen (aktualisiert auch versteckte Views).
+      if (key === 'forecastDays' && typeof loadHubForecast === 'function') loadHubForecast();
+      else if ((key === 'calHorizonDays' || key === 'calMax') && typeof loadHubCalendar === 'function') loadHubCalendar(true);
+      else if (key === 'todoHideDoneDays' && typeof renderTodos === 'function') renderTodos();
+    }
+
+    // Baustein: eine beschriftete Auswahlzeile fuers Verhalten-Panel. handler ist
+    // ein globaler Funktionsname (Delegation), der (key, $value) bekommt.
+    function behaviorSelectRow(label, hint, handler, key, current, options) {
+      const os = options.map(o => `<option value="${escapeHtml(String(o.value))}" ${String(o.value) === String(current) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
+      return `<label class="bg-slate-900/50 border border-slate-800/60 rounded-xl p-3 block">
+        <span class="text-sm text-slate-200">${escapeHtml(label)}</span>
+        <span class="block text-[11px] text-slate-500 mb-1.5">${hint ? escapeHtml(hint) : ''}</span>
+        <select data-onchange="${handler}|${key}|$value" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:border-teal-500/50 focus:outline-none">${os}</select>
+      </label>`;
+    }
+
+    // Baustein: eine Checkbox-Zeile fuers Verhalten-Panel ($checked ans handler).
+    function behaviorCheckboxRow(label, hint, handler, key, checked) {
+      return `<label class="bg-slate-900/50 border border-slate-800/60 rounded-xl p-3 flex items-start gap-2 cursor-pointer">
+        <input type="checkbox" ${checked ? 'checked' : ''} data-onchange="${handler}|${key}|$checked" class="accent-teal-500 mt-0.5 shrink-0">
+        <span><span class="text-sm text-slate-200">${escapeHtml(label)}</span><span class="block text-[11px] text-slate-500">${hint ? escapeHtml(hint) : ''}</span></span>
+      </label>`;
+    }
+
+    function renderBehaviorSettings() {
+      const el = document.getElementById('behavior-list');
+      if (!el) return;
+      const p = getAppPrefs();
+      const cp = getChartPrefs();
+      const wp = getWidgetPrefs();
+      el.innerHTML = [
+        behaviorSelectRow('Auto-Aktualisierung', 'Wie oft Daten still im Hintergrund neu geladen werden.', 'saveBehaviorSetting', 'refreshMin', p.refreshMin, [
+          { value: 2, label: 'alle 2 Minuten' }, { value: 5, label: 'alle 5 Minuten' },
+          { value: 10, label: 'alle 10 Minuten' }, { value: 15, label: 'alle 15 Minuten' }
+        ]),
+        behaviorSelectRow('Hub-Vorschau-Drossel', 'Mindestabstand fuer die Live-Vorschau der Standorte.', 'saveBehaviorSetting', 'hubPreviewMin', p.hubPreviewMin, [
+          { value: 1, label: '1 Minute' }, { value: 2, label: '2 Minuten' }, { value: 5, label: '5 Minuten' }
+        ]),
+        behaviorSelectRow('Standard-Zeitraum im Klimaverlauf', 'Beim ersten Oeffnen von ClimateFlow.', 'saveChartPref', 'defaultTf', cp.defaultTf, [
+          { value: 24, label: '24 Stunden' }, { value: 72, label: '3 Tage' },
+          { value: 168, label: '7 Tage' }, { value: -1, label: 'Alle' }
+        ]),
+        behaviorCheckboxRow('Letzten Zeitraum merken', 'Ueberschreibt den Standard mit der zuletzt gewaehlten Auswahl.', 'saveChartPref', 'rememberLast', cp.rememberLast),
+        behaviorSelectRow('Wetter-Vorschau', 'Anzahl Tage im 3-Tage-Widget.', 'saveWidgetPref', 'forecastDays', wp.forecastDays, [
+          { value: 3, label: '3 Tage' }, { value: 5, label: '5 Tage' }, { value: 7, label: '7 Tage' }
+        ]),
+        behaviorSelectRow('Kalender-Fenster', 'Wie weit der Termin-Ausblick reicht.', 'saveWidgetPref', 'calHorizonDays', wp.calHorizonDays, [
+          { value: 7, label: '7 Tage' }, { value: 14, label: '14 Tage' }, { value: 30, label: '30 Tage' }
+        ]),
+        behaviorSelectRow('Termine im Widget', 'Wie viele Termine angezeigt werden.', 'saveWidgetPref', 'calMax', wp.calMax, [
+          { value: 6, label: '6 Termine' }, { value: 10, label: '10 Termine' }
+        ]),
+        behaviorSelectRow('Erledigte To-dos ausblenden', 'Wann erledigte Aufgaben aus der Liste verschwinden (Daten bleiben).', 'saveWidgetPref', 'todoHideDoneDays', wp.todoHideDoneDays, [
+          { value: 0, label: 'nie' }, { value: 1, label: 'nach 1 Tag' }, { value: 7, label: 'nach 7 Tagen' }, { value: 30, label: 'nach 30 Tagen' }
+        ])
+      ].join('');
+      updateIcons();
+    }
+
+    function saveBehaviorSetting(key, value) {
+      const p = getAppPrefs();
+      p[key] = Number(value);
+      Store.setJSON('app_prefs', p);
+      // Auto-Refresh-Timer mit neuem Intervall neu starten (Funktion in app-main.js)
+      if (key === 'refreshMin' && typeof startAutoRefresh === 'function') startAutoRefresh();
+    }
+
     // ============ Einstellungsseite (P1) ============
     function renderSettings() {
       // Profil
@@ -34,6 +125,7 @@
       const tEl = document.getElementById('settings-ntfy-topic');
       if (tEl) tEl.innerText = topic || 'nicht gesetzt';
 
+      renderBehaviorSettings(); // Verhalten & Anzeige (Plan4-9)
       renderNotifyRules();
       initWebPushUI(); // Web-Push-Button je nach Server-/Geraete-Faehigkeit
       renderServerBackups(); // R2-Server-Backups (nur Admin, P3-1)
@@ -422,6 +514,16 @@
       quiet: { on: false, from: 22, to: 7 }
     };
 
+    // Kopie der Server-Entprell-Defaults in Stunden (s. functions/_notify.js
+    // DEFAULT_RULES) — nur zur Vorbelegung des UI (Plan4-12). Wird kein dedupeH
+    // gesendet, greift serverseitig typeCfg mit genau diesen Werten.
+    const DEDUPE_DEFAULTS = {
+      sensor: 6, mold: 12, frost: 18, heat: 18, co2: 6, dwd: 12, window: 3,
+      digest: 20, vent: 20, errors: 6, weekly: 120, monthly: 480, todo: 24
+    };
+    // Typen mit sinnvollem Intervall-Feld (<= 24 h). weekly/monthly bleiben fix.
+    const DEDUPE_EDITABLE = new Set(['sensor', 'mold', 'frost', 'heat', 'co2', 'dwd', 'window', 'digest', 'vent', 'errors', 'todo']);
+
     function getNotifyRules() {
       const r = Store.getJSON('notify_rules', {}) || {};
       const merged = { types: {}, quiet: { ...NOTIFY_DEFAULTS.quiet, ...(r.quiet || {}) } };
@@ -444,13 +546,22 @@
           ? `<span class="text-[11px] text-slate-400 flex items-center gap-1">${t.thLabel}
                <input type="number" id="nr-th-${t.key}" value="${cfg.threshold ?? t.thDef}" class="w-16 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200" data-onchange="saveNotifyRulesFromUI"></span>`
           : '';
+        // Digest-Feinconfig (Plan4-13): Button oeffnet Uhrzeit + Bausteine
+        const cfgBtn = t.key === 'digest'
+          ? `<button data-onclick="configureDigest" class="text-[11px] text-teal-300 hover:text-teal-200 transition-colors whitespace-nowrap" title="Uhrzeit und Bausteine">Anpassen</button>`
+          : '';
+        // Entprell-Intervall pro Regel (Plan4-12): "max 1x / N h"
+        const ddHtml = DEDUPE_EDITABLE.has(t.key)
+          ? `<span class="text-[11px] text-slate-400 flex items-center gap-1" title="Mindestabstand gleicher Meldungen in Stunden">max&nbsp;1×/
+               <input type="number" min="1" max="168" id="nr-dd-${t.key}" value="${cfg.dedupeH ?? DEDUPE_DEFAULTS[t.key]}" class="w-14 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200" data-onchange="saveNotifyRulesFromUI"> h</span>`
+          : '';
         row.innerHTML = `
           <label class="flex items-center gap-2 text-sm text-slate-200 cursor-pointer min-w-0">
             <input type="checkbox" id="nr-on-${t.key}" class="accent-teal-500 shrink-0" ${cfg.on ? 'checked' : ''} data-onchange="saveNotifyRulesFromUI">
             <i data-lucide="${t.icon}" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
             <span class="truncate">${t.label}</span>
           </label>
-          ${thHtml}
+          <div class="flex items-center gap-2 shrink-0">${cfgBtn}${thHtml}${ddHtml}</div>
         `;
         wrap.appendChild(row);
       });
@@ -466,14 +577,28 @@
     }
 
     function saveNotifyRulesFromUI() {
+      const prev = Store.getJSON('notify_rules', {}) || {};
       const rules = { types: {}, quiet: {} };
       NOTIFY_TYPES.forEach(t => {
         const on = document.getElementById(`nr-on-${t.key}`);
         rules.types[t.key] = { on: on ? on.checked : true };
+        // Zusatzfelder (z. B. digest hour/parts, Plan4-13) aus dem gespeicherten
+        // Stand erhalten — die Checkbox-UI baut das Objekt sonst neu und wuerde
+        // sie verlieren.
+        const prevType = (prev.types || {})[t.key] || {};
+        if (prevType.hour != null) rules.types[t.key].hour = prevType.hour;
+        if (prevType.parts) rules.types[t.key].parts = prevType.parts;
         if (t.thLabel) {
           const thEl = document.getElementById(`nr-th-${t.key}`);
           const v = thEl ? parseFloat(thEl.value.toString().replace(',', '.')) : NaN;
           rules.types[t.key].threshold = isNaN(v) ? t.thDef : v;
+        }
+        // Entprell-Intervall (Plan4-12): nur gueltige Werte 1..168 speichern,
+        // sonst weglassen → Server-Default (typeCfg) greift.
+        if (DEDUPE_EDITABLE.has(t.key)) {
+          const ddEl = document.getElementById(`nr-dd-${t.key}`);
+          const dv = ddEl ? parseInt(ddEl.value, 10) : NaN;
+          if (!isNaN(dv) && dv >= 1 && dv <= 168) rules.types[t.key].dedupeH = dv;
         }
       });
       const qOn = document.getElementById('quiet-on');
@@ -486,6 +611,40 @@
         to: clampH(qTo && qTo.value, 7)
       };
       Store.setJSON('notify_rules', rules);
+    }
+
+    // Morgen-Digest anpassen (Plan4-13): Uhrzeit + Bausteine, in notify_rules
+    // gemergt (on-Zustand bleibt erhalten — den steuert die Regel-Checkbox).
+    async function configureDigest() {
+      const rules = getNotifyRules();
+      const d = rules.types.digest || {};
+      const parts = d.parts || {};
+      const vals = await modalPrompt({
+        title: 'Morgen-Digest anpassen',
+        description: 'Zeitfenster und Inhalte des taeglichen Ueberblicks (der Server sendet im 2-Stunden-Fenster ab dieser Uhrzeit).',
+        fields: [
+          { key: 'hour', label: 'Uhrzeit (ca.)', type: 'select', value: String(d.hour ?? 7), options: [
+            { value: '5', label: '05 Uhr' }, { value: '6', label: '06 Uhr' }, { value: '7', label: '07 Uhr' },
+            { value: '8', label: '08 Uhr' }, { value: '9', label: '09 Uhr' }, { value: '10', label: '10 Uhr' }
+          ] },
+          { key: 'weather', label: 'Wetter', type: 'checkbox', value: parts.weather !== false },
+          { key: 'climate', label: 'Innenklima', type: 'checkbox', value: parts.climate !== false },
+          { key: 'todos', label: 'Fällige To-dos', type: 'checkbox', value: parts.todos !== false },
+          { key: 'events', label: 'Termine', type: 'checkbox', value: parts.events !== false }
+        ],
+        submitLabel: 'Speichern'
+      });
+      if (!vals) return;
+      const stored = Store.getJSON('notify_rules', {}) || {};
+      stored.types = stored.types || {};
+      stored.types.digest = {
+        ...(stored.types.digest || {}), // on-Zustand erhalten
+        hour: Number(vals.hour),
+        parts: { weather: !!vals.weather, climate: !!vals.climate, todos: !!vals.todos, events: !!vals.events }
+      };
+      Store.setJSON('notify_rules', stored);
+      renderNotifyRules();
+      showNotification('Digest-Einstellungen gespeichert.');
     }
 
     function sendTestPush() {

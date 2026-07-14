@@ -86,6 +86,19 @@
           : `${stats.count}× · Ø ${stats.perDay.toFixed(1)}/Tag${stats.avgHumDrop ? ` · −${stats.avgHumDrop.toFixed(0)} %` : ''}${stats.topHour != null ? ` · meist ${stats.topHour}–${(stats.topHour + 1) % 24} Uhr` : ''}`;
       }
 
+      // Wirkungsanalyse (Plan4-14): was bringt das Lueften typischerweise?
+      const impactEl = document.getElementById('vent-impact');
+      if (impactEl) {
+        const imp = ventilationImpact(recent);
+        if (imp) {
+          impactEl.classList.remove('hidden');
+          impactEl.innerHTML = `<i data-lucide="trending-down" class="w-3.5 h-3.5 text-teal-400 shrink-0"></i> Ø −${imp.avgDropRh.toFixed(1).replace('.', ',')} % Feuchte pro Stoßlüften · ~${Math.round(imp.avgDurationMin)} min · meist ${imp.bestHourFrom}–${imp.bestHourTo} Uhr`;
+          updateIcons();
+        } else {
+          impactEl.classList.add('hidden');
+        }
+      }
+
       const max = Math.max(1, ...stats.dailyCounts.map(d => d.count));
       barsEl.innerHTML = '';
       stats.dailyCounts.forEach(d => {
@@ -475,8 +488,9 @@
       appState.chartInstance = new Chart(ctx, config);
     }
 
-    function setChartTimeframe(hours) {
-      appState.currentChartTimeframe = hours;
+    // Aktiven Zeitraum-Button hervorheben (aus setChartTimeframe extrahiert,
+    // Plan4-10 — wird auch beim Anwenden der Voreinstellung genutzt).
+    function highlightTfButton(hours) {
       const tfIds = { 24: 'btn-tf-24', 72: 'btn-tf-72', 168: 'btn-tf-168', '-1': 'btn-tf-all' };
       Object.keys(tfIds).forEach(k => {
         const btn = document.getElementById(tfIds[k]);
@@ -484,7 +498,20 @@
       });
       const active = document.getElementById(tfIds[hours.toString()]);
       if (active) active.className = 'px-3.5 py-1.5 rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 text-xs font-semibold transition-all';
+    }
 
+    async function setChartTimeframe(hours) {
+      appState.currentChartTimeframe = hours;
+      highlightTfButton(hours);
+
+      // Zuletzt gewaehlten Zeitraum merken (Plan4-10), wenn aktiviert.
+      if (getChartPrefs().rememberLast) {
+        const p = getChartPrefs(); p.lastTf = hours; Store.setJSON('chart_prefs', p);
+      }
+
+      // "Alle" braucht die komplette Historie — der Erst-Load holt nur 14 Tage
+      // (Plan4-6). Erst nachladen, dann zeichnen.
+      if (hours === -1) await ensureFullHistory();
       drawChart();
     }
 
@@ -562,11 +589,12 @@
     // im Store (cf_collapsed); die Kernkarten (Messwerte, Analyse) bleiben immer
     // sichtbar. Kompakt-Modus klappt alle Detailkarten auf einmal ein.
     const CF_COLLAPSIBLE = {
+      'cf-pattern': { body: 'pattern-collapse-body', arrow: 'pattern-arrow', onOpen: () => renderHourlyPattern() },
       'cf-chart':   { body: 'chart-collapse-body', arrow: 'chart-arrow' },
       'cf-archive': { body: 'archive-container',   arrow: 'archive-arrow', onOpen: () => loadArchiveView() },
       'cf-table':   { body: 'table-container',     arrow: 'table-arrow' }
     };
-    const CF_COLLAPSED_DEFAULT = ['cf-archive', 'cf-table']; // wie bisher: Archiv/Tabelle zu
+    const CF_COLLAPSED_DEFAULT = ['cf-pattern', 'cf-archive', 'cf-table']; // Muster/Archiv/Tabelle starten zu
     function getCfCollapsed() {
       const c = Store.getJSON('cf_collapsed', null);
       return Array.isArray(c) ? c : CF_COLLAPSED_DEFAULT.slice();
@@ -599,6 +627,50 @@
     }
     // Header-Buttons in index.html rufen weiterhin diese Namen auf
     function toggleTableCollapse() { toggleCfCard('cf-table'); }
+
+    // ============ Wochen-Muster-Heatmap (Plan4-16) ============
+    let _patternField = 'humidity';
+    function setPatternField(field) { _patternField = field === 'temp' ? 'temp' : 'humidity'; renderHourlyPattern(); }
+    function renderHourlyPattern() {
+      const el = document.getElementById('pattern-grid');
+      if (!el) return;
+      // Umschalter-Status
+      ['temp', 'humidity'].forEach(f => {
+        const b = document.getElementById(`pattern-btn-${f}`);
+        if (b) b.className = f === _patternField
+          ? 'px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30'
+          : 'px-2 py-0.5 rounded text-[10px] font-semibold text-slate-400 border border-slate-800 hover:text-slate-200';
+      });
+      const pat = hourlyPattern(appState.insideData, _patternField);
+      if (!pat) { el.innerHTML = '<p class="text-xs text-slate-500">Noch keine Daten für das Wochen-Muster.</p>'; return; }
+      const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+      const unit = _patternField === 'temp' ? ' °C' : ' %';
+      const cellStyle = v => {
+        if (v == null) return 'background:rgba(30,41,59,0.4)';
+        const t = pat.max > pat.min ? (v - pat.min) / (pat.max - pat.min) : 0.5;
+        if (_patternField === 'temp') {
+          const r = Math.round(59 + t * (239 - 59)), g = Math.round(130 - t * 70), b = Math.round(246 - t * 200);
+          return `background:rgb(${r},${g},${b})`;
+        }
+        return `background:rgba(59,130,246,${(0.12 + t * 0.75).toFixed(2)})`;
+      };
+      const cols = 'grid-template-columns:1.6rem repeat(24,1fr)';
+      let html = `<div class="grid gap-0.5" style="${cols}">`;
+      pat.grid.forEach((rowVals, ri) => {
+        html += `<span class="text-[9px] text-slate-500 flex items-center">${days[ri]}</span>`;
+        rowVals.forEach((v, hi) => {
+          const title = v == null ? `${days[ri]} ${hi}:00 – keine Daten`
+            : `${days[ri]} ${hi}:00 – ${v.toFixed(1).replace('.', ',')}${unit}`;
+          html += `<span class="rounded-sm" style="${cellStyle(v)};height:12px" title="${title}"></span>`;
+        });
+      });
+      html += '</div>';
+      // Stunden-Achse (0/6/12/18)
+      html += `<div class="grid gap-0.5 mt-1" style="${cols}"><span></span>`
+        + Array.from({ length: 24 }, (_, h) => `<span class="text-[8px] text-slate-600 text-center">${h % 6 === 0 ? h : ''}</span>`).join('')
+        + '</div>';
+      el.innerHTML = html;
+    }
 
     // Populate data table (Extra-Felder aus dem Kanal-Schema erscheinen als eigene Spalten)
     function populateTable(feeds) {

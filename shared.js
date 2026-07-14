@@ -186,21 +186,60 @@ function modalPrompt(opts = {}) {
   });
 }
 
+// ============ fetch mit Timeout (Plan4-5) ============
+// Bricht haengende Verbindungen (typisch auf Mobilfunk) nach timeoutMs ab, statt
+// die aufrufende Logik minutenlang blockieren zu lassen. AbortError wird in einen
+// Fehler mit .timeout = true uebersetzt (NICHT .unavailable — ein Timeout heisst
+// nicht, dass die API fehlt).
+async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      const e = new Error('Zeitueberschreitung'); e.timeout = true; throw e;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ============ API-Schicht (/api/* → Cloudflare Pages Functions) ============
 // Wirft Error mit .unavailable = true, wenn die API (noch) nicht eingerichtet
 // ist (404: Functions fehlen, 503: Env-Var/D1-Binding nicht konfiguriert).
 // Aufrufer können dann auf Direktzugriff oder Nur-Lokal-Betrieb zurückfallen.
+// GET-Aufrufe werden bei Netzwerkfehler/Timeout EINMAL wiederholt (Plan4-5);
+// schreibende Methoden nie (Doppel-Schreiben vermeiden). timeoutMs pro Aufruf
+// ueberschreibbar (Default 8 s).
+function _wrapFetchErr(err) {
+  if (err && err.timeout) return err; // Timeout NICHT als „Feature fehlt" werten
+  const e = new Error('API nicht erreichbar');
+  e.unavailable = true;
+  return e;
+}
+
 async function apiFetch(path, options = {}) {
+  const { timeoutMs = 8000, ...fetchOpts } = options;
+  const method = (fetchOpts.method || 'GET').toUpperCase();
+  const canRetry = method === 'GET';
+  const doFetch = () => fetchWithTimeout(path, {
+    ...fetchOpts,
+    headers: { 'Content-Type': 'application/json', ...(fetchOpts.headers || {}) }
+  }, timeoutMs);
+
   let res;
   try {
-    res = await fetch(path, {
-      ...options,
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
-    });
-  } catch (networkErr) {
-    const e = new Error('API nicht erreichbar');
-    e.unavailable = true;
-    throw e;
+    res = await doFetch();
+  } catch (err) {
+    if (canRetry) {
+      await new Promise(r => setTimeout(r, 500));
+      try { res = await doFetch(); }
+      catch (err2) { throw _wrapFetchErr(err2); }
+    } else {
+      throw _wrapFetchErr(err);
+    }
   }
 
   if (res.status === 404 || res.status === 503 || res.status === 405) {
@@ -309,8 +348,14 @@ function registerServiceWorker() {
     });
   }).catch(err => console.warn('Service Worker Registrierung fehlgeschlagen:', err));
 
+  // Beim ERSTEN Install uebernimmt der neue SW die Seite (clients.claim) und
+  // loest controllerchange aus — dieses eine Mal NICHT neu laden (Plan4-7),
+  // sonst gibt es beim Erstbesuch einen unnoetigen Voll-Reload mitten im Start.
+  // Nur echte Updates (Nutzer tippt "Neu laden") sollen reloaden.
+  let hadController = !!navigator.serviceWorker.controller;
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) { hadController = true; return; }
     if (refreshing) return;
     refreshing = true;
     location.reload();
@@ -392,6 +437,36 @@ function _delegatedArg(raw, el, event) {
 // Ersetzt inline `document.getElementById(id).click()` fuer versteckte Datei-Inputs.
 function openPicker(id) { const el = document.getElementById(id); if (el) el.click(); }
 window.openPicker = openPicker;
+
+// ============ Leere-/Fehlerzustaende (Plan4-22) ============
+// Einheitlicher Platzhalter mit Icon, Text und optionaler Aktion. actionFn ist
+// ein FUNKTIONSNAME (data-onclick-Delegation), kein Code — die Funktion muss
+// global existieren. Nach dem Einsetzen updateIcons() aufrufen.
+function emptyStateHtml({ icon = 'inbox', text = '', actionLabel = null, actionFn = null } = {}) {
+  const btn = (actionLabel && actionFn)
+    ? `<button data-onclick="${actionFn}" class="mt-1 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700 hover:border-slate-500 text-[11px] text-slate-200 transition-colors">${escapeHtml(actionLabel)}</button>`
+    : '';
+  return `<div class="flex flex-col items-center justify-center text-center py-3 gap-1">
+    <i data-lucide="${icon}" class="w-5 h-5 text-slate-600"></i>
+    <p class="text-xs text-slate-500">${escapeHtml(text)}</p>${btn}
+  </div>`;
+}
+
+// ============ Offline-Status (Plan4-20) ============
+// Zeigt/versteckt den Offline-Banner und stoesst bei Netz-Rueckkehr eine
+// Synchronisation an. navigator.onLine ist nur heuristisch → reiner Hinweis,
+// keine Feature-Sperre. Seiten reagieren auf das 'net-online'-CustomEvent.
+function updateOfflineBanner() {
+  const el = document.getElementById('offline-banner');
+  if (el) el.classList.toggle('hidden', navigator.onLine);
+}
+window.addEventListener('offline', updateOfflineBanner);
+window.addEventListener('online', () => {
+  updateOfflineBanner();
+  try { if (window.Store && window.Store.flush) window.Store.flush(); } catch (e) { /* best effort */ }
+  try { window.dispatchEvent(new CustomEvent('net-online')); } catch (e) { /* alte Browser */ }
+});
+updateOfflineBanner();
 
 // Skript bei Bedarf nachladen (Promise-gecacht, P2-19: Vendor-Lazy-Loading).
 const _scriptCache = {};

@@ -2,7 +2,7 @@
 // Strategie: Network-first für alles Eigene (damit Deployments sofort ankommen),
 // Cache als Offline-Fallback. API-Aufrufe (ThingSpeak, Open-Meteo, CDNs) gehen
 // immer direkt ans Netz und werden nicht gecacht.
-const CACHE_NAME = 'smarthub-v44';
+const CACHE_NAME = 'smarthub-v67';
 const APP_SHELL = [
   './',
   './gpx.html',
@@ -28,7 +28,13 @@ const APP_SHELL = [
   './vendor/lucide.min.js',
   './vendor/exifr.lite.umd.js',
   './vendor/leaflet/leaflet.js',
-  './vendor/leaflet/leaflet.css'
+  './vendor/leaflet/leaflet.css',
+  // Outfit-Schrift lokal (Plan4-4) — offline-faehig, kein Google-Fonts-Request
+  './vendor/fonts/outfit-300.woff2',
+  './vendor/fonts/outfit-400.woff2',
+  './vendor/fonts/outfit-500.woff2',
+  './vendor/fonts/outfit-600.woff2',
+  './vendor/fonts/outfit-700.woff2'
 ];
 
 self.addEventListener('install', event => {
@@ -104,18 +110,41 @@ self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return; // API-Aufrufe immer live, nie cachen
 
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-        }
-        return response;
-      })
-      .catch(() =>
-        caches.match(event.request, { ignoreSearch: event.request.mode === 'navigate' })
-          .then(match => match || (event.request.mode === 'navigate' ? caches.match('./') : Promise.reject(new Error('offline'))))
-      )
-  );
+  // Navigationsanfragen kuerzer bewerten (Shell schnell aus dem Cache), sonstige
+  // Assets etwas grosszuegiger (Plan4-7).
+  event.respondWith(networkFirstWithTimeout(event.request, event.request.mode === 'navigate' ? 2500 : 3500));
 });
+
+// Network-first MIT Timeout (Plan4-7): auf langsamem Netz nicht ewig aufs Netz
+// warten, sondern nach ms auf den Cache ausweichen. Der Netz-Request laeuft im
+// Hintergrund weiter und aktualisiert den Cache, damit Deployments ankommen.
+async function networkFirstWithTimeout(request, ms) {
+  const networkP = fetch(request).then(response => {
+    if (response.ok) {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+    }
+    return response;
+  });
+  networkP.catch(() => {}); // gegen unhandled rejection, wir racen dagegen
+
+  const timeoutP = new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), ms));
+  try {
+    const winner = await Promise.race([networkP, timeoutP]);
+    if (winner !== 'TIMEOUT') return winner; // Netz war rechtzeitig da
+  } catch (e) { /* Netz hat schnell abgelehnt (offline) → unten Cache */ }
+
+  const cached = await caches.match(request, { ignoreSearch: request.mode === 'navigate' });
+  if (cached) return cached;
+
+  // kein Cache-Treffer → doch aufs Netz warten (oder Navigations-Shell)
+  try {
+    return await networkP;
+  } catch (e) {
+    if (request.mode === 'navigate') {
+      const shell = await caches.match('./');
+      if (shell) return shell;
+    }
+    throw new Error('offline');
+  }
+}

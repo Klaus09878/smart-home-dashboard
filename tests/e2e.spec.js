@@ -18,9 +18,22 @@ test('Hub lädt: Widgets, Uhr, keine JS-Fehler', async ({ page }) => {
   expect(errors, errors.join('\n')).toHaveLength(0);
 });
 
+test('Erststart zeigt Geruest sofort, auch bei langsamen APIs', async ({ page }) => {
+  // APIs kuenstlich stark verzoegern; das Render-Geruest darf NICHT darauf
+  // warten (Plan4-2). Vor dem Split blieb #view-home bis zum whoami-Ende hidden.
+  await page.route('**/api/**', async route => { await new Promise(r => setTimeout(r, 5000)); route.abort(); });
+  await page.route(/open-meteo\.com|brightsky\.dev|thingspeak\.com|openstreetmap\.org/,
+    async route => { await new Promise(r => setTimeout(r, 5000)); route.abort(); });
+  await page.goto('/index.html#home', { waitUntil: 'commit' });
+  await expect(page.locator('#view-home')).toBeVisible({ timeout: 2500 });
+  await expect(page.locator('#hub-widgets')).toBeVisible();
+});
+
 test('Einstellungen: Regeln + Theme-Umschalter', async ({ page }) => {
   await page.goto('/index.html#settings');
   await waitReady(page);
+  await expect(page.locator('#settings-behavior')).toBeVisible(); // Verhalten & Anzeige (Plan4-9)
+  await expect(page.locator('#behavior-list select')).toHaveCount(7); // Intervalle, Chart, Widget-Feinconfig (Plan4-9/10/11)
   await expect(page.locator('#notify-rules > div')).toHaveCount(13); // 13 Regeltypen (inkl. CO₂, DWD, Fenster, Digest)
   // Theme umschalten
   await page.click('button:has-text("umschalten")');
@@ -100,6 +113,16 @@ test('Hub: Status-Briefing rendert', async ({ page }) => {
   await waitReady(page);
   // Briefing fuellt sich (mind. eine Zeile: Signale oder "alles im gruenen Bereich")
   await expect(page.locator('#briefing-list > *').first()).toBeVisible({ timeout: 15000 });
+});
+
+test('Offline-Banner erscheint und verschwindet (Plan4-20)', async ({ page, context }) => {
+  await page.goto('/index.html#home');
+  await waitReady(page);
+  await expect(page.locator('#offline-banner')).toBeHidden();
+  await context.setOffline(true);
+  await expect(page.locator('#offline-banner')).toBeVisible();
+  await context.setOffline(false);
+  await expect(page.locator('#offline-banner')).toBeHidden();
 });
 
 test('GPX-Viewer lädt ohne Fehler', async ({ page }) => {

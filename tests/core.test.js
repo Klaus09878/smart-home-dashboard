@@ -117,6 +117,99 @@ test('detectVentilationEvents: langsamer Abfall über Stunden ist KEIN Lüften',
   assert.strictEqual(core.detectVentilationEvents(aligned).length, 0);
 });
 
+test('ventilationImpact: mittlere Feuchte-Senkung und Anzahl (Plan4-14)', () => {
+  const day = (h, m) => new Date(2026, 6, 1, h, m, 0); // lokale Zeit → getHours() stabil
+  const mk = (d, temp, hum) => ({ time: d, temp, humidity: hum });
+  const aligned = [
+    mk(day(7, 0), 22, 60), mk(day(7, 20), 20, 50),   // Event 1: −10 %
+    mk(day(8, 0), 22, 58), mk(day(8, 20), 20, 50)    // Event 2: −8 %
+  ];
+  const r = core.ventilationImpact(aligned);
+  assert.strictEqual(r.count, 2);
+  assert.ok(Math.abs(r.avgDropRh - 9) < 0.001, `avgDropRh=${r.avgDropRh}`);
+  assert.ok(Math.abs(r.avgDurationMin - 20) < 0.001, `avgDurationMin=${r.avgDurationMin}`);
+});
+
+test('ventilationImpact: null ohne Ereignisse (Plan4-14)', () => {
+  const day = (h, m) => new Date(2026, 6, 1, h, m, 0);
+  const aligned = [{ time: day(7, 0), temp: 22, humidity: 60 }, { time: day(7, 20), temp: 22, humidity: 60 }];
+  assert.strictEqual(core.ventilationImpact(aligned), null);
+});
+
+test('ventilationImpact: bestes 3-h-Fenster bei Morgen-Lueftungen (Plan4-14)', () => {
+  const day = (h, m) => new Date(2026, 6, 1, h, m, 0);
+  const mk = (d, temp, hum) => ({ time: d, temp, humidity: hum });
+  const aligned = [
+    mk(day(7, 0), 22, 60), mk(day(7, 20), 20, 50),
+    mk(day(8, 0), 22, 60), mk(day(8, 20), 20, 50),
+    mk(day(9, 0), 22, 60), mk(day(9, 20), 20, 50)
+  ];
+  const r = core.ventilationImpact(aligned);
+  assert.strictEqual(r.count, 3);
+  assert.strictEqual(r.bestHourFrom, 7);
+  assert.strictEqual(r.bestHourTo, 10);
+});
+
+function monthDays(ym, count, tAvg, hAvg) {
+  const out = [];
+  for (let d = 1; d <= count; d++) out.push({ day: `${ym}-${String(d).padStart(2, '0')}`, t_avg: tAvg, t_min: tAvg - 3, t_max: tAvg + 3, h_avg: hAvg });
+  return out;
+}
+test('monthlyInsights: Vormonat + Vorjahr → zwei Saetze (Plan4-15)', () => {
+  const rows = [
+    ...monthDays('2025-06', 12, 19, 58),
+    ...monthDays('2026-05', 12, 18, 60),
+    ...monthDays('2026-06', 12, 20, 55)
+  ];
+  const r = core.monthlyInsights(rows, new Date(2026, 6, 15)); // Juli 2026
+  assert.strictEqual(r.month, '2026-06');
+  assert.strictEqual(r.sentences.length, 2);
+  assert.ok(/wärmer/.test(r.sentences[0]), r.sentences[0]);
+  assert.ok(/2025/.test(r.sentences[1]), r.sentences[1]);
+});
+test('monthlyInsights: ohne Vorjahresmonat nur ein Satz (Plan4-15)', () => {
+  const rows = [...monthDays('2026-05', 12, 18, 60), ...monthDays('2026-06', 12, 20, 55)];
+  const r = core.monthlyInsights(rows, new Date(2026, 6, 15));
+  assert.strictEqual(r.sentences.length, 1);
+});
+test('monthlyInsights: leeres Archiv → null (Plan4-15)', () => {
+  assert.strictEqual(core.monthlyInsights([], new Date(2026, 6, 15)), null);
+});
+
+test('alignYearSeries: filtert Jahr, sortiert nach MM-TT (Plan4-17)', () => {
+  const rows = [
+    { day: '2025-03-02', t_avg: 8 }, { day: '2025-03-01', t_avg: 7 },
+    { day: '2026-03-01', t_avg: 12 }
+  ];
+  const s = core.alignYearSeries(rows, 2025);
+  assert.deepStrictEqual(s.map(e => e.md), ['03-01', '03-02']);
+  assert.strictEqual(s[0].t_avg, 7);
+});
+test('alignYearSeries: ueberspringt den 29.02. (Plan4-17)', () => {
+  const rows = [{ day: '2024-02-28', t_avg: 3 }, { day: '2024-02-29', t_avg: 4 }, { day: '2024-03-01', t_avg: 5 }];
+  const s = core.alignYearSeries(rows, 2024);
+  assert.deepStrictEqual(s.map(e => e.md), ['02-28', '03-01']);
+});
+
+test('hourlyPattern: mittelt je Wochentag/Stunde (Plan4-16)', () => {
+  const d1 = new Date(2026, 6, 6, 8, 0);   // lokale Zeit; getDay bestimmt Zeile
+  const d2 = new Date(2026, 6, 6, 8, 30);
+  const row = (d1.getDay() + 6) % 7;
+  const r = core.hourlyPattern([{ time: d1, humidity: 55, temp: 20 }, { time: d2, humidity: 65, temp: 22 }]);
+  assert.ok(Math.abs(r.grid[row][8] - 60) < 0.001, `cell=${r.grid[row][8]}`);
+  assert.strictEqual(r.min, 60);
+  assert.strictEqual(r.max, 60);
+});
+test('hourlyPattern: leeres Array → null (Plan4-16)', () => {
+  assert.strictEqual(core.hourlyPattern([]), null);
+});
+test('hourlyPattern: Feld temp (Plan4-16)', () => {
+  const d = new Date(2026, 6, 7, 14, 0);
+  const row = (d.getDay() + 6) % 7;
+  const r = core.hourlyPattern([{ time: d, temp: 25, humidity: 40 }], 'temp');
+  assert.ok(Math.abs(r.grid[row][14] - 25) < 0.001, `cell=${r.grid[row][14]}`);
+});
+
 test('heatingDemandIndex: heute vs. gestern inkl. Prozent-Änderung', () => {
   const now = Date.UTC(2026, 6, 2, 12, 0, 0);
   const h = 60 * 60 * 1000;
@@ -713,6 +806,40 @@ test('expandSimpleRepeat: none nur im Fenster', () => {
   const start = Date.UTC(2026, 5, 1);
   assert.strictEqual(core.expandSimpleRepeat([{ id: 'c', startMs: start, repeat: 'none' }], start - 10, start + 10).length, 1);
   assert.strictEqual(core.expandSimpleRepeat([{ id: 'c', startMs: start, repeat: 'none' }], start + 100, start + 200).length, 0);
+});
+
+test('goalForecast: auf Kurs zur Jahresmitte (Plan4-18)', () => {
+  const r = core.goalForecast({ goalKm: 2000, doneKm: 1010, now: new Date(2026, 6, 2) });
+  assert.ok(r.projectedKm > 1900 && r.projectedKm < 2150, `projected=${r.projectedKm}`);
+  assert.strictEqual(r.onTrack, true);
+});
+test('goalForecast: Rueckstand → benoetigte km/Woche > 0 (Plan4-18)', () => {
+  const r = core.goalForecast({ goalKm: 2000, doneKm: 100, now: new Date(2026, 6, 2) });
+  assert.strictEqual(r.onTrack, false);
+  assert.ok(r.requiredPerWeekKm > 0, `req=${r.requiredPerWeekKm}`);
+});
+test('goalForecast: kein Ziel bzw. erste Jahreswoche → null (Plan4-18)', () => {
+  assert.strictEqual(core.goalForecast({ goalKm: 0, doneKm: 50 }), null);
+  assert.strictEqual(core.goalForecast({ goalKm: 2000, doneKm: 10, now: new Date(2026, 0, 3) }), null);
+});
+
+test('personalRecords: Gewinner + <5km-Ausschluss beim Schnitt (Plan4-19)', () => {
+  const acts = [
+    { id: 'a', name: 'A', startMs: new Date(2026, 6, 6).getTime(), distanceKm: 10, movingSec: 3600, ascent: 100 }, // 10 km/h
+    { id: 'b', name: 'B', startMs: new Date(2026, 6, 7).getTime(), distanceKm: 4, movingSec: 600, ascent: 300 },  // 24 km/h aber <5 km
+    { id: 'c', name: 'C', startMs: new Date(2026, 6, 8).getTime(), distanceKm: 20, movingSec: 3600, ascent: 50 }  // 20 km/h, laengste
+  ];
+  const r = core.personalRecords(acts);
+  assert.strictEqual(r.longest.id, 'c');
+  assert.strictEqual(r.mostAscent.id, 'b');
+  assert.strictEqual(r.fastest.id, 'c'); // B (<5 km) ausgeschlossen
+  assert.ok(r.biggestWeek && r.biggestWeek.value > 33);
+});
+test('personalRecords: leeres Array → alle null (Plan4-19)', () => {
+  const r = core.personalRecords([]);
+  assert.strictEqual(r.longest, null);
+  assert.strictEqual(r.fastest, null);
+  assert.strictEqual(r.biggestWeek, null);
 });
 
 console.log(process.exitCode === 1 ? '\nTests FEHLGESCHLAGEN' : `\nAlle ${passed} Tests bestanden ✔`);
