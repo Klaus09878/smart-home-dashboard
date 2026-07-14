@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <!-- Theme sofort anwenden (vor dem Paint), verhindert Aufblitzen (Punkt 10) -->
   <script>(function(){try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.remove('dark');document.documentElement.classList.add('light');}}catch(e){}})();</script>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- viewport-fit=cover (Plan4-23): Safe-Area-Insets nutzbar (iPhone-Gestenleiste) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Smart Home Hub</title>
   <!-- SEO & Meta Tags -->
   <meta name="description" content="Visualisiere und analysiere deine Smart-Home-Klimadaten in Echtzeit. Erhalte intelligente Lüftungsempfehlungen basierend auf der absoluten Luftfeuchtigkeit.">
@@ -91,7 +92,7 @@
 
           <!-- Widget: Uhr, Datum, Begrüßung, Wetter jetzt -->
           <div data-widget="clock" class="glass-panel rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg md:col-span-3 relative group/widget">
-            <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
+            <button class="widget-grip tap-target absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
               <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </button>
             <div class="text-center sm:text-left">
@@ -109,7 +110,7 @@
 
           <!-- Widget: Status-Briefing ("Ist alles okay?") -->
           <div data-widget="briefing" class="glass-panel rounded-2xl p-5 shadow-lg md:col-span-3 relative group/widget">
-            <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
+            <button class="widget-grip tap-target absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
               <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </button>
             <div class="flex items-center gap-2 mb-3">
@@ -124,7 +125,7 @@
 
           <!-- Widget: 3-Tage-Wettervorschau -->
           <div data-widget="forecast" class="glass-panel rounded-2xl p-5 shadow-lg relative group/widget">
-            <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
+            <button class="widget-grip tap-target absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
               <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </button>
             <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
@@ -141,7 +142,7 @@
 
           <!-- Widget: To-do-Liste (lokal, localStorage) -->
           <div data-widget="todo" class="glass-panel rounded-2xl p-5 shadow-lg relative group/widget">
-            <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
+            <button class="widget-grip tap-target absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
               <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </button>
             <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
@@ -161,16 +162,16 @@
 
           <!-- Widget: Kalender (.ics-Feed über /api/ical) -->
           <div data-widget="calendar" class="glass-panel rounded-2xl p-5 shadow-lg relative group/widget">
-            <button class="widget-grip absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
+            <button class="widget-grip tap-target absolute top-2 right-2 p-1 rounded text-slate-600 hover:text-slate-300 cursor-grab opacity-0 group-hover/widget:opacity-100 transition-opacity" title="Widget verschieben (ziehen)">
               <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </button>
             <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
               <i data-lucide="calendar" class="w-4 h-4 text-orange-400"></i>
               Nächste Termine
-              <button data-onclick="addOwnEvent" class="ml-auto p-1 rounded text-slate-500 hover:text-teal-300 transition-colors" title="Eigenen Termin anlegen">
+              <button data-onclick="addOwnEvent" class="tap-target ml-auto p-1 rounded text-slate-500 hover:text-teal-300 transition-colors" title="Eigenen Termin anlegen">
                 <i data-lucide="plus" class="w-3.5 h-3.5"></i>
               </button>
-              <button data-onclick="configureIcal" class="mr-5 p-1 rounded text-slate-500 hover:text-white transition-colors" title="Kalender-URL (.ics) hinterlegen">
+              <button data-onclick="configureIcal" class="tap-target mr-5 p-1 rounded text-slate-500 hover:text-white transition-colors" title="Kalender-URL (.ics) hinterlegen">
                 <i data-lucide="settings-2" class="w-3.5 h-3.5"></i>
               </button>
             </h3>

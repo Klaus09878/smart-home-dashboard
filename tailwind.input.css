@@ -86,6 +86,34 @@ html.light .leaflet-container { background: #e5e7eb; }
 html.light ::-webkit-scrollbar-track { background: #e2e8f0; }
 html.light ::-webkit-scrollbar-thumb { background: #94a3b8; }
 
+/* ============ Mobile-Ergonomie (Plan4-23) ============ */
+/* Safe-Area der installierten PWA (iPhone-Gestenleiste) freihalten. Braucht
+   viewport-fit=cover im Meta-Tag beider Seiten. */
+body {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Vergroessert die TREFFERFLAECHE kleiner Icon-Buttons, ohne das Layout zu
+   aendern (unsichtbares ::after-Rechteck). .tap-target-sm fuer dicht stehende
+   Leisten, damit sich die Flaechen nicht ueberlappen. NICHT auf Elemente
+   setzen, die selbst klickbare Kinder enthalten. */
+.tap-target {
+  position: relative;
+}
+.tap-target::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+.tap-target-sm {
+  position: relative;
+}
+.tap-target-sm::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+
 /* ============ GPX-Viewer: Leaflet & Dropzone ============ */
 
 /* OSM-Kacheln in dunklen Look einfärben */

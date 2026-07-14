@@ -297,7 +297,9 @@
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.checked = !!t.done;
-        cb.className = 'accent-teal-500 shrink-0 cursor-pointer';
+        // Groesserer Touch-Punkt (Plan4-23): ::after wirkt auf <input> nicht,
+        // daher echte Groesse statt tap-target.
+        cb.className = 'accent-teal-500 shrink-0 cursor-pointer w-4 h-4';
         cb.onchange = () => toggleTodo(t.id, cb.checked);
 
         // Kategorie-Farbpunkt (Punkt 19)
@@ -318,13 +320,13 @@
         mid.innerHTML = `<span class="block truncate text-xs ${t.done ? 'line-through text-slate-600' : 'text-slate-300'}">${t.shared ? '<i data-lucide=\'users\' class=\'w-2.5 h-2.5 inline text-indigo-400\'></i> ' : ''}${escapeHtml(t.text)}</span>${dueBadge}`;
 
         const opts = document.createElement('button');
-        opts.className = 'p-0.5 rounded text-slate-600 hover:text-teal-300 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
+        opts.className = 'tap-target-sm p-0.5 rounded text-slate-600 hover:text-teal-300 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
         opts.title = 'Fällig/Wiederholung/geteilt';
         opts.innerHTML = '<i data-lucide="sliders-horizontal" class="w-3 h-3"></i>';
         opts.onclick = () => editTodo(t.id);
 
         const del = document.createElement('button');
-        del.className = 'p-0.5 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
+        del.className = 'tap-target-sm p-0.5 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
         del.title = 'Löschen';
         del.innerHTML = '<i data-lucide="x" class="w-3 h-3"></i>';
         del.onclick = () => deleteTodo(t.id);
