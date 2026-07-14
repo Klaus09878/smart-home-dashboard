@@ -623,6 +623,16 @@ function renderActivityList() {
   const list = document.getElementById('activity-list');
   list.innerHTML = '';
 
+  // Leerzustand (Plan4-22): statt leerer Flaeche ein Hinweis, was zu tun ist.
+  if (state.activities.length === 0) {
+    list.innerHTML = emptyStateHtml({
+      icon: 'route',
+      text: 'Noch keine Touren — GPX-Datei hierher ziehen oder eine Aufzeichnung starten.'
+    });
+    updateIcons();
+    return;
+  }
+
   state.activities.forEach(act => {
     const type = ACTIVITY_TYPES[act.type] || ACTIVITY_TYPES.ride;
     const isActive = act.id === state.selectedId;

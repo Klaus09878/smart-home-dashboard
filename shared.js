@@ -438,6 +438,20 @@ function _delegatedArg(raw, el, event) {
 function openPicker(id) { const el = document.getElementById(id); if (el) el.click(); }
 window.openPicker = openPicker;
 
+// ============ Leere-/Fehlerzustaende (Plan4-22) ============
+// Einheitlicher Platzhalter mit Icon, Text und optionaler Aktion. actionFn ist
+// ein FUNKTIONSNAME (data-onclick-Delegation), kein Code — die Funktion muss
+// global existieren. Nach dem Einsetzen updateIcons() aufrufen.
+function emptyStateHtml({ icon = 'inbox', text = '', actionLabel = null, actionFn = null } = {}) {
+  const btn = (actionLabel && actionFn)
+    ? `<button data-onclick="${actionFn}" class="mt-1 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700 hover:border-slate-500 text-[11px] text-slate-200 transition-colors">${escapeHtml(actionLabel)}</button>`
+    : '';
+  return `<div class="flex flex-col items-center justify-center text-center py-3 gap-1">
+    <i data-lucide="${icon}" class="w-5 h-5 text-slate-600"></i>
+    <p class="text-xs text-slate-500">${escapeHtml(text)}</p>${btn}
+  </div>`;
+}
+
 // ============ Offline-Status (Plan4-20) ============
 // Zeigt/versteckt den Offline-Banner und stoesst bei Netz-Rueckkehr eine
 // Synchronisation an. navigator.onLine ist nur heuristisch → reiner Hinweis,

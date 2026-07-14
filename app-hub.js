@@ -465,10 +465,21 @@
         getDwdAlerts(conf.lat, conf.lon).then(alerts => { appState.dwdAlerts = alerts; renderDwdBanner(document.getElementById('hub-dwd'), alerts); });
       } catch (err) {
         console.warn('Hub-Vorschau fehlgeschlagen:', err);
-        el.style.gridTemplateColumns = ''; // zurueck auf die Klassen-Spalten
-        el.innerHTML = '<p class="text-xs text-slate-500 col-span-3">Vorschau nicht verfügbar.</p>';
+        // Einheitlicher Fehlerzustand mit Retry (Plan4-22). Eine Spalte, damit
+        // der Platzhalter die volle Breite bekommt.
+        el.style.gridTemplateColumns = '1fr';
+        el.innerHTML = emptyStateHtml({
+          icon: 'cloud-off',
+          text: 'Wetter-Vorschau nicht verfügbar.',
+          actionLabel: 'Erneut versuchen',
+          actionFn: 'retryHubForecast'
+        });
+        updateIcons();
       }
     }
+
+    // Retry-Aktion des Vorschau-Fehlerzustands (Plan4-22, via data-onclick).
+    function retryHubForecast() { loadHubForecast(); }
 
     // Stunden-Leiste für einen Tag im Vorschau-Widget (Punkt 18)
     function showHourlyForecast(dayIndex) {
@@ -563,6 +574,7 @@
       let all = [];
       let ownAvailable = false;
       let proxyMissing = false;
+      let feedError = false; // echter Ladefehler (nicht "Proxy fehlt"), Plan4-22
 
       // Eigene Termine aus D1 (P3-8) — expandiert ueber das Fenster
       try {
@@ -578,14 +590,23 @@
           const evs = await fetchIcalEvents(feeds[i], from, horizon);
           evs.forEach(e => all.push({ ...e, cal: i }));
         } catch (err) {
-          if (err.unavailable) proxyMissing = true; else console.warn('Kalender-Feed fehlgeschlagen:', err);
+          if (err.unavailable) proxyMissing = true;
+          else { feedError = true; console.warn('Kalender-Feed fehlgeschlagen:', err); }
         }
       }
 
       appState.calEvents = all; // fuers Status-Briefing (heutige Termine)
 
       if (all.length === 0) {
-        if (feeds.length === 0 && !ownAvailable) el.innerHTML = 'Kein Kalender verbunden — über das Zahnrad eine .ics-URL hinterlegen oder mit „+" einen eigenen Termin anlegen.';
+        // Echter Ladefehler zuerst (Plan4-22): sonst stand hier irrefuehrend
+        // "Keine Termine", obwohl der Feed gar nicht geladen werden konnte.
+        if (feedError) {
+          el.innerHTML = emptyStateHtml({
+            icon: 'calendar-x', text: 'Kalender konnte nicht geladen werden.',
+            actionLabel: 'Erneut versuchen', actionFn: 'refreshHubCalendar'
+          });
+          updateIcons();
+        } else if (feeds.length === 0 && !ownAvailable) el.innerHTML = 'Kein Kalender verbunden — über das Zahnrad eine .ics-URL hinterlegen oder mit „+" einen eigenen Termin anlegen.';
         else if (proxyMissing) el.innerHTML = 'Kalender-Proxy (/api/ical) noch nicht deployt — erscheint nach dem nächsten Cloudflare-Deploy automatisch.';
         else el.innerHTML = `Keine Termine in den nächsten ${wp.calHorizonDays} Tagen.`;
         return;
