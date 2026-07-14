@@ -1544,12 +1544,20 @@ async function deleteActivity() {
 
 // ============ Init ============
 async function init() {
-  // Profil + Einstellungen laden, bevor Ziele/Notizen gelesen werden
-  await Store.init();
-  applyTheme(getTheme());
-  updateIcons();
-  await refreshActivities();
+  // Profil/Einstellungen parallel starten, aber NICHT darauf warten (Plan4-24):
+  // die Tourenliste kommt aus IndexedDB und braucht weder Netz noch Store.
+  const storeP = Store.init();
+  updateIcons(); // Shell-Icons sofort — brauchen keinen Store
+
+  await refreshActivities();  // IndexedDB → Liste ist sofort sichtbar
   if (state.activities.length > 0) selectActivity(state.activities[0].id);
+
+  // Ab hier Store-Abhaengiges. renderSummary lief in refreshActivities bereits
+  // einmal mit Default-Zielen (getGoals ohne aktives Profil) — nach Store.init
+  // erneut rendern, damit Ziele/Prognose des echten Profils erscheinen.
+  await storeP;
+  applyTheme(getTheme());
+  renderSummary();
 
   // Cloud-Abgleich im Hintergrund (holt Touren von anderen Geräten)
   syncWithCloud().then(() => {
