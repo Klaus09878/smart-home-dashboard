@@ -429,9 +429,11 @@
                 }
               }
             },
-            // Zoomen (Mausrad/Pinch) + Schwenken (Ziehen) auf der Zeitachse (Punkt 12)
+            // Zoomen (Strg+Mausrad/Pinch) + Schwenken (Ziehen) auf der Zeitachse
+            // (Punkt 12). modifierKey verhindert versehentliches Zoomen beim
+            // Scrollen ueber dem Chart (Plan5-2, Test-Feedback).
             zoom: {
-              zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+              zoom: { wheel: { enabled: true, modifierKey: 'ctrl' }, pinch: { enabled: true }, mode: 'x' },
               pan: { enabled: true, mode: 'x' }
             }
           },

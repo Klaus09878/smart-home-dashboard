@@ -2,7 +2,7 @@
 // Strategie: Network-first für alles Eigene (damit Deployments sofort ankommen),
 // Cache als Offline-Fallback. API-Aufrufe (ThingSpeak, Open-Meteo, CDNs) gehen
 // immer direkt ans Netz und werden nicht gecacht.
-const CACHE_NAME = 'smarthub-v67';
+const CACHE_NAME = 'smarthub-v73';
 const APP_SHELL = [
   './',
   './gpx.html',
@@ -120,7 +120,10 @@ self.addEventListener('fetch', event => {
 // Hintergrund weiter und aktualisiert den Cache, damit Deployments ankommen.
 async function networkFirstWithTimeout(request, ms) {
   const networkP = fetch(request).then(response => {
-    if (response.ok) {
+    // response.redirected: z. B. die 302-Umleitung auf login.html bei
+    // abgelaufener Session (Plan5-5) — die darf NIE unter der Original-URL
+    // gecacht werden, sonst zeigt der Offline-Fallback die Login-Seite.
+    if (response.ok && !response.redirected) {
       const copy = response.clone();
       caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
     }

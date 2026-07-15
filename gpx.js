@@ -1250,6 +1250,11 @@ function ensureMap() {
     state.map = L.map('map', { zoomControl: true, attributionControl: true });
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
+      // Die globale Referrer-Policy (_headers) ist no-referrer, aber die
+      // OSM-Tile-Server verlangen einen Referer und liefern sonst
+      // "Access blocked"-Kacheln — daher nur fuer die Tiles den Origin
+      // mitschicken (Plan5-3).
+      referrerPolicy: 'strict-origin-when-cross-origin',
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(state.map);
   }

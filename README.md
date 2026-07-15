@@ -144,9 +144,16 @@ Der Forward-Fill im Dashboard bleibt als Fallback aktiv, alte Daten funktioniere
 ## Hub-Widgets
 
 - **Uhr/Begrüßung/Wetter jetzt**, **3-Tage-Wettervorschau**, **To-do-Liste** (lokal) und **Kalender** (nächste Termine)
-- **Anpassbar**: Reihenfolge per Drag & Drop am Griff-Symbol (erscheint beim Überfahren), Ein-/Ausblenden über „Widgets anpassen" — beides bleibt gespeichert
+- **Anpassbar**: „Widgets anpassen" öffnen → Reihenfolge per Drag & Drop am Griff-Symbol oder über die Pfeil-Buttons, Ein-/Ausblenden per Checkbox — beides bleibt gespeichert (außerhalb des Bearbeiten-Modus ist nichts verschiebbar)
 - **Kalender verbinden**: Zahnrad im Termine-Widget → .ics-URL eintragen (Google Kalender: Einstellungen → [Kalender] → „Geheime Adresse im iCal-Format"). Braucht den deployten `/api/ical`-Proxy ☁️. Serientermine (RRULE) werden expandiert und mit ↻ markiert.
 - **Fehler-Reporting**: unbehandelte JS-Fehler auf jedem Gerät werden als ntfy-Push gemeldet (max. 3/Sitzung, Topic muss eingerichtet sein)
+
+## Anmeldung: Login-Seite mit Session-Cookie (Plan5-5)
+
+Die Anmeldung läuft über eine eigene **`login.html`** (Formular mit „Angemeldet bleiben", 30 Tage) statt über den nativen Basic-Auth-Dialog des Browsers:
+- `/api/login` prüft die Zugangsdaten (Env-Nutzer + D1-Profile) und setzt ein **HMAC-signiertes Session-Cookie** (`HttpOnly; Secure; SameSite=Lax`). Optional die Env-Var **`SESSION_SECRET`** setzen; ohne sie wird der Signaturschlüssel deterministisch aus den Env-Zugangsdaten abgeleitet (ändern sich diese, sind alle Sessions ungültig).
+- Die Middleware akzeptiert weiterhin **Basic Auth** (für `curl`, Cron-Dienste und als Übergang) — nicht angemeldete Browser-Navigationen werden auf die Login-Seite umgeleitet, API-Aufrufe bekommen 401 ohne `WWW-Authenticate` (kein Browser-Dialog mehr).
+- „Abmelden" in den Einstellungen löscht das Cookie und führt zurück zur Login-Seite.
 
 ## Cloudflare Access statt Basic Auth (optional, vorbereitet)
 

@@ -1,11 +1,17 @@
-// Abmeldung (Punkt 28). Basic Auth kennt technisch kein „Logout" — der Browser
-// merkt sich die Zugangsdaten bis zum Schließen. Dieser Endpunkt antwortet mit
-// 401, was viele Browser dazu bringt, die gespeicherten Basic-Auth-Daten zu
-// verwerfen bzw. neu abzufragen. Bei Cloudflare Access übernimmt stattdessen
-// /cdn-cgi/access/logout die Abmeldung (der Client leitet dorthin um).
+// Abmeldung: loescht das Session-Cookie (Plan5-5). Der Client leitet danach
+// auf login.html um. Im Browser gemerkte Basic-Auth-Zugangsdaten lassen sich
+// technisch nicht zuverlaessig verwerfen — der Login-Screen ist jetzt aber der
+// Normalweg, der native Dialog erscheint nicht mehr (Middleware sendet kein
+// WWW-Authenticate). Bei Cloudflare Access uebernimmt /cdn-cgi/access/logout.
+import { clearSessionCookieHeader } from '../_auth.js';
+
 export function onRequestGet() {
-  return new Response('Abgemeldet. Bitte Fenster schließen oder Zugangsdaten neu eingeben.', {
-    status: 401,
-    headers: { 'WWW-Authenticate': 'Basic realm="SmartHome — abgemeldet"' }
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'Set-Cookie': clearSessionCookieHeader(),
+    },
   });
 }

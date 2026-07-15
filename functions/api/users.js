@@ -6,7 +6,7 @@
 //   POST   /api/users {name,password}→ Nutzer anlegen
 //   PUT    /api/users {name,password}→ Passwort aendern
 //   DELETE /api/users?name=...       → Nutzer entfernen
-import { identify, hashPassword, ensureUsersTable, parseUsers } from '../_auth.js';
+import { identify, hashPassword, ensureUsersTable, parseUsers, verifyDbPassword, invalidateAuthCache } from '../_auth.js';
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
@@ -19,7 +19,10 @@ export async function onRequest(context) {
 
   const id = identify(request, env);
   if (!id) return json({ error: 'nicht authentifiziert' }, 401);
-  if (!id.isAdmin) return json({ error: 'nur das Admin-Konto darf Profile verwalten' }, 403);
+  // Self-Service (Plan5-7): das EIGENE Passwort darf jeder D1-Nutzer per PUT
+  // mit Altpasswort-Nachweis aendern; alles andere bleibt dem Admin vorbehalten.
+  const selfService = request.method === 'PUT' && !id.isAdmin;
+  if (!id.isAdmin && !selfService) return json({ error: 'nur das Admin-Konto darf Profile verwalten' }, 403);
 
   await ensureUsersTable(env.DB);
   const envNames = new Set([...parseUsers(env).users.keys()]);
@@ -33,8 +36,16 @@ export async function onRequest(context) {
 
   if (request.method === 'POST' || request.method === 'PUT') {
     const body = await request.json().catch(() => ({}));
-    const name = (body.name || '').trim();
+    const name = (body.name || (selfService ? id.user : '')).trim();
     const password = String(body.password || '');
+    if (selfService) {
+      // Nur das eigene Passwort, nur fuer D1-Profile, nur mit Altpasswort.
+      if (name !== id.user) return json({ error: 'nur das eigene Passwort kann geaendert werden' }, 403);
+      if (envNames.has(name)) return json({ error: 'Dieses Profil wird ueber Umgebungsvariablen verwaltet — Passwortwechsel dort' }, 400);
+      if (!(await verifyDbPassword(env, id.user, String(body.oldPassword || '')))) {
+        return json({ error: 'Aktuelles Passwort ist falsch' }, 403);
+      }
+    }
     if (!NAME_RE.test(name)) return json({ error: 'Ungueltiger Name (2–32 Zeichen: Buchstaben, Ziffern, . _ -)' }, 400);
     if (envNames.has(name)) return json({ error: 'Name kollidiert mit einem Env-Nutzer' }, 409);
     if (password.length < 6) return json({ error: 'Passwort zu kurz (min. 6 Zeichen)' }, 400);
@@ -46,6 +57,7 @@ export async function onRequest(context) {
     const { salt, hash, iters } = await hashPassword(password);
     await env.DB.prepare('INSERT OR REPLACE INTO users (name, pass_hash, salt, iters, is_admin, created_at) VALUES (?,?,?,?,0,?)')
       .bind(name, hash, salt, iters, Date.now()).run();
+    invalidateAuthCache(name); // altes Passwort sofort ungueltig (Isolate-Cache)
     return json({ ok: true, name });
   }
 
@@ -54,6 +66,7 @@ export async function onRequest(context) {
     if (!name) return json({ error: 'name erforderlich' }, 400);
     if (envNames.has(name)) return json({ error: 'Env-Nutzer koennen nicht geloescht werden' }, 400);
     await env.DB.prepare('DELETE FROM users WHERE name = ?').bind(name).run();
+    invalidateAuthCache(name); // auch laufende Sessions/Logins sofort beenden
     return json({ ok: true });
   }
 

@@ -127,9 +127,8 @@
         location.href = '/cdn-cgi/access/logout';
         return;
       }
-      try { await fetch('/api/logout', { cache: 'no-store' }); } catch (e) { /* 401 erwartet */ }
-      showNotification('Abgemeldet. Zugangsdaten werden neu abgefragt…');
-      setTimeout(() => location.reload(), 800);
+      try { await fetch('/api/logout', { cache: 'no-store' }); } catch (e) { /* offline — Cookie laeuft dann einfach ab */ }
+      location.href = 'login.html';
     }
 
     // Theme umschalten (Punkt 10) — pro Profil im Store gespeichert
@@ -403,11 +402,14 @@
 
       // Einstellungs-Popover bei Klick außerhalb schließen (Hub + ClimateFlow)
       document.addEventListener('click', event => {
-        [['widget-settings', 'toggleWidgetSettings'], ['cf-settings', 'toggleClimateSettings']].forEach(([panelId, handler]) => {
+        [['widget-settings', 'toggleWidgetSettings', 'hub-widgets'], ['cf-settings', 'toggleClimateSettings', 'climate-cards']].forEach(([panelId, handler, containerId]) => {
           const panel = document.getElementById(panelId);
           if (panel && !panel.classList.contains('hidden') &&
               !panel.contains(event.target) && !event.target.closest(`button[data-onclick="${handler}"]`)) {
             panel.classList.add('hidden');
+            // Bearbeiten-Modus mit beenden (Plan5-1: Griffe wieder ausblenden)
+            const container = document.getElementById(containerId);
+            if (container) container.classList.remove('layout-editing');
           }
         });
       });
