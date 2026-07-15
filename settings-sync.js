@@ -20,6 +20,7 @@ const Store = (function () {
     isAdmin: false,
     mode: 'local',      // 'server' sobald /api/whoami + D1 erreichbar
     authMode: 'basic',  // 'basic' | 'access' (aus whoami)
+    source: 'env',      // 'env' | 'd1' — nur D1-Profile koennen ihr Passwort selbst aendern (Plan5-7)
     profiles: null,
     ready: false,
     _initPromise: null
@@ -75,6 +76,7 @@ const Store = (function () {
   const api = {
     get profile() { return state.profile; },
     get isAdmin() { return state.isAdmin; },
+    get source() { return state.source; },
     get mode() { return state.mode; },
     get authMode() { return state.authMode; },
     get profiles() { return state.profiles; },
@@ -225,6 +227,7 @@ const Store = (function () {
       state.isAdmin = !!who.isAdmin;
       state.profiles = who.profiles || null;
       state.authMode = who.mode || 'basic';
+      state.source = who.source || 'env';
       state.mode = 'server';
     } catch (e) {
       state.profile = localStorage.getItem('active_profile_local') || 'default';

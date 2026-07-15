@@ -143,6 +143,33 @@ test('users: doppelter Name und Env-Kollision werden abgelehnt', async () => {
   assert.strictEqual(delEnv.status, 400);
 });
 
+test('users: Self-Service-Passwortwechsel (Plan5-7) nur mit korrektem Altpasswort', async () => {
+  const mod = await loadEndpoint('api/users');
+  const auth = await loadEndpoint('_auth');
+  const env = { AUTH_USERS: 'carl:pw', DB: createD1() };
+  await call(mod, ctx('POST', '/api/users', { env, auth: 'test', body: { name: 'bob', password: 'geheim1' } }));
+
+  // falsches Altpasswort → 403
+  const wrong = await call(mod, ctx('PUT', '/api/users', { env, auth: 'bob:geheim1', body: { oldPassword: 'falsch', password: 'neues1' } }));
+  assert.strictEqual(wrong.status, 403);
+
+  // fremder Name ohne Admin-Rechte → 403
+  const foreign = await call(mod, ctx('PUT', '/api/users', { env, auth: 'bob:geheim1', body: { name: 'alice', oldPassword: 'geheim1', password: 'neues1' } }));
+  assert.strictEqual(foreign.status, 403);
+
+  // korrektes Altpasswort → ok; Login nur noch mit dem neuen Passwort
+  const ok = await call(mod, ctx('PUT', '/api/users', { env, auth: 'bob:geheim1', body: { oldPassword: 'geheim1', password: 'neues1' } }));
+  assert.strictEqual(ok.status, 200);
+  const oldLogin = await auth.authenticateAsync(ctx('GET', '/x', { env, auth: 'bob:geheim1' }).request, env);
+  assert.strictEqual(oldLogin, null);
+  const newLogin = await auth.authenticateAsync(ctx('GET', '/x', { env, auth: 'bob:neues1' }).request, env);
+  assert.ok(newLogin && newLogin.user === 'bob');
+
+  // Env-Profile werden ueber Umgebungsvariablen verwaltet → 400
+  const envUser = await call(mod, ctx('PUT', '/api/users', { env, auth: 'carl:pw', body: { oldPassword: 'pw', password: 'neues1' } }));
+  assert.strictEqual(envUser.status, 400);
+});
+
 // ---- backup-dump.js: Dump nach R2 + Restore (Plan3-1) ----
 test('backup-dump: Dump nach R2, Liste, Restore in frische DB', async () => {
   const dump = await loadEndpoint('api/backup-dump');

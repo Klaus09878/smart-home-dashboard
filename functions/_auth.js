@@ -119,6 +119,29 @@ export async function ensureUsersTable(db) {
   await db.exec('CREATE TABLE IF NOT EXISTS users (name TEXT PRIMARY KEY, pass_hash TEXT, salt TEXT, iters INTEGER, is_admin INTEGER, created_at INTEGER)');
 }
 
+// Prueft Name+Passwort direkt gegen die D1-Nutzertabelle — fuer den
+// Self-Service-Passwortwechsel (Plan5-7, Altpasswort-Nachweis). true nur bei
+// existierendem D1-Nutzer mit korrektem Passwort; D1-Fehler => false.
+export async function verifyDbPassword(env, name, password) {
+  if (!env.DB) return false;
+  try {
+    await ensureUsersTable(env.DB);
+    const row = await env.DB.prepare('SELECT pass_hash, salt, iters FROM users WHERE name = ?').bind(name).first();
+    if (!row) return false;
+    const hash = await pbkdf2Hex(password, row.salt, row.iters || PBKDF2_ITERS);
+    return timingSafeEqual(hash, row.pass_hash);
+  } catch (e) { return false; }
+}
+
+// Login-Cache eines Nutzers in diesem Isolate verwerfen (nach Passwort-
+// Aenderung, Plan5-7), damit das alte Passwort nicht noch bis zu 5 Minuten
+// weiter akzeptiert wird.
+export function invalidateAuthCache(name) {
+  for (const key of [..._authCache.keys()]) {
+    if (key.startsWith(name + ':')) _authCache.delete(key);
+  }
+}
+
 // Namen aller D1-Nutzer (fuer die Profil-Liste in whoami). Best effort.
 export async function dbUserNames(env) {
   if (!env.DB) return [];

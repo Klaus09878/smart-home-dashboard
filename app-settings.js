@@ -114,7 +114,12 @@
           <button data-onclick="toggleTheme" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors">${light ? 'Heller Modus' : 'Dunkler Modus'} · umschalten</button>
         </div>`;
         if (window.Store && Store.mode === 'server') {
-          html += `<div class="mt-2 flex justify-end"><button data-onclick="logout" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-red-500/40 text-xs text-slate-400 hover:text-red-300 transition-colors flex items-center gap-1.5"><i data-lucide="log-out" class="w-3.5 h-3.5"></i> Abmelden</button></div>`;
+          // Self-Service-Passwortwechsel (Plan5-7): nur D1-Profile — Env-Profile
+          // werden ueber Umgebungsvariablen verwaltet, Access-Login hat kein Passwort.
+          const pwBtn = (Store.authMode === 'basic' && Store.source === 'd1')
+            ? `<button data-onclick="changeOwnPassword" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1.5"><i data-lucide="key-round" class="w-3.5 h-3.5"></i> Passwort ändern</button>`
+            : '';
+          html += `<div class="mt-2 flex justify-end gap-2">${pwBtn}<button data-onclick="logout" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-red-500/40 text-xs text-slate-400 hover:text-red-300 transition-colors flex items-center gap-1.5"><i data-lucide="log-out" class="w-3.5 h-3.5"></i> Abmelden</button></div>`;
         }
         pEl.innerHTML = html;
         if (Store.isAdmin && Store.profiles && Store.profiles.length) renderProfileAdmin();
@@ -340,6 +345,31 @@
         await apiFetch('/api/users', { method: 'PUT', body: JSON.stringify({ name, password: vals.password || '' }) });
         showNotification('Passwort geändert.');
       } catch (e) { showNotification('Änderung fehlgeschlagen.', 'error'); }
+    }
+
+    // Eigenes Passwort aendern (Plan5-7, Self-Service ohne Admin): PUT /api/users
+    // auf den eigenen Namen, mit Altpasswort-Nachweis. Nur fuer D1-Profile.
+    async function changeOwnPassword() {
+      const vals = await modalPrompt({
+        title: 'Eigenes Passwort ändern',
+        description: 'Gilt sofort für den nächsten Login. Danach bitte neu anmelden.',
+        fields: [
+          { key: 'oldPassword', label: 'Aktuelles Passwort', type: 'password', value: '' },
+          { key: 'password', label: 'Neues Passwort (min. 6 Zeichen)', type: 'password', value: '' },
+          { key: 'password2', label: 'Neues Passwort wiederholen', type: 'password', value: '' }
+        ]
+      });
+      if (!vals) return;
+      if ((vals.password || '') !== (vals.password2 || '')) {
+        showNotification('Die neuen Passwörter stimmen nicht überein.', 'error');
+        return;
+      }
+      try {
+        await apiFetch('/api/users', { method: 'PUT', body: JSON.stringify({ oldPassword: vals.oldPassword || '', password: vals.password || '' }) });
+        showNotification('Passwort geändert — bitte beim nächsten Login das neue Passwort verwenden.');
+      } catch (e) {
+        showNotification(/403/.test(e && e.message || '') ? 'Aktuelles Passwort ist falsch.' : 'Änderung fehlgeschlagen (min. 6 Zeichen?).', 'error');
+      }
     }
 
     async function deleteProfile(name) {

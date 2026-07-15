@@ -13,10 +13,11 @@ export async function onRequestGet(context) {
     });
   }
 
+  const envNames = [...parseUsers(env).users.keys()];
+
   // Admin bekommt die Liste aller Profilnamen (Env + D1) fuer die Anzeige.
   let profiles = null;
   if (id.isAdmin && id.mode === 'basic') {
-    const envNames = [...parseUsers(env).users.keys()];
     const d1Names = await dbUserNames(env);
     profiles = [...new Set([...envNames, ...d1Names])];
   }
@@ -25,6 +26,9 @@ export async function onRequestGet(context) {
     user: id.user,
     isAdmin: id.isAdmin,
     mode: id.mode,
+    // 'env' = Passwort liegt in Umgebungsvariablen, 'd1' = Nutzertabelle.
+    // Nur D1-Profile koennen ihr Passwort selbst aendern (Plan5-7).
+    source: id.mode === 'basic' ? (envNames.includes(id.user) ? 'env' : 'd1') : id.mode,
     profiles
   }), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
