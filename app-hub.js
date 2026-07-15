@@ -107,16 +107,27 @@
         Store.setJSON(cfg.orderKey, order);
         apply(); renderPanel();
       };
+      // Bearbeiten-Modus = „Widgets anpassen"-Panel offen (Plan5-1): nur dann
+      // sind die Griffe sichtbar (CSS .layout-editing) und der Drag scharf —
+      // verhindert versehentliches Verschieben, besonders auf dem Handy.
+      const isEditing = () => {
+        const panel = document.getElementById(cfg.panel);
+        return !!panel && !panel.classList.contains('hidden');
+      };
+      const syncEditing = () => {
+        const c = document.getElementById(cfg.container);
+        if (c) c.classList.toggle('layout-editing', isEditing());
+      };
       const initDrag = () => {
         const c = document.getElementById(cfg.container);
         if (!c) return;
         c.querySelectorAll('[data-widget]').forEach(el => {
           const grip = el.querySelector('.' + (cfg.gripClass || 'widget-grip'));
           if (grip) {
-            grip.addEventListener('mousedown', () => { el.draggable = true; });
-            grip.addEventListener('touchstart', () => { el.draggable = true; }, { passive: true });
+            grip.addEventListener('mousedown', () => { if (isEditing()) el.draggable = true; });
+            grip.addEventListener('touchstart', () => { if (isEditing()) el.draggable = true; }, { passive: true });
           }
-          el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', el.dataset.widget); e.dataTransfer.effectAllowed = 'move'; el.classList.add('opacity-50'); });
+          el.addEventListener('dragstart', e => { if (!isEditing()) { e.preventDefault(); return; } e.dataTransfer.setData('text/plain', el.dataset.widget); e.dataTransfer.effectAllowed = 'move'; el.classList.add('opacity-50'); });
           el.addEventListener('dragend', () => { el.classList.remove('opacity-50'); el.draggable = false; });
           el.addEventListener('dragover', e => e.preventDefault());
           el.addEventListener('drop', e => {
@@ -168,6 +179,7 @@
         if (!panel) return;
         if (panel.classList.contains('hidden')) { renderPanel(); panel.classList.remove('hidden'); }
         else panel.classList.add('hidden');
+        syncEditing();
       };
       return { apply, initDrag, toggleSettings, saveOrder, getOrder, getHidden, renderPanel, move };
     }
