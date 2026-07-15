@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <!-- Theme sofort anwenden (vor dem Paint), verhindert Aufblitzen (Punkt 10) -->
+  <script>(function(){try{if(localStorage.getItem('theme')==='light'){document.documentElement.classList.remove('dark');document.documentElement.classList.add('light');}}catch(e){}})();</script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Anmelden — Smart Home Hub</title>
+  <meta name="description" content="Anmeldung zum Smart Home Hub.">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="robots" content="noindex">
+
+  <!-- Outfit-Schrift lokal (Plan4-4): @font-face in tailwind.css -->
+  <link rel="preload" href="vendor/fonts/outfit-400.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="vendor/fonts/outfit-600.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="tailwind.css">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <!-- Login-Seite ist oeffentlich (Plan5-5) und bewusst eigenstaendig:
+       kein shared.js/Store, nur Lucide fuer die Icons + login.js. -->
+  <script defer src="vendor/lucide.min.js"></script>
+  <script defer src="login.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
+
+  <!-- Dezente Hintergrund-Glows wie im Hub -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-teal-500/10 rounded-full blur-[100px]"></div>
+    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px]"></div>
+  </div>
+
+  <main class="min-h-screen flex items-center justify-center p-4">
+    <div class="glass-panel rounded-2xl shadow-2xl p-8 w-full max-w-sm relative">
+      <div class="flex flex-col items-center text-center mb-6">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-400 to-indigo-500 flex items-center justify-center shadow-lg mb-4">
+          <i data-lucide="home" class="w-7 h-7 text-white"></i>
+        </div>
+        <h1 class="text-xl font-bold text-white tracking-tight">Smart Home Hub</h1>
+        <p class="text-xs text-slate-400 mt-1">Bitte melde dich mit deinem Profil an.</p>
+      </div>
+
+      <form id="login-form" class="flex flex-col gap-3" autocomplete="on">
+        <label class="text-xs text-slate-400 flex flex-col gap-1.5">Name
+          <input id="login-user" name="username" type="text" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Profilname"
+            class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-teal-500/50 focus:outline-none">
+        </label>
+        <label class="text-xs text-slate-400 flex flex-col gap-1.5">Passwort
+          <input id="login-pass" name="password" type="password" required autocomplete="current-password" placeholder="••••••••"
+            class="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-teal-500/50 focus:outline-none">
+        </label>
+        <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none mt-1">
+          <input id="login-remember" type="checkbox" class="accent-teal-500" checked>
+          Angemeldet bleiben (30 Tage)
+        </label>
+        <p id="login-error" class="hidden text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2"></p>
+        <button id="login-submit" type="submit"
+          class="mt-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white text-sm font-semibold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+          <i data-lucide="log-in" class="w-4 h-4"></i> Anmelden
+        </button>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

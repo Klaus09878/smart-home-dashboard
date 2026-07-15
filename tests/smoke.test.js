@@ -33,9 +33,11 @@ const APP_PARTS = ['app-core.js', 'app-analysis.js', 'app-archive.js', 'app-hub.
 const files = {
   'index.html': read('index.html'),
   'gpx.html': read('gpx.html'),
+  'login.html': read('login.html'),
   'app.js': APP_PARTS.map(read).join('\n'),
   'gpx.js': read('gpx.js'),
   'shared.js': read('shared.js'),
+  'login.js': read('login.js'),
   'sw.js': read('sw.js')
 };
 
@@ -54,6 +56,12 @@ test('gpx.js: alle getElementById-IDs existieren in gpx.html', () => {
   const ids = htmlIds(files['gpx.html']);
   const missing = [...new Set(usedIds(files['gpx.js']))].filter(id => !ids.has(id) && !DYNAMIC_IDS.has(id));
   assert.deepStrictEqual(missing, [], `fehlende IDs in gpx.html: ${missing.join(', ')}`);
+});
+
+test('login.js: alle getElementById-IDs existieren in login.html', () => {
+  const ids = htmlIds(files['login.html']);
+  const missing = [...new Set(usedIds(files['login.js']))].filter(id => !ids.has(id) && !DYNAMIC_IDS.has(id));
+  assert.deepStrictEqual(missing, [], `fehlende IDs in login.html: ${missing.join(', ')}`);
 });
 
 // data-onclick/onchange/oninput/onsubmit/onbackdrop-Handler im HTML (Event-
@@ -79,7 +87,7 @@ test('gpx.html: alle data-on*-Handler sind in gpx.js/shared.js definiert', () =>
 });
 
 test('HTML: keine Inline-Event-Handler mehr (CSP ohne unsafe-inline)', () => {
-  ['index.html', 'gpx.html'].forEach(page => {
+  ['index.html', 'gpx.html', 'login.html'].forEach(page => {
     // jedes Inline-on*-Attribut (mit fuehrendem Leerzeichen; data-on* hat '-')
     const bare = files[page].match(/\son[a-z]+="/);
     assert.strictEqual(bare, null, `${page}: Inline-Handler gefunden (muss data-on* sein): ${bare && bare[0]}`);
@@ -87,7 +95,7 @@ test('HTML: keine Inline-Event-Handler mehr (CSP ohne unsafe-inline)', () => {
 });
 
 test('HTML: alle lokalen script-src/link-href-Dateien existieren', () => {
-  ['index.html', 'gpx.html'].forEach(page => {
+  ['index.html', 'gpx.html', 'login.html'].forEach(page => {
     const refs = [...files[page].matchAll(/(?:src|href)="([^"]+)"/g)]
       .map(m => m[1])
       .filter(u => !/^(https?:|#|mailto:)/.test(u) && !u.startsWith('data:'));
@@ -137,6 +145,8 @@ test('_headers: script-src ohne unsafe-inline, Theme-Snippet-Hash stimmt', () =>
   assert.ok(snippet, 'Inline-Theme-Snippet in index.html nicht gefunden');
   const gpxSnippet = (files['gpx.html'].match(/<script>([\s\S]*?)<\/script>/) || [])[1];
   assert.strictEqual(gpxSnippet, snippet, 'Theme-Snippet in index.html und gpx.html muss identisch sein');
+  const loginSnippet = (files['login.html'].match(/<script>([\s\S]*?)<\/script>/) || [])[1];
+  assert.strictEqual(loginSnippet, snippet, 'Theme-Snippet in login.html muss identisch zu index.html sein (CSP-Hash)');
 
   const hash = 'sha256-' + crypto.createHash('sha256').update(snippet, 'utf8').digest('base64');
   assert.ok(h.includes(hash), `CSP-Hash passt nicht zum Snippet — erwartet '${hash}' in _headers`);

@@ -170,6 +170,72 @@ test('users: Self-Service-Passwortwechsel (Plan5-7) nur mit korrektem Altpasswor
   assert.strictEqual(envUser.status, 400);
 });
 
+// ---- login.js + _middleware.js: Session-Cookie-Login (Plan5-5) ----
+test('login: Session-Cookie wird gesetzt, Middleware akzeptiert es', async () => {
+  const login = await loadEndpoint('api/login');
+  const mw = await loadEndpoint('_middleware');
+  const env = { DB: createD1() };
+
+  // falsches Passwort → 401 ohne Cookie
+  const bad = await call(login, ctx('POST', '/api/login', { env, body: { user: 'test', pass: 'falsch' } }));
+  assert.strictEqual(bad.status, 401);
+  assert.strictEqual(bad.headers.get('Set-Cookie'), null);
+
+  // korrekt → 200 + sh_session-Cookie (remember: mit Max-Age)
+  const good = await call(login, ctx('POST', '/api/login', { env, body: { user: 'test', pass: 'test', remember: true } }));
+  assert.strictEqual(good.status, 200);
+  const cookie = good.headers.get('Set-Cookie') || '';
+  assert.ok(cookie.startsWith('sh_session='), 'Set-Cookie fehlt');
+  assert.ok(/Max-Age=\d+/.test(cookie), 'remember sollte Max-Age setzen');
+  assert.ok(/HttpOnly/.test(cookie) && /Secure/.test(cookie), 'Cookie muss HttpOnly + Secure sein');
+
+  // Middleware: gueltiges Cookie → next() mit synthetischem Basic-Header,
+  // identify() erkennt daraus den Nutzer
+  const sessionPair = cookie.split(';')[0];
+  let forwarded = null;
+  const req = new Request('https://test.local/api/whoami', { headers: { Cookie: sessionPair } });
+  const res = await mw.onRequest({ request: req, env: { ...env, AUTH_USER: 'test', AUTH_PASS: 'test' }, next: r => { forwarded = r || req; return new Response('OK'); } });
+  assert.strictEqual(await res.text(), 'OK');
+  const auth = await loadEndpoint('_auth');
+  const id = auth.identify(forwarded, { AUTH_USER: 'test', AUTH_PASS: 'test' });
+  assert.ok(id && id.user === 'test' && id.isAdmin === true);
+
+  // manipuliertes Cookie (anderer Ablauf) → keine Anmeldung (401 fuer APIs)
+  const [payloadUser, , sig] = sessionPair.replace('sh_session=', '').split('.');
+  const forged = `sh_session=${payloadUser}.${Date.now() + 999999999}.${sig}`;
+  const forgedReq = new Request('https://test.local/api/whoami', { headers: { Cookie: forged } });
+  const denied = await mw.onRequest({ request: forgedReq, env: { ...env, AUTH_USER: 'test', AUTH_PASS: 'test' }, next: () => new Response('NEIN') });
+  assert.strictEqual(denied.status, 401);
+});
+
+test('middleware: ohne Anmeldung Redirect fuer HTML, 401 ohne Dialog fuer APIs', async () => {
+  const mw = await loadEndpoint('_middleware');
+  const env = { AUTH_USER: 'test', AUTH_PASS: 'test', DB: createD1() };
+  const fail = () => new Response('DURCHGELASSEN');
+
+  // Browser-Navigation → 302 auf /login.html mit next=
+  const nav = new Request('https://test.local/gpx.html', { headers: { Accept: 'text/html,application/xhtml+xml' } });
+  const redir = await mw.onRequest({ request: nav, env, next: fail });
+  assert.strictEqual(redir.status, 302);
+  assert.ok(redir.headers.get('Location').includes('/login.html?next=%2Fgpx.html'));
+
+  // API-Fetch → 401 als JSON, bewusst OHNE WWW-Authenticate (kein Browser-Dialog)
+  const api = new Request('https://test.local/api/settings');
+  const denied = await mw.onRequest({ request: api, env, next: fail });
+  assert.strictEqual(denied.status, 401);
+  assert.strictEqual(denied.headers.get('WWW-Authenticate'), null);
+
+  // Login-Seite + Assets sind oeffentlich
+  for (const p of ['/login.html', '/login.js', '/tailwind.css', '/vendor/fonts/outfit-400.woff2']) {
+    const pub = await mw.onRequest({ request: new Request('https://test.local' + p, { headers: { Accept: 'text/html' } }), env, next: () => new Response('SEITE') });
+    assert.strictEqual(await pub.text(), 'SEITE', `${p} sollte oeffentlich sein`);
+  }
+
+  // Basic Auth funktioniert weiter (API-Clients/Cron)
+  const basic = await mw.onRequest({ request: ctx('GET', '/api/settings', { env, auth: 'test' }).request, env, next: () => new Response('BASIC-OK') });
+  assert.strictEqual(await basic.text(), 'BASIC-OK');
+});
+
 // ---- backup-dump.js: Dump nach R2 + Restore (Plan3-1) ----
 test('backup-dump: Dump nach R2, Liste, Restore in frische DB', async () => {
   const dump = await loadEndpoint('api/backup-dump');

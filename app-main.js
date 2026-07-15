@@ -127,9 +127,8 @@
         location.href = '/cdn-cgi/access/logout';
         return;
       }
-      try { await fetch('/api/logout', { cache: 'no-store' }); } catch (e) { /* 401 erwartet */ }
-      showNotification('Abgemeldet. Zugangsdaten werden neu abgefragt…');
-      setTimeout(() => location.reload(), 800);
+      try { await fetch('/api/logout', { cache: 'no-store' }); } catch (e) { /* offline — Cookie laeuft dann einfach ab */ }
+      location.href = 'login.html';
     }
 
     // Theme umschalten (Punkt 10) — pro Profil im Store gespeichert

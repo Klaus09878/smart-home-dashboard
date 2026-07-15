@@ -4,8 +4,10 @@
  */
 module.exports = {
   darkMode: 'class',
-  // Wichtig: auch JS-Dateien scannen — viele Klassen stehen in Template-Strings
-  content: ['./index.html', './gpx.html', './app.js', './shared.js'],
+  // Wichtig: auch JS-Dateien scannen — viele Klassen stehen in Template-Strings.
+  // (Plan5-5: Liste aktualisiert — './app.js' war seit dem Plan2-9-Split in
+  // app-*.js verwaist, gpx.js/settings-sync.js fehlten; login.html/login.js neu.)
+  content: ['./index.html', './gpx.html', './login.html', './app-*.js', './gpx.js', './shared.js', './settings-sync.js', './login.js'],
   theme: {
     extend: {
       fontFamily: {

@@ -66,6 +66,7 @@ export async function onRequest(context) {
     if (!name) return json({ error: 'name erforderlich' }, 400);
     if (envNames.has(name)) return json({ error: 'Env-Nutzer koennen nicht geloescht werden' }, 400);
     await env.DB.prepare('DELETE FROM users WHERE name = ?').bind(name).run();
+    invalidateAuthCache(name); // auch laufende Sessions/Logins sofort beenden
     return json({ ok: true });
   }
 
