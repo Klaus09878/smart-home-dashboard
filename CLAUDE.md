@@ -27,7 +27,7 @@ Multi-Projekt-SPA auf Cloudflare Pages (statisch + Functions), Mehrbenutzer-Logi
 
 ## Nicht-offensichtliche Regeln
 1. **Nach jeder Klassen-Änderung in HTML/app.js/gpx.js/shared.js:** `npm run build:css` und `tailwind.css` mitcommitten (Tailwind scannt auch JS-Template-Strings).
-2. **Bei Änderungen an gecachten Dateien:** `CACHE_NAME` in `sw.js` hochzählen (aktuell `smarthub-v73`; Shell-Liste dort pflegen).
+2. **Bei Änderungen an gecachten Dateien:** `CACHE_NAME` in `sw.js` hochzählen (aktuell `smarthub-v74`; Shell-Liste dort pflegen).
 3. **Profilbezogene Einstellungen** immer über `Store` (siehe oben), nie roh. Die Pref-Bündel `app_prefs`, `chart_prefs`, `widget_prefs` (Plan4-9/10/11) NUR über ihre Getter `getAppPrefs()` / `getChartPrefs()` / `getWidgetPrefs()` lesen — die mergen die Defaults, damit neue Schlüssel abwärtskompatibel bleiben.
 4. **ThingSpeak-Daten:** Komma-Dezimal, Felder asynchron (field1=Temp, field2=Feuchte). Immer über `processRawFeeds`; nie annehmen, dass ein Eintrag beide Felder hat.
 5. **Open-Meteo:** immer `timeformat=unixtime`; `past_days=7&forecast_days=2` für Chart + Prognose.

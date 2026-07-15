@@ -11,10 +11,12 @@
   }
 
   // Sicheres Sprungziel nach dem Login (?next= aus der Middleware):
-  // nur gleiche Herkunft (Pfad), nie zurueck auf die Login-Seite selbst.
+  // nur gleiche Herkunft (Pfad), nie zurueck auf die Login-Seite selbst —
+  // '/login' deckt auch '/login.html' und verschachtelte next-Ketten ab
+  // (Redirect-Schleife vor Plan5-5b).
   function nextTarget() {
     const next = new URLSearchParams(location.search).get('next') || '';
-    const ok = next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/login.html');
+    const ok = next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/login');
     return ok ? next : './';
   }
 

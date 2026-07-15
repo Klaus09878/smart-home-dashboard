@@ -2,7 +2,11 @@ import { authenticateAsync, sessionUserFromCookie, syntheticBasicHeader, registe
 
 // Oeffentliche Pfade (Plan5-5): die Login-Seite und ihre rein statischen
 // Assets (Styles, Fonts, Icons) — keine Daten, kein API-Zugriff.
-const PUBLIC_PATHS = ['/login.html', '/login.js', '/api/login', '/tailwind.css', '/manifest.webmanifest', '/favicon.ico'];
+// WICHTIG (Plan5-5b): Cloudflare Pages normalisiert Pretty-URLs und leitet
+// /login.html per 308 auf /login um — BEIDE Varianten muessen public sein,
+// sonst entsteht eine Redirect-Schleife (Middleware -> /login.html -> 308
+// -> /login -> Middleware -> ...).
+const PUBLIC_PATHS = ['/login', '/login.html', '/login.js', '/api/login', '/tailwind.css', '/manifest.webmanifest', '/favicon.ico'];
 const PUBLIC_PREFIXES = ['/vendor/', '/icons/'];
 function isPublic(pathname) {
   return PUBLIC_PATHS.includes(pathname) || PUBLIC_PREFIXES.some(p => pathname.startsWith(p));
@@ -65,7 +69,9 @@ export async function onRequest(context) {
   const wantsHtml = request.method === 'GET' && (request.headers.get('Accept') || '').includes('text/html');
   if (wantsHtml) {
     const path = url.pathname + url.search;
-    const target = path === '/' ? '/login.html' : '/login.html?next=' + encodeURIComponent(path);
+    // Ziel ist /login (ohne .html): Pages wuerde /login.html sonst per 308
+    // auf /login normalisieren — ein Redirect-Hop weniger (Plan5-5b).
+    const target = path === '/' ? '/login' : '/login?next=' + encodeURIComponent(path);
     return Response.redirect(url.origin + target, 302);
   }
   return new Response(JSON.stringify({ error: 'nicht angemeldet' }), {

@@ -213,11 +213,12 @@ test('middleware: ohne Anmeldung Redirect fuer HTML, 401 ohne Dialog fuer APIs',
   const env = { AUTH_USER: 'test', AUTH_PASS: 'test', DB: createD1() };
   const fail = () => new Response('DURCHGELASSEN');
 
-  // Browser-Navigation → 302 auf /login.html mit next=
+  // Browser-Navigation → 302 auf /login mit next= (ohne .html: Pages
+  // normalisiert Pretty-URLs, siehe Plan5-5b)
   const nav = new Request('https://test.local/gpx.html', { headers: { Accept: 'text/html,application/xhtml+xml' } });
   const redir = await mw.onRequest({ request: nav, env, next: fail });
   assert.strictEqual(redir.status, 302);
-  assert.ok(redir.headers.get('Location').includes('/login.html?next=%2Fgpx.html'));
+  assert.ok(redir.headers.get('Location').includes('/login?next=%2Fgpx.html'));
 
   // API-Fetch → 401 als JSON, bewusst OHNE WWW-Authenticate (kein Browser-Dialog)
   const api = new Request('https://test.local/api/settings');
@@ -225,8 +226,9 @@ test('middleware: ohne Anmeldung Redirect fuer HTML, 401 ohne Dialog fuer APIs',
   assert.strictEqual(denied.status, 401);
   assert.strictEqual(denied.headers.get('WWW-Authenticate'), null);
 
-  // Login-Seite + Assets sind oeffentlich
-  for (const p of ['/login.html', '/login.js', '/tailwind.css', '/vendor/fonts/outfit-400.woff2']) {
+  // Login-Seite + Assets sind oeffentlich — '/login' (Pretty-URL von
+  // Cloudflare Pages) MUSS dabei sein, sonst Redirect-Schleife (Plan5-5b)
+  for (const p of ['/login', '/login.html', '/login.js', '/tailwind.css', '/vendor/fonts/outfit-400.woff2']) {
     const pub = await mw.onRequest({ request: new Request('https://test.local' + p, { headers: { Accept: 'text/html' } }), env, next: () => new Response('SEITE') });
     assert.strictEqual(await pub.text(), 'SEITE', `${p} sollte oeffentlich sein`);
   }

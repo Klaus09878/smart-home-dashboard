@@ -16,6 +16,14 @@
 > - **Im Zuge von Punkt 5:** Die Tailwind-`content`-Liste war seit dem
 >   Plan2-9-Split defekt (`./app.js` verwaist, `gpx.js`/`settings-sync.js`
 >   fehlten) — repariert; `login.html`/`login.js` aufgenommen.
+> - **Punkt 5, Hotfix `Plan5-5b` (nach dem Merge entdeckt):** Cloudflare
+>   Pages normalisiert Pretty-URLs (`/login.html` → 308 → `/login`); da
+>   `/login` nicht in `PUBLIC_PATHS` stand, entstand live eine Redirect-
+>   Schleife („more than 20 redirections"). Lokal/Tests gibt es die
+>   Normalisierung nicht — darum blieb es unentdeckt. Fix: `/login` ist
+>   public, Redirect-Ziel ist `/login` (ein Hop weniger), `login.js`
+>   verwirft `next`-Ziele auf die Login-Seite; Regressionstest ergänzt.
+>   **Merke: neue oeffentliche Seiten immer MIT und OHNE `.html` freigeben.**
 > - **Punkt 7:** Passwortwechsel invalidiert zusätzlich den Isolate-Login-
 >   Cache; Profil-Löschung beendet auch laufende Cookie-Sessions.
 >
