@@ -1,10 +1,23 @@
-# Umsetzungsplan Runde 5 — Kandidatenliste aus Nutzer-Feedback
+# Umsetzungsplan Runde 5 — aus Nutzer-Feedback
 
-> **Status: ENTWURF — Kandidatenliste, noch keine Freigabe zur Umsetzung.**
-> Grundlage: Test-Feedback eines externen Nutzers (Juli 2026, Text + 5 Screenshots)
-> plus Code-Recherche. Punkte, die nicht umgesetzt werden sollen, hier streichen —
-> danach wird daraus der Umsetzungsplan (ein Punkt = ein Commit, Prefix `Plan5-N:`,
-> Arbeitsregeln wie in PLAN4.md).
+> **Status: ✅ umgesetzt** (Commits `Plan5-1` … `Plan5-5` und `Plan5-7`;
+> Punkt 6 war bereits vorhanden, nur Doku). Grundlage: Test-Feedback eines
+> externen Nutzers (Juli 2026, Text + 5 Screenshots) plus Code-Recherche.
+> Verifiziert: `npm run lint` (0 Fehler), `npm test` (80 Core + 3 Web-Push +
+> 16 API + 10 Smoke), `npm run test:e2e` (9/9) — alles grün; Light-/Dark-
+> Screenshots aller Views per Playwright geprüft. Service-Worker v73.
+>
+> **Abweichungen gegenüber der Planung (ehrlich dokumentiert):**
+> - **Punkt 2:** Hinweis „Zoom: Strg + Mausrad · Ziehen schwenkt." steht als
+>   Untertitel-Zusatz (ab sm sichtbar), nicht als Tooltip.
+> - **Punkt 4:** Über die Farb-Politur hinaus behoben: `hover:text-white`
+>   machte Icon-Buttons im hellen Modus beim Hover unsichtbar; weiße Schrift
+>   auf Farbverlaufs-Chips wird nicht mehr dunkel ummappt.
+> - **Im Zuge von Punkt 5:** Die Tailwind-`content`-Liste war seit dem
+>   Plan2-9-Split defekt (`./app.js` verwaist, `gpx.js`/`settings-sync.js`
+>   fehlten) — repariert; `login.html`/`login.js` aufgenommen.
+> - **Punkt 7:** Passwortwechsel invalidiert zusätzlich den Isolate-Login-
+>   Cache; Profil-Löschung beendet auch laufende Cookie-Sessions.
 >
 > **Bewertungsskalen hinter jedem Titel:**
 > - `Aufwand 1–5` — 1 = Einzeiler/Kleinstfix, 3 = ein Nachmittag, 5 = mehrere Tage.

@@ -144,7 +144,7 @@ Der Forward-Fill im Dashboard bleibt als Fallback aktiv, alte Daten funktioniere
 ## Hub-Widgets
 
 - **Uhr/Begrüßung/Wetter jetzt**, **3-Tage-Wettervorschau**, **To-do-Liste** (lokal) und **Kalender** (nächste Termine)
-- **Anpassbar**: Reihenfolge per Drag & Drop am Griff-Symbol (erscheint beim Überfahren), Ein-/Ausblenden über „Widgets anpassen" — beides bleibt gespeichert
+- **Anpassbar**: „Widgets anpassen" öffnen → Reihenfolge per Drag & Drop am Griff-Symbol oder über die Pfeil-Buttons, Ein-/Ausblenden per Checkbox — beides bleibt gespeichert (außerhalb des Bearbeiten-Modus ist nichts verschiebbar)
 - **Kalender verbinden**: Zahnrad im Termine-Widget → .ics-URL eintragen (Google Kalender: Einstellungen → [Kalender] → „Geheime Adresse im iCal-Format"). Braucht den deployten `/api/ical`-Proxy ☁️. Serientermine (RRULE) werden expandiert und mit ↻ markiert.
 - **Fehler-Reporting**: unbehandelte JS-Fehler auf jedem Gerät werden als ntfy-Push gemeldet (max. 3/Sitzung, Topic muss eingerichtet sein)
 
