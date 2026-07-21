@@ -41,6 +41,9 @@ module.exports = {
           500: 'oklch(var(--sh-accent-strong) / <alpha-value>)',
           600: 'oklch(var(--sh-accent-strong) / <alpha-value>)',
         },
+        // Text AUF Akzentfuellungen (Pill-CTAs): dunkel auf hellem Teal (dark
+        // mode) bzw. hell auf tiefem Teal (light mode) — nie remapped-white.
+        'accent-ink': 'oklch(var(--sh-accent-ink) / <alpha-value>)',
       },
       // Straffere, benannte Radien (hallmark: Einheits-Blob-Radius ist ein Tell).
       // rounded-2xl = Karten, rounded-xl/-lg = Controls; rounded-full bleibt.

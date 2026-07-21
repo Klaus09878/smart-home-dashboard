@@ -54,26 +54,28 @@
   </div>
 
   <!-- Main Container -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col min-h-screen">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-screen">
     
     <!-- ============ VIEW: HOME (Navigations-Hub) ============ -->
     <div id="view-home" class="hidden flex-1 flex-col animate-fade-in">
-      <!-- Werkzeugleiste: schmal, direkt auf dem Papier, Hairline statt Karte (Plan6-2b) -->
-      <header class="flex items-center gap-3 pb-4 mb-8 border-b border-slate-800">
-        <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400">
-          <i data-lucide="layout-grid" class="w-4 h-4"></i>
-        </div>
-        <h1 class="text-base font-semibold tracking-tight text-white">Smart Home Hub</h1>
-        <div class="ml-auto flex items-center gap-2">
-          <!-- Aktives Login-Profil -->
-          <span id="profile-badge" class="hidden items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300" title="Angemeldetes Profil">
-            <i data-lucide="user" class="w-3.5 h-3.5 text-teal-400"></i>
-            <span id="profile-badge-name">–</span>
-          </span>
-          <!-- Zentrale Einstellungen -->
-          <button data-onclick="navigateTo|settings" class="p-2 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Einstellungen">
-            <i data-lucide="settings" class="w-4.5 h-4.5"></i>
-          </button>
+      <!-- Floating-Pill-Nav (hallmark N5, Plan6-2c): schwebt beim Scrollen mit -->
+      <header class="sticky top-4 z-40 mb-10">
+        <div class="nav-pill rounded-full flex items-center gap-3 pl-2 pr-2 py-1.5">
+          <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400">
+            <i data-lucide="layout-grid" class="w-4 h-4"></i>
+          </div>
+          <h1 class="text-sm font-semibold tracking-tight text-white">Smart Home Hub</h1>
+          <div class="ml-auto flex items-center gap-1.5">
+            <!-- Aktives Login-Profil -->
+            <span id="profile-badge" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-800 text-xs text-slate-300" title="Angemeldetes Profil">
+              <i data-lucide="user" class="w-3.5 h-3.5 text-teal-400"></i>
+              <span id="profile-badge-name">–</span>
+            </span>
+            <!-- Zentrale Einstellungen -->
+            <button data-onclick="navigateTo|settings" class="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" title="Einstellungen">
+              <i data-lucide="settings" class="w-4.5 h-4.5"></i>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -95,7 +97,7 @@
             </div>
           </div>
         </div>
-        <div id="hub-widgets" class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5 mb-10">
+        <div id="hub-widgets" class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-6 mb-12">
 
           <!-- Widget: Uhr, Datum, Begrüßung, Wetter jetzt — freier Typo-Block
                auf dem Papier statt Karte (Plan6-2b, Instrumentenkopf) -->
@@ -104,11 +106,11 @@
               <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </button>
             <div>
-              <h2 class="text-3xl font-semibold text-white tracking-tight" id="hub-greeting">Willkommen</h2>
-              <p class="text-sm text-slate-400 mt-1" id="hub-date">–</p>
+              <h2 class="text-4xl sm:text-5xl font-semibold text-white tracking-tight" id="hub-greeting">Willkommen</h2>
+              <p class="text-sm text-slate-400 mt-2" id="hub-date">–</p>
             </div>
             <div class="sm:text-right">
-              <p class="text-6xl leading-none font-semibold tracking-tight text-white font-mono tabular-nums" id="hub-clock">--:--</p>
+              <p class="text-6xl sm:text-7xl leading-none font-semibold tracking-tight text-white font-mono tabular-nums" id="hub-clock">--:--</p>
               <p class="text-xs text-slate-400 mt-2 flex items-center gap-1.5 sm:justify-end">
                 <i data-lucide="cloud-sun" class="w-3.5 h-3.5 text-teal-400"></i>
                 <span id="hub-weather-text">Wetter wird geladen...</span>
@@ -163,7 +165,7 @@
             <form data-onsubmit="addTodo|$event" class="flex gap-1.5">
               <input id="todo-input" type="text" maxlength="120" placeholder="Neuer Eintrag …"
                 class="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-teal-500/50 focus:outline-none">
-              <button type="submit" class="px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-600 transition-colors" title="Hinzufügen">
+              <button type="submit" class="px-3 py-1.5 rounded-full bg-teal-500 text-accent-ink hover:bg-teal-600 transition-colors" title="Hinzufügen">
                 <i data-lucide="plus" class="w-3.5 h-3.5"></i>
               </button>
             </form>

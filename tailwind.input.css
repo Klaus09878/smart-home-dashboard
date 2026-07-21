@@ -30,9 +30,12 @@
   --sh-accent-strong:  63% 0.115 184;   /* teal-500/600: Fuellungen/Borders */
   --sh-accent-ink:     18% 0.040 200;   /* Text AUF Akzentfuellung */
   /* Geometrie + Bewegung */
-  --sh-radius-card: 10px;
-  --sh-radius-control: 6px;
+  --sh-radius-card: 12px;
+  --sh-radius-control: 8px;
   --sh-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Schatten-Tokens (moderner, subtiler Lift — nie farbige Glows) */
+  --sh-shadow-card: 0 1px 2px oklch(3% 0.01 250 / 0.4), 0 12px 32px -24px oklch(3% 0.01 250 / 0.8);
+  --sh-shadow-pop: 0 4px 12px oklch(3% 0.01 250 / 0.35), 0 24px 48px -24px oklch(3% 0.01 250 / 0.7);
 }
 html.light {
   --sh-paper:          96.5% 0.004 250;
@@ -48,6 +51,8 @@ html.light {
   --sh-accent-soft:    40% 0.090 190;
   --sh-accent-strong:  46% 0.100 189;
   --sh-accent-ink:     98% 0.010 180;
+  --sh-shadow-card: 0 1px 2px oklch(35% 0.02 250 / 0.05), 0 12px 32px -24px oklch(35% 0.02 250 / 0.25);
+  --sh-shadow-pop: 0 4px 12px oklch(35% 0.02 250 / 0.08), 0 24px 48px -24px oklch(35% 0.02 250 / 0.3);
 }
 
 /* Sichtbarer Fokus-Ring (hallmark-Pflicht) — sofort, nie animiert */
@@ -90,13 +95,26 @@ html.light {
 .glass-panel {
   background: oklch(var(--sh-surface));
   border: 1px solid oklch(var(--sh-rule));
+  box-shadow: var(--sh-shadow-card);
 }
 .glass-card-hover {
-  transition: border-color 0.2s var(--sh-ease), transform 0.2s var(--sh-ease);
+  transition: border-color 0.2s var(--sh-ease), transform 0.2s var(--sh-ease), box-shadow 0.2s var(--sh-ease);
 }
 .glass-card-hover:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   border-color: oklch(var(--sh-rule-2));
+  box-shadow: var(--sh-shadow-pop);
+}
+
+/* Floating-Pill-Navigation (hallmark N5 — die modern-minimal-Signatur):
+   inhaltsbreit, vom Rand geloest, Blur-Backdrop, weicher Schatten. Blur ist
+   hier als NAV-Behandlung erlaubt (im Gegensatz zum frueheren Panel-Glas). */
+.nav-pill {
+  background: oklch(var(--sh-surface) / 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid oklch(var(--sh-rule));
+  box-shadow: var(--sh-shadow-pop);
 }
 
 /* ============ Heller Modus (html.light) ============ */
