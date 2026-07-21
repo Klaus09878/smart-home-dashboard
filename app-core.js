@@ -788,10 +788,10 @@
       const text = document.getElementById('status-text');
       
       if (isLive && !appState.isDemoMode) {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-teal-500 shadow-[0_0_8px_#14b8a6] animate-pulse';
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-teal-500 animate-pulse';
         text.innerText = 'ThingSpeak API live';
       } else {
-        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_#f59e0b] animate-pulse-slow';
+        dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse-slow';
         text.innerText = 'Demo-Modus aktiv';
       }
     }

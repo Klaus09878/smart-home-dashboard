@@ -267,12 +267,11 @@
     // Jahres-Heatmap + Saisonvergleich (P9). Nutzt yearHeatmap/periodCompare aus
     // lib/core.js. Farbe = Tagesmittel-Temperatur (blau kalt → rot warm).
     function tempToColor(t, min, max) {
-      if (t == null || min == null || max == null || max === min) return 'rgba(100,116,139,0.22)';
+      // Sequenzielle Temperatur-Rampe (kalt→warm) aus den Datentokens via
+      // color-mix (Plan6-8, Gate 48): Endpunkte sky (kalt) → alert (warm).
+      if (t == null || min == null || max == null || max === min) return chartToken('--sh-ink-4', 0.22);
       const f = Math.max(0, Math.min(1, (t - min) / (max - min)));
-      const r = Math.round(59 + f * (239 - 59));
-      const g = Math.round(130 - f * (130 - 68));
-      const b = Math.round(246 - f * (246 - 68));
-      return `rgb(${r},${g},${b})`;
+      return `color-mix(in oklch, ${viz.alert()} ${Math.round(f * 100)}%, ${viz.sky()})`;
     }
 
     function renderArchiveYear(rows) {
@@ -303,7 +302,7 @@
           if (d > daysInMonth) { cells += '<div></div>'; continue; }
           const dayKey = `${year}-${mm}-${String(d).padStart(2, '0')}`;
           const rec = byDay[dayKey];
-          const color = rec ? tempToColor(rec.tAvg, hm.min, hm.max) : 'rgba(100,116,139,0.12)';
+          const color = rec ? tempToColor(rec.tAvg, hm.min, hm.max) : chartToken('--sh-ink-4', 0.12);
           const hasNote = rec && rec.note;
           const title = rec ? `${dayKey}: Ø ${rec.tAvg.toFixed(1)} °C${rec.hAvg != null ? `, ${rec.hAvg.toFixed(0)} %` : ''}${hasNote ? ` — ${rec.note}` : ''}` : `${dayKey}: keine Daten`;
           // Tage mit Notiz (P3-7) bekommen einen weissen Rahmen
@@ -401,8 +400,8 @@
           data: {
             labels: base.map(e => fmtMd(e.md)),
             datasets: [
-              { label: `${baseYear} (Ø °C)`, data: base.map(e => e.t_avg), borderColor: '#f8fafc', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false, spanGaps: true },
-              { label: `${appState.archiveCompareYear} (Ø °C)`, data: base.map(e => cmpMap[e.md] ?? null), borderColor: '#14b8a6', borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, spanGaps: true }
+              { label: `${baseYear} (Ø °C)`, data: base.map(e => e.t_avg), borderColor: viz.ink(), borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false, spanGaps: true },
+              { label: `${appState.archiveCompareYear} (Ø °C)`, data: base.map(e => cmpMap[e.md] ?? null), borderColor: viz.accent(), borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, spanGaps: true }
             ]
           },
           options: {
@@ -433,12 +432,12 @@
         data: {
           labels,
           datasets: [
-            { label: 'Max (°C)', data: rows.map(r => r.t_max), borderColor: 'rgba(249,115,22,0.7)', backgroundColor: 'rgba(249,115,22,0.12)', borderWidth: 1, pointRadius: 0, tension: 0.3, fill: '+1', yAxisID: 'yT' },
-            { label: 'Min (°C)', data: rows.map(r => r.t_min), borderColor: 'rgba(59,130,246,0.7)', borderWidth: 1, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yT' },
-            { label: 'Mittel (°C)', data: rows.map(r => r.t_avg), borderColor: '#f8fafc', borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yT' },
-            { label: 'Feuchte Ø (%)', data: rows.map(r => r.h_avg), borderColor: '#6366f1', borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yH' },
+            { label: 'Max (°C)', data: rows.map(r => r.t_max), borderColor: viz.warm(0.7), backgroundColor: viz.warm(0.12), borderWidth: 1, pointRadius: 0, tension: 0.3, fill: '+1', yAxisID: 'yT' },
+            { label: 'Min (°C)', data: rows.map(r => r.t_min), borderColor: viz.sky(0.7), borderWidth: 1, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yT' },
+            { label: 'Mittel (°C)', data: rows.map(r => r.t_avg), borderColor: viz.ink(), borderWidth: 2, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yT' },
+            { label: 'Feuchte Ø (%)', data: rows.map(r => r.h_avg), borderColor: viz.cool(), borderDash: [5, 5], borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yH' },
             // Komfort-Score pro Tag (0–100, rechte Achse) aus den Tages-Mitteln
-            { label: 'Komfort-Score', data: rows.map(r => comfortScore(r.t_avg, r.h_avg, null, getThresholds())), borderColor: '#10b981', borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yH' }
+            { label: 'Komfort-Score', data: rows.map(r => comfortScore(r.t_avg, r.h_avg, null, getThresholds())), borderColor: viz.ok(), borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false, yAxisID: 'yH' }
           ]
         },
         options: {
@@ -451,9 +450,9 @@
             tooltip: { backgroundColor: chartToken('--sh-surface', 0.96), titleColor: chartToken('--sh-ink'), bodyColor: chartToken('--sh-ink-2') }
           },
           scales: {
-            x: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 10 } },
-            yT: { position: 'left', grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#94a3b8', callback: v => `${v}°` } },
-            yH: { position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { color: '#94a3b8', callback: v => `${v}%` } }
+            x: { grid: { color: chartToken('--sh-rule', 0.35) }, ticks: { color: chartToken('--sh-ink-4'), font: { size: 10 }, maxTicksLimit: 10 } },
+            yT: { position: 'left', grid: { color: chartToken('--sh-rule', 0.4) }, ticks: { color: chartToken('--sh-ink-3'), callback: v => `${v}°` } },
+            yH: { position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, ticks: { color: chartToken('--sh-ink-3'), callback: v => `${v}%` } }
           }
         }
       };

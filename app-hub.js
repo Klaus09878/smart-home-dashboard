@@ -258,7 +258,7 @@
     }
 
     // Farbe aus dem Kategorienamen ableiten (stabil, Punkt 19)
-    const TODO_COLORS = ['#f97316', '#14b8a6', '#6366f1', '#ec4899', '#eab308', '#22c55e', '#0ea5e9'];
+    const TODO_COLORS = vizCategoryColors();
     function categoryColor(cat) {
       if (!cat) return null;
       let hash = 0;

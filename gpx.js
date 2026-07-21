@@ -751,7 +751,7 @@ function renderPhotoMarkers(photos) {
   if (!geo.length) return;
   const icon = L.divIcon({
     className: '',
-    html: '<div style="background:#0f172a;border:2px solid #14b8a6;border-radius:9999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:#5eead4;box-shadow:0 1px 4px rgba(0,0,0,.5)">📷</div>',
+    html: `<div style="background:${viz.surface()};border:2px solid ${viz.accent()};border-radius:9999px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.5)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${viz.accentSoft()}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg></div>`,
     iconSize: [26, 26], iconAnchor: [13, 13]
   });
   const markers = geo.map(p => {
@@ -931,7 +931,7 @@ function drawLivePolyline() {
   if (!r || !state.map || r.points.length < 2) return;
   const latlngs = r.points.map(p => [p[0], p[1]]);
   if (state.recLiveLayer) state.recLiveLayer.setLatLngs(latlngs);
-  else state.recLiveLayer = L.polyline(latlngs, { color: '#f43f5e', weight: 4, opacity: 0.9 }).addTo(state.map);
+  else state.recLiveLayer = L.polyline(latlngs, { color: viz.alert(), weight: 4, opacity: 0.9 }).addTo(state.map);
 }
 
 function updateRecordingUI() {
@@ -1146,11 +1146,11 @@ function drawSegmentComparison(act, segs) {
   for (let i = 1; i < pts.length; i++) {
     cum += haversine(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
     const d = deltaAt(cum);
-    const color = d > 2 ? '#ef4444' : d < -2 ? '#10b981' : '#eab308';
+    const color = d > 2 ? viz.alert() : d < -2 ? viz.ok() : viz.warn();
     layers.push(L.polyline([[pts[i - 1][0], pts[i - 1][1]], [pts[i][0], pts[i][1]]], { color, weight: 4, opacity: 0.9 }));
   }
   const bounds = L.latLngBounds(pts.map(p => [p[0], p[1]]));
-  layers.push(L.circleMarker([pts[0][0], pts[0][1]], { radius: 6, color: '#10b981', fillColor: '#10b981', fillOpacity: 1 }).bindTooltip('Start'));
+  layers.push(L.circleMarker([pts[0][0], pts[0][1]], { radius: 6, color: viz.ok(), fillColor: viz.ok(), fillOpacity: 1 }).bindTooltip('Start'));
   state.trackLayer = L.layerGroup(layers).addTo(state.map);
   state.map.fitBounds(bounds, { padding: [24, 24] });
 }
@@ -1214,7 +1214,7 @@ function renderRouteMatches(act) {
 
 // segmentSpeeds kommt aus lib/core.js (getestet).
 
-const SPEED_COLORS = ['#3b82f6', '#14b8a6', '#22c55e', '#eab308', '#f97316', '#ef4444'];
+const SPEED_COLORS = vizSpeedColors();
 
 function toggleSpeedColor() {
   state.speedColor = !state.speedColor;
@@ -1294,8 +1294,8 @@ function toggleHeatmap() {
   state.activities.forEach(a => {
     if (!a.points || a.points.length < 2) return;
     const latlngs = downsamplePoints(a.points, 600).map(p => [p[0], p[1]]);
-    layers.push(L.polyline(latlngs, { color: '#f97316', weight: 5, opacity: 0.10, interactive: false }));
-    layers.push(L.polyline(latlngs, { color: '#fdba74', weight: 1.5, opacity: 0.45, interactive: false }).bindTooltip(a.name));
+    layers.push(L.polyline(latlngs, { color: viz.warm(), weight: 5, opacity: 0.10, interactive: false }));
+    layers.push(L.polyline(latlngs, { color: viz.warmSoft(), weight: 1.5, opacity: 0.45, interactive: false }).bindTooltip(a.name));
     bounds = bounds ? bounds.extend(L.latLngBounds(latlngs)) : L.latLngBounds(latlngs);
   });
 
@@ -1348,11 +1348,11 @@ function drawMap(act) {
     }
     layers.push(L.polyline(seg, { color: segColor, weight: 4, opacity: 0.9 }));
   } else {
-    layers.push(L.polyline(latlngs, { color: '#f97316', weight: 3.5, opacity: 0.9 }));
+    layers.push(L.polyline(latlngs, { color: viz.warm(), weight: 3.5, opacity: 0.9 }));
   }
 
-  layers.push(L.circleMarker(latlngs[0], { radius: 6, color: '#10b981', fillColor: '#10b981', fillOpacity: 1 }).bindTooltip('Start'));
-  layers.push(L.circleMarker(latlngs[latlngs.length - 1], { radius: 6, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }).bindTooltip('Ziel'));
+  layers.push(L.circleMarker(latlngs[0], { radius: 6, color: viz.ok(), fillColor: viz.ok(), fillOpacity: 1 }).bindTooltip('Start'));
+  layers.push(L.circleMarker(latlngs[latlngs.length - 1], { radius: 6, color: viz.alert(), fillColor: viz.alert(), fillOpacity: 1 }).bindTooltip('Ziel'));
 
   const bounds = L.latLngBounds(latlngs);
 
@@ -1361,7 +1361,7 @@ function drawMap(act) {
     const other = state.activities.find(a => a.id === state.compareId);
     if (other) {
       const otherLatlngs = other.points.map(p => [p[0], p[1]]);
-      layers.push(L.polyline(otherLatlngs, { color: '#818cf8', weight: 3, opacity: 0.75, dashArray: '6 6' }).bindTooltip(other.name));
+      layers.push(L.polyline(otherLatlngs, { color: viz.sky(), weight: 3, opacity: 0.75, dashArray: '6 6' }).bindTooltip(other.name));
       bounds.extend(L.latLngBounds(otherLatlngs));
     }
   }
@@ -1398,7 +1398,7 @@ function drawElevationChart(act) {
   const datasets = [{
     label: act.name,
     data: elevationSeries(act),
-    borderColor: '#6366f1',
+    borderColor: viz.cool(),
     borderWidth: 2,
     backgroundColor: grad,
     fill: true,
@@ -1414,7 +1414,7 @@ function drawElevationChart(act) {
       datasets.push({
         label: other.name,
         data: elevationSeries(other),
-        borderColor: '#14b8a6',
+        borderColor: viz.accent(),
         borderWidth: 2,
         borderDash: [5, 5],
         backgroundColor: 'transparent',

@@ -268,6 +268,23 @@ function chartToken(name, alpha) {
   return alpha != null ? `oklch(${v} / ${alpha})` : `oklch(${v})`;
 }
 
+// ============ Viz-Farbrollen aus Design-Tokens (Plan6-8, Gate 48) ============
+// Chart-Serien, GPX-Routen, Heatmap, To-do-Punkte beziehen ihre Farben aus den
+// benannten Tokens statt aus rohen Hex-Werten — Funktionen, damit sie beim
+// Theme-Wechsel neu aufloesen. `viz.role([alpha])` -> oklch-String.
+const VIZ_ROLES = {
+  accent: '--sh-accent', accentSoft: '--sh-accent-soft',
+  ink: '--sh-ink', surface: '--sh-surface',
+  ok: '--sh-ok', warn: '--sh-warn', warnStrong: '--sh-warn-strong', alert: '--sh-alert',
+  warm: '--sh-data-warm', warmSoft: '--sh-data-warm-soft',
+  cool: '--sh-data-cool', sky: '--sh-data-sky'
+};
+const viz = new Proxy({}, { get: (_, role) => (alpha) => chartToken(VIZ_ROLES[role] || '--sh-ink', alpha) });
+// Tempo-Rampe (langsam -> schnell) fuer die GPX-Routeneinfaerbung, 6 Stufen.
+function vizSpeedColors() { return [viz.sky(), viz.cool(), viz.ok(), viz.warn(), viz.warm(), viz.alert()]; }
+// Kategorie-Rotation (z. B. To-do-Punkte), semantik-frei aus den Datenfarben.
+function vizCategoryColors() { return [viz.warm(), viz.accent(), viz.cool(), viz.sky(), viz.warn(), viz.ok(), viz.alert()]; }
+
 // ============ CSV-Download-Helfer ============
 // lines: Array bereits fertig getrennter Zeilen (Semikolon-getrennt).
 // Stellt das UTF-8-BOM voran, damit Excel Umlaute korrekt erkennt.
@@ -328,8 +345,11 @@ function applyTheme(theme) {
   document.documentElement.classList.toggle('light', light);
   document.documentElement.classList.toggle('dark', !light);
   try { localStorage.setItem('theme', light ? 'light' : 'dark'); } catch (e) { /* ignore */ }
+  // Browser-Chrome-Farbe = Paper-Token. Bewusste Ausnahme von Gate 48:
+  // meta theme-color braucht auf iOS-Safari einen statischen Hex/rgb-Wert
+  // (oklch dort nicht zuverlaessig) — Werte spiegeln --sh-paper hell/dunkel.
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', light ? '#eef2f7' : '#0f172a');
+  if (meta) meta.setAttribute('content', light ? '#f2f4f7' : '#0d1524');
 }
 
 function getTheme() {

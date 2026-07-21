@@ -322,12 +322,12 @@
       }
 
       const tempGrad = ctx.createLinearGradient(0, 0, 0, 360);
-      tempGrad.addColorStop(0, 'rgba(249, 115, 22, 0.15)');
-      tempGrad.addColorStop(1, 'rgba(249, 115, 22, 0)');
+      tempGrad.addColorStop(0, viz.warm(0.15));
+      tempGrad.addColorStop(1, viz.warm(0));
 
       const humGrad = ctx.createLinearGradient(0, 0, 0, 360);
-      humGrad.addColorStop(0, 'rgba(99, 102, 241, 0.05)');
-      humGrad.addColorStop(1, 'rgba(99, 102, 241, 0)');
+      humGrad.addColorStop(0, viz.cool(0.05));
+      humGrad.addColorStop(1, viz.cool(0));
 
       const outsideTempData = filtered.map((f, i) => ({ x: f.time.getTime(), y: outsideTemp[i] }));
 
@@ -343,17 +343,17 @@
         const otherHum = otherFiltered.map(f => ({ x: f.time.getTime(), y: f.humidity }));
         const common = { fill: false, tension: 0.35, pointRadius: 0, pointHoverRadius: 5 };
         datasets = [
-          { label: `${activeName} · Temperatur (°C)`, data: insideTemp, borderColor: '#f97316', borderWidth: 2.5, backgroundColor: tempGrad, fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 5, yAxisID: 'yTemp' },
-          { label: `${otherName} · Temperatur (°C)`, data: otherTemp, borderColor: '#a78bfa', borderWidth: 2, ...common, yAxisID: 'yTemp' },
-          { label: `${activeName} · Feuchte (%)`, data: insideHum, borderColor: '#6366f1', borderDash: [5, 5], borderWidth: 2, ...common, yAxisID: 'yHum' },
-          { label: `${otherName} · Feuchte (%)`, data: otherHum, borderColor: '#2dd4bf', borderDash: [5, 5], borderWidth: 2, ...common, yAxisID: 'yHum' }
+          { label: `${activeName} · Temperatur (°C)`, data: insideTemp, borderColor: viz.warm(), borderWidth: 2.5, backgroundColor: tempGrad, fill: true, tension: 0.35, pointRadius: 0, pointHoverRadius: 5, yAxisID: 'yTemp' },
+          { label: `${otherName} · Temperatur (°C)`, data: otherTemp, borderColor: viz.sky(), borderWidth: 2, ...common, yAxisID: 'yTemp' },
+          { label: `${activeName} · Feuchte (%)`, data: insideHum, borderColor: viz.cool(), borderDash: [5, 5], borderWidth: 2, ...common, yAxisID: 'yHum' },
+          { label: `${otherName} · Feuchte (%)`, data: otherHum, borderColor: viz.accent(), borderDash: [5, 5], borderWidth: 2, ...common, yAxisID: 'yHum' }
         ];
       } else {
         datasets = [
           {
             label: 'Innentemperatur (°C)',
             data: insideTemp,
-            borderColor: '#f97316',
+            borderColor: viz.warm(),
             borderWidth: 2.5,
             backgroundColor: tempGrad,
             fill: true,
@@ -365,7 +365,7 @@
           {
             label: 'Außentemperatur (°C)',
             data: outsideTempData,
-            borderColor: '#14b8a6',
+            borderColor: viz.accent(),
             borderWidth: 2,
             backgroundColor: 'transparent',
             fill: false,
@@ -377,7 +377,7 @@
           {
             label: 'Innenfeuchtigkeit (%)',
             data: insideHum,
-            borderColor: '#6366f1',
+            borderColor: viz.cool(),
             borderWidth: 2,
             borderDash: [5, 5],
             backgroundColor: humGrad,
@@ -390,7 +390,7 @@
         ];
         if (hasCo2Data) {
           datasets.push({
-            label: 'CO₂ (ppm)', data: co2Data, borderColor: '#eab308', borderWidth: 2,
+            label: 'CO₂ (ppm)', data: co2Data, borderColor: viz.warn(), borderWidth: 2,
             backgroundColor: 'transparent', fill: false, tension: 0.35,
             pointRadius: 0, pointHoverRadius: 5, spanGaps: true, yAxisID: 'yCo2'
           });
@@ -480,9 +480,9 @@
       if (hasCo2Data) {
         config.options.scales.yCo2 = {
           type: 'linear', position: 'right',
-          title: { display: true, text: 'CO₂ (ppm)', color: '#a16207', font: { size: 10, weight: 'bold' } },
+          title: { display: true, text: 'CO₂ (ppm)', color: chartToken('--sh-warn-strong'), font: { size: 10, weight: 'bold' } },
           grid: { drawOnChartArea: false },
-          ticks: { color: '#eab308', callback: val => Math.round(val) }
+          ticks: { color: chartToken('--sh-warn'), callback: val => Math.round(val) }
         };
       }
 
