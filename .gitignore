@@ -4,5 +4,7 @@ node_modules/
 test-results/
 playwright-report/
 
-# Lokale Claude-Code-Konfiguration (Dev-Server für Preview)
-.claude/
+# Lokale Claude-Code-Konfiguration (Dev-Server für Preview) — aber gevendorte
+# Skills (Plan6-1: hallmark) sind Teil des Repos:
+.claude/*
+!.claude/skills/

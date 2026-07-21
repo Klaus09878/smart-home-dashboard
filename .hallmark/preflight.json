@@ -1,0 +1,8 @@
+{
+  "scanned": "2026-07-15",
+  "fonts": "Outfit 300-700 lokal (vendor/fonts, @font-face tailwind.input.css)",
+  "palette": "keine Tokens; ad-hoc Tailwind-Klassen in HTML+JS; heller Modus als html.light-Remaps",
+  "motion": "motion-cut (keine Library; CSS-Transitions + fade-in/slide-up)",
+  "spacing": "Tailwind-Default 4pt",
+  "framework": "Vanilla HTML + klassische Skripte, Tailwind 3.4 statisch, Cloudflare Pages, CSP nur lokale Assets"
+}
