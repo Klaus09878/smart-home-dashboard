@@ -40,7 +40,11 @@
   /* Geometrie + Bewegung */
   --sh-radius-card: 12px;
   --sh-radius-control: 8px;
-  --sh-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Drei benannte Easings (hallmark motion.md) + Legacy-Alias --sh-ease */
+  --sh-ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* Elemente kommen herein */
+  --sh-ease-in: cubic-bezier(0.7, 0, 0.84, 0);    /* Elemente gehen hinaus */
+  --sh-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* Zustandswechsel */
+  --sh-ease: var(--sh-ease-out);
   /* Schatten-Tokens (moderner, subtiler Lift — nie farbige Glows) */
   --sh-shadow-card: 0 1px 2px oklch(3% 0.01 250 / 0.4), 0 12px 32px -24px oklch(3% 0.01 250 / 0.8);
   --sh-shadow-pop: 0 4px 12px oklch(3% 0.01 250 / 0.35), 0 24px 48px -24px oklch(3% 0.01 250 / 0.7);
@@ -73,6 +77,23 @@ html.light {
 :focus-visible {
   outline: 2px solid oklch(var(--sh-accent));
   outline-offset: 2px;
+}
+
+/* Seitenrand-Clipping (hallmark layout-and-space / Gate 34): clip statt hidden,
+   damit position:sticky (Nav-Pillen) nicht bricht — nie horizontaler Scroll. */
+html, body { overflow-x: clip; }
+
+/* Reduced-Motion (hallmark motion.md / Gate 27): jede raeumliche Bewegung faellt
+   auf einen kurzen Opacity-Crossfade zusammen; funktionale Loader laufen (langsamer). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.15s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.15s !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-spin { animation-duration: 0.8s !important; animation-iteration-count: infinite !important; }
+  .animate-pulse, .animate-pulse-slow { animation-iteration-count: infinite !important; }
 }
 
 /* ============ Outfit-Schrift lokal (Plan4-4) ============ */
@@ -179,18 +200,18 @@ body {
   filter: brightness(0.6) invert(1) contrast(3.2) hue-rotate(200deg) saturate(0.35) brightness(0.65);
 }
 .leaflet-container {
-  background: #0b1220;
+  background: oklch(var(--sh-paper));
   font-family: 'Outfit', sans-serif;
 }
 .leaflet-control-attribution {
-  background: rgba(15, 23, 42, 0.8) !important;
-  color: #64748b !important;
+  background: oklch(var(--sh-surface) / 0.8) !important;
+  color: oklch(var(--sh-ink-4)) !important;
 }
 .leaflet-control-attribution a {
-  color: #94a3b8 !important;
+  color: oklch(var(--sh-ink-3)) !important;
 }
 
 #dropzone.dragover {
-  border-color: #14b8a6;
-  background: rgba(20, 184, 166, 0.08);
+  border-color: oklch(var(--sh-accent));
+  background: oklch(var(--sh-accent) / 0.08);
 }

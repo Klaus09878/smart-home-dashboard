@@ -88,6 +88,17 @@ module.exports = {
         xl: 'var(--sh-radius-control)',
         '2xl': 'var(--sh-radius-card)',
       },
+      // Benannte z-index-Skala (hallmark layout-and-space): keine freien Werte
+      // mehr. Reihenfolge bewahrt die bestehende Schichtung.
+      zIndex: {
+        raised: '10',
+        dropdown: '100',
+        sticky: '200',
+        banner: '300',   // Offline-Banner ueber der Sticky-Nav
+        modal: '400',
+        toast: '500',
+        tooltip: '600',
+      },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'fade-in': 'fadeIn 0.4s ease-out forwards',

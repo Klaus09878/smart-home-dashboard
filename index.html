@@ -35,14 +35,14 @@
   <script defer src="vendor/lucide.min.js"></script>
 
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
 
   <!-- Offline-Hinweis (Plan4-20): erscheint bei navigator.offline, verschwindet
        bei Netz-Rueckkehr; dann wird automatisch nachsynchronisiert. -->
-  <div id="offline-banner" class="hidden sticky top-0 z-[900] bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-xs text-center px-3 py-1.5">Offline — Daten können veraltet sein; Änderungen werden nachsynchronisiert.</div>
+  <div id="offline-banner" class="hidden sticky top-0 z-banner bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-xs text-center px-3 py-1.5">Offline — Daten können veraltet sein; Änderungen werden nachsynchronisiert.</div>
 
   <!-- Loading Overlay (Shown during data load) -->
-  <div id="loading-overlay" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex flex-col items-center justify-center gap-4 transition-all duration-300">
+  <div id="loading-overlay" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-md z-modal flex flex-col items-center justify-center gap-4 transition-[opacity,box-shadow] duration-300">
     <div class="relative w-16 h-16 flex items-center justify-center">
       <div class="w-16 h-16 rounded-full border-4 border-slate-800 border-t-teal-500 animate-spin absolute"></div>
       <i data-lucide="wind" class="w-6 h-6 text-teal-400"></i>
@@ -59,7 +59,7 @@
     <!-- ============ VIEW: HOME (Navigations-Hub) ============ -->
     <div id="view-home" class="hidden flex-1 flex-col animate-fade-in">
       <!-- Floating-Pill-Nav (hallmark N5, Plan6-2c): schwebt beim Scrollen mit -->
-      <header class="sticky top-4 z-40 mb-10">
+      <header class="sticky top-4 z-sticky mb-10">
         <div class="nav-pill rounded-full flex items-center gap-3 pl-2 pr-2 py-1.5">
           <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400">
             <i data-lucide="layout-grid" class="w-4 h-4"></i>
@@ -86,11 +86,11 @@
         <div class="flex items-center justify-between mb-3">
           <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Übersicht</p>
           <div class="relative">
-            <button data-onclick="toggleWidgetSettings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-all flex items-center gap-1.5">
+            <button data-onclick="toggleWidgetSettings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-colors flex items-center gap-1.5">
               <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
               Widgets anpassen
             </button>
-            <div id="widget-settings" class="hidden absolute right-0 top-full mt-2 z-[500] panel rounded-xl p-3 shadow-2xl w-56">
+            <div id="widget-settings" class="hidden absolute right-0 top-full mt-2 z-dropdown panel rounded-xl p-3 shadow-2xl w-56">
               <p class="text-[10px] text-slate-500 uppercase font-semibold mb-2">Widgets ein-/ausblenden</p>
               <div id="widget-settings-list" class="flex flex-col gap-1.5 text-xs text-slate-300"></div>
               <p class="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-800/60">Reihenfolge: Widgets am Griff-Symbol ziehen.</p>
@@ -221,7 +221,7 @@
                 <p class="text-[11px] text-slate-400 mt-0.5"><span id="hub-prev-sean-hum">-- %</span> · <span id="hub-prev-sean-time">--</span></p>
               </div>
             </div>
-            <i data-lucide="arrow-right" class="hidden md:block w-4 h-4 text-slate-500 group-hover:text-teal-400 group-hover:translate-x-1 transition-all shrink-0"></i>
+            <i data-lucide="arrow-right" class="hidden md:block w-4 h-4 text-slate-500 group-hover:text-teal-400 group-hover:translate-x-1 transition-transform shrink-0"></i>
           </button>
 
           <!-- Projektzeile: GPX-Viewer -->
@@ -250,13 +250,13 @@
                 <!-- Wochenziel-Fortschritt (gpx_goals, P10) -->
                 <div id="hub-gpx-goal-wrap" class="hidden mt-1.5">
                   <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800">
-                    <div class="h-full rounded-full bg-teal-500 transition-all duration-500" id="hub-gpx-goal-bar" style="width: 0%"></div>
+                    <div class="h-full rounded-full bg-teal-500 transition-[width] duration-500" id="hub-gpx-goal-bar" style="width: 0%"></div>
                   </div>
                   <p class="text-[9px] text-slate-500 mt-0.5" id="hub-gpx-goal-label"></p>
                 </div>
               </div>
             </div>
-            <i data-lucide="arrow-right" class="hidden md:block w-4 h-4 text-slate-500 group-hover:text-teal-400 group-hover:translate-x-1 transition-all shrink-0"></i>
+            <i data-lucide="arrow-right" class="hidden md:block w-4 h-4 text-slate-500 group-hover:text-teal-400 group-hover:translate-x-1 transition-transform shrink-0"></i>
           </button>
         </div>
       </div>
@@ -264,7 +264,7 @@
 
     <!-- ============ VIEW: EINSTELLUNGEN ============ -->
     <div id="view-settings" class="hidden flex-1 flex-col animate-fade-in">
-      <header class="sticky top-4 z-40 mb-8">
+      <header class="sticky top-4 z-sticky mb-8">
         <div class="nav-pill rounded-full flex items-center gap-3 pl-2 pr-4 py-1.5">
           <button data-onclick="navigateTo|home" class="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" title="Zurück zum Hub">
             <i data-lucide="arrow-left" class="w-4.5 h-4.5"></i>
@@ -405,14 +405,14 @@
     </div>
 
     <!-- Onboarding-Assistent (P16) -->
-    <div id="onboarding-modal" class="hidden fixed inset-0 z-[1600] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4" data-onbackdrop="closeOnboarding">
+    <div id="onboarding-modal" class="hidden fixed inset-0 z-modal bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4" data-onbackdrop="closeOnboarding">
       <div class="panel rounded-2xl p-6 shadow-2xl w-full max-w-md">
         <div class="flex items-center justify-between mb-1">
           <h3 class="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="sparkles" class="w-5 h-5 text-blue-400"></i> Einrichtung</h3>
           <button data-onclick="closeOnboarding" class="p-1.5 rounded-lg text-slate-500 hover:text-white transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
         </div>
         <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-4">
-          <div id="onboarding-progress" class="h-full bg-teal-500 transition-all duration-300" style="width: 0%"></div>
+          <div id="onboarding-progress" class="h-full bg-teal-500 transition-[opacity,box-shadow] duration-300" style="width: 0%"></div>
         </div>
         <div id="onboarding-body" class="min-h-[140px] text-sm text-slate-300"></div>
         <div class="flex items-center justify-between mt-5">
@@ -443,7 +443,7 @@
     </div>
 
     <!-- HEADER: Navigation and location switching -->
-    <header class="sticky top-4 z-40 mb-8">
+    <header class="sticky top-4 z-sticky mb-8">
     <div class="nav-pill rounded-2xl p-3 flex flex-col sm:flex-row gap-3 items-center justify-between">
       <div class="flex items-center gap-3">
         <!-- Back to Hub -->
@@ -474,16 +474,16 @@
 
         <!-- Weather Location Picker Button -->
         <div class="relative w-full sm:w-auto" id="nav-weather-picker">
-          <button id="location-btn" data-onclick="toggleLocationModal" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-sm font-medium flex items-center justify-between sm:justify-start gap-2.5 transition-all text-slate-200">
+          <button id="location-btn" data-onclick="toggleLocationModal" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-sm font-medium flex items-center justify-between sm:justify-start gap-2.5 transition-colors text-slate-200">
             <i data-lucide="map-pin" class="w-4 h-4 text-teal-400"></i>
             <span id="current-location-name">Standort wählen...</span>
             <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-500"></i>
           </button>
           
           <!-- Quick search panel dropdown -->
-          <div id="location-dropdown" class="hidden absolute right-0 mt-2 w-72 rounded-xl panel shadow-2xl z-50 p-3 flex flex-col gap-2">
+          <div id="location-dropdown" class="hidden absolute right-0 mt-2 w-72 rounded-xl panel shadow-2xl z-dropdown p-3 flex flex-col gap-2">
             <div class="relative">
-              <input type="text" id="city-search" placeholder="Stadt suchen..." data-onkeyup="searchCity|$event" class="w-full px-3 py-2 bg-slate-900/90 border border-slate-800 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 rounded-lg text-sm outline-none text-slate-200 placeholder-slate-500 transition-all">
+              <input type="text" id="city-search" placeholder="Stadt suchen..." data-onkeyup="searchCity|$event" class="w-full px-3 py-2 bg-slate-900/90 border border-slate-800 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 rounded-lg text-sm outline-none text-slate-200 placeholder-slate-500 transition-colors">
               <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute right-3 top-2.5"></i>
             </div>
             <div id="search-results" class="max-h-40 overflow-y-auto flex flex-col gap-1 text-xs text-slate-400 mt-1">
@@ -525,7 +525,7 @@
           <button data-onclick="toggleClimateSettings" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Karten anpassen (ein-/ausblenden, ordnen)">
             <i data-lucide="layout-grid" class="w-4.5 h-4.5"></i>
           </button>
-          <div id="cf-settings" class="hidden absolute right-0 top-full mt-2 z-[500] panel border border-slate-800 rounded-xl p-3 shadow-2xl w-64">
+          <div id="cf-settings" class="hidden absolute right-0 top-full mt-2 z-dropdown panel border border-slate-800 rounded-xl p-3 shadow-2xl w-64">
             <label class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-800 cursor-pointer text-xs text-slate-300 hover:text-white transition-colors">
               <input type="checkbox" id="cf-density-toggle" data-onchange="toggleCfCompact" class="accent-teal-500 shrink-0">
               <span>Kompakt-Modus <span class="text-slate-500">(Detailkarten einklappen)</span></span>
@@ -548,10 +548,10 @@
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
           <h2 class="text-2xl font-bold tracking-tight text-white" id="detail-loc-title">Standort Name</h2>
-          <button data-onclick="renameActiveLocation" class="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Standort umbenennen">
+          <button data-onclick="renameActiveLocation" class="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors" title="Standort umbenennen">
             <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
           </button>
-          <button data-onclick="openThresholdSettings" class="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Ziel- und Schwellwerte einstellen">
+          <button data-onclick="openThresholdSettings" class="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors" title="Ziel- und Schwellwerte einstellen">
             <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
           </button>
         </div>
@@ -578,7 +578,7 @@
               <i data-lucide="thermometer" class="w-6 h-6"></i>
             </div>
           </div>
-          <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-10">
+          <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-raised">
             <span class="flex items-center gap-1 text-slate-400">
               Comfort: <span id="kpi-temp-comfort" class="font-semibold text-teal-400">Optimal</span>
             </span>
@@ -606,7 +606,7 @@
               <i data-lucide="droplets" class="w-6 h-6"></i>
             </div>
           </div>
-          <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-10">
+          <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-raised">
             <span class="flex items-center gap-1 text-slate-400">
               Qualität: <span id="kpi-humidity-comfort" class="font-semibold text-emerald-400">Optimal</span>
             </span>
@@ -634,7 +634,7 @@
               <i data-lucide="cloud-sun" class="w-6 h-6"></i>
             </div>
           </div>
-          <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-10">
+          <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-raised">
             <span class="flex items-center gap-1 text-slate-400" id="weather-desc">
               Bewölkt
             </span>
@@ -690,7 +690,7 @@
                   <span class="font-bold text-white" id="abs-hum-in">--.- g/m³</span>
                 </div>
                 <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
-                  <div class="bg-teal-500 h-full rounded-full transition-all duration-500" id="bar-abs-hum-in" style="width: 0%"></div>
+                  <div class="bg-teal-500 h-full rounded-full transition-[width] duration-500" id="bar-abs-hum-in" style="width: 0%"></div>
                 </div>
               </div>
 
@@ -700,7 +700,7 @@
                   <span class="font-bold text-white" id="abs-hum-out">--.- g/m³</span>
                 </div>
                 <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
-                  <div class="bg-blue-500 h-full rounded-full transition-all duration-500" id="bar-abs-hum-out" style="width: 0%"></div>
+                  <div class="bg-blue-500 h-full rounded-full transition-[width] duration-500" id="bar-abs-hum-out" style="width: 0%"></div>
                 </div>
               </div>
 
@@ -800,7 +800,7 @@
               </div>
               <div class="flex items-center gap-3">
                 <div class="flex-1 bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
-                  <div class="h-full rounded-full transition-all duration-500 bg-emerald-500" id="comfort-score-bar" style="width: 0%"></div>
+                  <div class="h-full rounded-full transition-[width] duration-500 bg-emerald-500" id="comfort-score-bar" style="width: 0%"></div>
                 </div>
                 <p class="text-sm font-bold text-white mt-0.5 w-8 text-right" id="comfort-score-value">--</p>
               </div>
@@ -857,7 +857,7 @@
               <span class="font-bold text-white" id="mold-bar-label">--%</span>
             </div>
             <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800 relative">
-              <div class="h-full rounded-full transition-all duration-500 bg-emerald-500" id="mold-bar" style="width: 0%"></div>
+              <div class="h-full rounded-full transition-[width] duration-500 bg-emerald-500" id="mold-bar" style="width: 0%"></div>
               <div class="absolute top-0 bottom-0 w-px bg-red-400/70" style="left: 80%"></div>
             </div>
           </div>
@@ -906,7 +906,7 @@
           <div class="flex items-center gap-2">
             <button data-onclick="setPatternField|temp" id="pattern-btn-temp" class="px-2 py-0.5 rounded text-[10px] font-semibold text-slate-400 border border-slate-800">Temp</button>
             <button data-onclick="setPatternField|humidity" id="pattern-btn-humidity" class="px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30">Feuchte</button>
-            <button data-onclick="toggleCfCard|cf-pattern" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all" title="Wochen-Muster ein-/ausklappen">
+            <button data-onclick="toggleCfCard|cf-pattern" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Wochen-Muster ein-/ausklappen">
               <i data-lucide="chevron-down" class="w-4 h-4 transition-transform" id="pattern-arrow"></i>
             </button>
           </div>
@@ -929,19 +929,19 @@
           </div>
 
           <div class="flex flex-wrap gap-2 items-center w-full sm:w-auto">
-            <button data-onclick="setChartTimeframe|24" id="btn-tf-24" class="px-3.5 py-1.5 rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 text-xs font-semibold transition-all">24h</button>
-            <button data-onclick="setChartTimeframe|72" id="btn-tf-72" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all">3 Tage</button>
-            <button data-onclick="setChartTimeframe|168" id="btn-tf-168" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all">7 Tage</button>
-            <button data-onclick="setChartTimeframe|-1" id="btn-tf-all" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all">Alle</button>
+            <button data-onclick="setChartTimeframe|24" id="btn-tf-24" class="px-3.5 py-1.5 rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 text-xs font-semibold transition-colors">24h</button>
+            <button data-onclick="setChartTimeframe|72" id="btn-tf-72" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-colors">3 Tage</button>
+            <button data-onclick="setChartTimeframe|168" id="btn-tf-168" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-colors">7 Tage</button>
+            <button data-onclick="setChartTimeframe|-1" id="btn-tf-all" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-colors">Alle</button>
             <span class="w-px h-5 bg-slate-800 mx-0.5 hidden sm:block"></span>
-            <button data-onclick="toggleCompareMode" id="btn-compare" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all" title="Beide Standorte im selben Chart vergleichen">Vergleich</button>
-            <button data-onclick="resetChartZoom" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all" title="Zoom zurücksetzen">
+            <button data-onclick="toggleCompareMode" id="btn-compare" class="px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-colors" title="Beide Standorte im selben Chart vergleichen">Vergleich</button>
+            <button data-onclick="resetChartZoom" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Zoom zurücksetzen">
               <i data-lucide="zoom-out" class="w-4 h-4"></i>
             </button>
-            <button data-onclick="exportChartImage" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all" title="Chart als Bild speichern">
+            <button data-onclick="exportChartImage" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Chart als Bild speichern">
               <i data-lucide="image-down" class="w-4 h-4"></i>
             </button>
-            <button data-onclick="toggleCfCard|cf-chart" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all" title="Klimaverlauf ein-/ausklappen">
+            <button data-onclick="toggleCfCard|cf-chart" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Klimaverlauf ein-/ausklappen">
               <i data-lucide="chevron-down" class="w-4 h-4 transition-transform duration-300" id="chart-arrow"></i>
             </button>
           </div>
@@ -970,7 +970,7 @@
       </section>
 
       <!-- Langzeit-Archiv: tägliche Aggregate aus Cloudflare D1 -->
-      <section data-widget="cf-archive" class="panel rounded-2xl shadow-lg transition-all duration-300">
+      <section data-widget="cf-archive" class="panel rounded-2xl shadow-lg transition-[opacity,box-shadow] duration-300">
         <button data-onclick="toggleArchiveCollapse" class="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none">
           <div class="flex items-center gap-2">
             <i data-lucide="database" class="w-5 h-5 text-teal-400"></i>
@@ -986,11 +986,11 @@
               <select id="archive-compare-year" data-onchange="setArchiveCompareYear|$value" class="px-2 py-1.5 rounded-lg text-xs bg-slate-900 border border-slate-800 text-slate-300 focus:border-teal-500/50 focus:outline-none" title="Ein zweites Jahr zum Vergleich einblenden">
                 <option value="">Vergleich: aus</option>
               </select>
-              <button data-onclick="openPicker|archive-import-input" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-all flex items-center gap-1.5" title="ThingSpeak-CSV-Export rückwirkend ins Archiv importieren">
+              <button data-onclick="openPicker|archive-import-input" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-colors flex items-center gap-1.5" title="ThingSpeak-CSV-Export rückwirkend ins Archiv importieren">
                 <i data-lucide="upload" class="w-3.5 h-3.5"></i>
                 Historie
               </button>
-              <button data-onclick="exportArchiveCsv" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-all flex items-center gap-1.5" title="Langzeitdaten als CSV exportieren">
+              <button data-onclick="exportArchiveCsv" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-colors flex items-center gap-1.5" title="Langzeitdaten als CSV exportieren">
                 <i data-lucide="download" class="w-3.5 h-3.5"></i>
                 CSV
               </button>
@@ -1014,7 +1014,7 @@
       </section>
 
       <!-- Collapsible Historical Feed Data Table -->
-      <section data-widget="cf-table" class="panel rounded-2xl shadow-lg transition-all duration-300">
+      <section data-widget="cf-table" class="panel rounded-2xl shadow-lg transition-[opacity,box-shadow] duration-300">
         <button data-onclick="toggleTableCollapse" class="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none">
           <div class="flex items-center gap-2">
             <i data-lucide="list" class="w-5 h-5 text-blue-400"></i>
@@ -1048,7 +1048,7 @@
     </main>
 
     <!-- Modal: Ziel-/Schwellwerte pro Standort (öffnet über das Regler-Symbol) -->
-    <div id="threshold-modal" class="hidden fixed inset-0 z-[1500] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4" data-onbackdrop="closeThresholdSettings">
+    <div id="threshold-modal" class="hidden fixed inset-0 z-modal bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4" data-onbackdrop="closeThresholdSettings">
       <div class="panel rounded-2xl p-6 shadow-2xl w-full max-w-md border border-slate-800">
         <div class="flex items-start justify-between mb-1">
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -1087,10 +1087,10 @@
         </div>
 
         <div class="flex items-center justify-between gap-3 mt-6">
-          <button data-onclick="resetThresholdSettings" class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-all">Standard</button>
+          <button data-onclick="resetThresholdSettings" class="px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-colors">Standard</button>
           <div class="flex gap-2">
-            <button data-onclick="closeThresholdSettings" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 border border-slate-800 hover:border-slate-700 transition-all">Abbrechen</button>
-            <button data-onclick="saveThresholdSettings" class="px-4 py-2 rounded-xl text-xs font-bold bg-teal-500 text-slate-950 hover:bg-teal-400 transition-all">Speichern</button>
+            <button data-onclick="closeThresholdSettings" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 border border-slate-800 hover:border-slate-700 transition-colors">Abbrechen</button>
+            <button data-onclick="saveThresholdSettings" class="px-4 py-2 rounded-xl text-xs font-bold bg-teal-500 text-slate-950 hover:bg-teal-400 transition-colors">Speichern</button>
           </div>
         </div>
       </div>

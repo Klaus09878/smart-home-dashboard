@@ -31,17 +31,17 @@
   <script defer src="vendor/leaflet/leaflet.js"></script>
 
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
 
   <!-- Offline-Hinweis (Plan4-20) -->
-  <div id="offline-banner" class="hidden sticky top-0 z-[900] bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-xs text-center px-3 py-1.5">Offline — Daten können veraltet sein; Änderungen werden nachsynchronisiert.</div>
+  <div id="offline-banner" class="hidden sticky top-0 z-banner bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-xs text-center px-3 py-1.5">Offline — Daten können veraltet sein; Änderungen werden nachsynchronisiert.</div>
 
   <!-- Background Glows -->
 
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col min-h-screen gap-6">
 
     <!-- Header -->
-    <header class="nav-pill sticky top-4 z-40 rounded-2xl p-3 flex flex-col sm:flex-row gap-3 items-center justify-between">
+    <header class="nav-pill sticky top-4 z-sticky rounded-2xl p-3 flex flex-col sm:flex-row gap-3 items-center justify-between">
       <div class="flex items-center gap-3">
         <a href="index.html#home" class="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" title="Zurück zum Hub">
           <i data-lucide="arrow-left" class="w-4.5 h-4.5"></i>
@@ -93,7 +93,7 @@
     </div>
 
     <!-- Dropzone (auch Empty State) -->
-    <div id="dropzone" class="panel rounded-2xl p-8 border-2 border-dashed border-slate-700/80 flex flex-col items-center justify-center text-center transition-all cursor-pointer" data-onclick="openPicker|file-input">
+    <div id="dropzone" class="panel rounded-2xl p-8 border-2 border-dashed border-slate-700/80 flex flex-col items-center justify-center text-center transition-colors cursor-pointer" data-onclick="openPicker|file-input">
       <div class="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-3">
         <i data-lucide="route" class="w-7 h-7"></i>
       </div>
@@ -146,7 +146,7 @@
               <span class="text-slate-300 font-medium" id="goal-week-label">–</span>
             </div>
             <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-              <div class="h-full rounded-full transition-all duration-500 bg-teal-500" id="goal-week-bar" style="width: 0%"></div>
+              <div class="h-full rounded-full transition-[width] duration-500 bg-teal-500" id="goal-week-bar" style="width: 0%"></div>
             </div>
           </div>
           <div id="goal-year-wrap" class="hidden space-y-1">
@@ -155,7 +155,7 @@
               <span class="text-slate-300 font-medium" id="goal-year-label">–</span>
             </div>
             <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
-              <div class="h-full rounded-full transition-all duration-500 bg-orange-500" id="goal-year-bar" style="width: 0%"></div>
+              <div class="h-full rounded-full transition-[width] duration-500 bg-orange-500" id="goal-year-bar" style="width: 0%"></div>
             </div>
             <!-- Zielprognose (Plan4-18): Hochrechnung + noetige km/Woche -->
             <p class="text-[10px] text-slate-500" id="goal-year-forecast"></p>
@@ -204,13 +204,13 @@
               <option value="ride">🚴 Fahrrad</option>
               <option value="moto">🏍️ Motorrad</option>
             </select>
-            <button data-onclick="renameActivity" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Umbenennen">
+            <button data-onclick="renameActivity" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors" title="Umbenennen">
               <i data-lucide="edit-2" class="w-4 h-4"></i>
             </button>
-            <button data-onclick="exportGpx" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-all" title="Als GPX-Datei herunterladen">
+            <button data-onclick="exportGpx" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition-colors" title="Als GPX-Datei herunterladen">
               <i data-lucide="download" class="w-4 h-4"></i>
             </button>
-            <button data-onclick="deleteActivity" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-all" title="Löschen">
+            <button data-onclick="deleteActivity" class="p-2 rounded-xl bg-slate-900/80 border border-slate-800 text-slate-400 hover:text-red-400 hover:border-red-500/40 transition-colors" title="Löschen">
               <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
           </div>
@@ -218,7 +218,7 @@
 
         <!-- Karte -->
         <div class="panel rounded-2xl p-2 shadow-lg overflow-hidden relative">
-          <button id="btn-speed-color" data-onclick="toggleSpeedColor" class="absolute top-4 right-4 z-[1000] px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/90 border border-slate-800 text-slate-300 hover:border-slate-600 transition-all" title="Route nach Geschwindigkeit einfärben (blau = langsam, rot = schnell)">
+          <button id="btn-speed-color" data-onclick="toggleSpeedColor" class="absolute top-4 right-4 z-dropdown px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/90 border border-slate-800 text-slate-300 hover:border-slate-600 transition-colors" title="Route nach Geschwindigkeit einfärben (blau = langsam, rot = schnell)">
             Tempo-Färbung
           </button>
           <div id="map" class="w-full h-[320px] md:h-[380px] rounded-xl z-0"></div>
@@ -276,7 +276,7 @@
         </div>
 
         <!-- Foto-Lightbox -->
-        <div id="photo-lightbox" class="hidden fixed inset-0 z-[1700] bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4" data-onclick="closePhotoLightbox">
+        <div id="photo-lightbox" class="hidden fixed inset-0 z-modal bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4" data-onclick="closePhotoLightbox">
           <img id="photo-lightbox-img" src="" alt="Tour-Foto" class="max-w-full max-h-full rounded-xl shadow-2xl">
         </div>
 

@@ -639,7 +639,7 @@ function renderActivityList() {
     const type = ACTIVITY_TYPES[act.type] || ACTIVITY_TYPES.ride;
     const isActive = act.id === state.selectedId;
     const btn = document.createElement('button');
-    btn.className = `w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${
+    btn.className = `w-full text-left p-3 rounded-xl border transition-colors flex items-center gap-3 ${
       isActive ? 'bg-orange-500/10 border-orange-500/30' : 'bg-slate-900/40 border-slate-800/60 hover:border-slate-700'
     }`;
     btn.innerHTML = `
@@ -1220,8 +1220,8 @@ function toggleSpeedColor() {
   state.speedColor = !state.speedColor;
   const btn = document.getElementById('btn-speed-color');
   btn.className = state.speedColor
-    ? 'absolute top-4 right-4 z-[1000] px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-500/20 border border-teal-500/40 text-teal-300 transition-all'
-    : 'absolute top-4 right-4 z-[1000] px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/90 border border-slate-800 text-slate-300 hover:border-slate-600 transition-all';
+    ? 'absolute top-4 right-4 z-dropdown px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-500/20 border border-teal-500/40 text-teal-300 transition-colors'
+    : 'absolute top-4 right-4 z-dropdown px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/90 border border-slate-800 text-slate-300 hover:border-slate-600 transition-colors';
   const act = state.activities.find(a => a.id === state.selectedId);
   if (act) drawMap(act);
 }

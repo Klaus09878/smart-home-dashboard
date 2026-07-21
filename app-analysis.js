@@ -38,7 +38,7 @@
       }
       if (barEl) {
         barEl.style.width = `${score}%`;
-        barEl.className = `h-full rounded-full transition-all duration-500 ${barColor}`;
+        barEl.className = `h-full rounded-full transition-[width] duration-500 ${barColor}`;
       }
     }
 
@@ -496,10 +496,10 @@
       const tfIds = { 24: 'btn-tf-24', 72: 'btn-tf-72', 168: 'btn-tf-168', '-1': 'btn-tf-all' };
       Object.keys(tfIds).forEach(k => {
         const btn = document.getElementById(tfIds[k]);
-        if (btn) btn.className = 'px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all';
+        if (btn) btn.className = 'px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-colors';
       });
       const active = document.getElementById(tfIds[hours.toString()]);
-      if (active) active.className = 'px-3.5 py-1.5 rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 text-xs font-semibold transition-all';
+      if (active) active.className = 'px-3.5 py-1.5 rounded-xl border border-teal-500/20 bg-teal-500/10 text-teal-400 text-xs font-semibold transition-colors';
     }
 
     async function setChartTimeframe(hours) {
@@ -536,8 +536,8 @@
       const btn = document.getElementById('btn-compare');
       if (!btn) return;
       btn.className = appState.compareMode
-        ? 'px-3.5 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-300 text-xs font-semibold transition-all'
-        : 'px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all';
+        ? 'px-3.5 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-300 text-xs font-semibold transition-colors'
+        : 'px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-colors';
       const staticLegend = document.getElementById('chart-legend-static');
       if (staticLegend) staticLegend.classList.toggle('hidden', appState.compareMode);
     }

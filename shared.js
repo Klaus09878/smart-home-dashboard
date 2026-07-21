@@ -63,7 +63,7 @@ function showToast(message, type = 'success', action = null, durationMs = 4000) 
   if (!container) {
     container = document.createElement('div');
     container.id = 'toast-container';
-    container.className = 'fixed bottom-4 right-4 z-[2000] flex flex-col gap-2 items-end pointer-events-none';
+    container.className = 'fixed bottom-4 right-4 z-toast flex flex-col gap-2 items-end pointer-events-none';
     document.body.appendChild(container);
   }
 
@@ -103,7 +103,7 @@ function showToast(message, type = 'success', action = null, durationMs = 4000) 
 // bestätigen/absenden. Fokus landet automatisch im Dialog.
 function _mkOverlay() {
   const overlay = document.createElement('div');
-  overlay.className = 'fixed inset-0 z-[1700] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in';
+  overlay.className = 'fixed inset-0 z-modal bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in';
   return overlay;
 }
 

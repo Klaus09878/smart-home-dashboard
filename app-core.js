@@ -200,8 +200,8 @@
           const btn = document.createElement('button');
           btn.id = `tab-${loc.id}`;
           btn.className = active
-            ? 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 text-slate-950 shadow-md shadow-teal-500/10 transition-all'
-            : 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all';
+            ? 'px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 text-slate-950 shadow-md shadow-teal-500/10 transition-colors'
+            : 'px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition-colors';
           btn.innerText = getLocationName(loc.id).replace('Schlafzimmer ', '');
           btn.onclick = () => switchLocation(loc.id);
           wrap.appendChild(btn);
@@ -1075,7 +1075,7 @@
         if (inRh > getThresholds().humMax - 2) {
           badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400';
           badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span><span>Wichtig!</span>';
-          circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-emerald-500 bg-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.3)] relative transition-all duration-500';
+          circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-emerald-500 bg-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.3)] relative transition-[width] duration-500';
           icon.className = 'w-8 h-8 text-emerald-400 transition-colors duration-500';
           icon.setAttribute('data-lucide', 'wind');
           verdict.innerText = 'LÜFTEN';
@@ -1087,7 +1087,7 @@
         } else {
           badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400';
           badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>Empfohlen</span>';
-          circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-emerald-500 bg-slate-950 shadow-inner relative transition-all duration-500';
+          circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-emerald-500 bg-slate-950 shadow-inner relative transition-[width] duration-500';
           icon.className = 'w-8 h-8 text-emerald-400 transition-colors duration-500';
           icon.setAttribute('data-lucide', 'wind');
           verdict.innerText = 'LÜFTEN';
@@ -1100,7 +1100,7 @@
       } else if (diff < -0.4) {
         badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400';
         badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500"></span><span>Geschlossen</span>';
-        circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-red-500 bg-slate-950 shadow-inner relative transition-all duration-500';
+        circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-red-500 bg-slate-950 shadow-inner relative transition-[width] duration-500';
         icon.className = 'w-8 h-8 text-red-400 transition-colors duration-500';
         icon.setAttribute('data-lucide', 'lock');
         verdict.innerText = 'SCHLIESSEN';
@@ -1112,7 +1112,7 @@
       } else {
         badge.className = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-slate-900 border border-slate-800 text-slate-400';
         badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-slate-500"></span><span>Neutral</span>';
-        circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-slate-700 bg-slate-950 shadow-inner relative transition-all duration-500';
+        circle.className = 'w-28 h-28 rounded-full flex flex-col items-center justify-center border-4 border-slate-700 bg-slate-950 shadow-inner relative transition-[width] duration-500';
         icon.className = 'w-8 h-8 text-slate-400 transition-colors duration-500';
         icon.setAttribute('data-lucide', 'minus');
         verdict.innerText = 'EGAL';
@@ -1163,7 +1163,7 @@
       bar.style.width = `${surfaceRh}%`;
 
       const badgeBase = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1';
-      const barBase = 'h-full rounded-full transition-all duration-500';
+      const barBase = 'h-full rounded-full transition-[width] duration-500';
 
       if (surfaceRhRaw >= 100) {
         badge.className = `${badgeBase} bg-red-500/10 border border-red-500/20 text-red-400`;

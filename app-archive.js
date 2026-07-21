@@ -224,7 +224,7 @@
       wrap.innerHTML = `
         <div class="flex items-center justify-between gap-2 mb-3">
           <h3 class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5"><i data-lucide="flame" class="w-3.5 h-3.5 text-orange-400"></i> Heizperiode ${heatYearLabel}</h3>
-          <button data-onclick="editEnergyConfig" title="Heizkosten-Faktoren einstellen" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-all"><i data-lucide="settings-2" class="w-3.5 h-3.5"></i></button>
+          <button data-onclick="editEnergyConfig" title="Heizkosten-Faktoren einstellen" class="p-1.5 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors"><i data-lucide="settings-2" class="w-3.5 h-3.5"></i></button>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
           <div class="bg-slate-900/50 border border-slate-800/60 rounded-xl p-2.5 text-center">
@@ -483,7 +483,7 @@
         : '';
 
       const overlay = document.createElement('div');
-      overlay.className = 'fixed inset-0 z-[1700] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in';
+      overlay.className = 'fixed inset-0 z-modal bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in';
       overlay.innerHTML = `
         <div class="panel rounded-2xl p-6 shadow-2xl w-full max-w-sm">
           <div class="flex items-center justify-between mb-3">
