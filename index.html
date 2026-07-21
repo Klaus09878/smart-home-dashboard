@@ -264,16 +264,18 @@
 
     <!-- ============ VIEW: EINSTELLUNGEN ============ -->
     <div id="view-settings" class="hidden flex-1 flex-col animate-fade-in">
-      <header class="glass-panel rounded-2xl p-4 mb-6 flex items-center gap-3 shadow-lg">
-        <button data-onclick="navigateTo|home" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Zurück zum Hub">
-          <i data-lucide="arrow-left" class="w-4.5 h-4.5"></i>
-        </button>
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-600 to-slate-800 flex items-center justify-center text-white shadow-md">
-          <i data-lucide="settings" class="w-5 h-5"></i>
-        </div>
-        <div>
-          <h1 class="text-xl font-bold tracking-tight text-white">Einstellungen</h1>
-          <p class="text-xs text-slate-400 mt-0.5">Personalisierung, Benachrichtigungen &amp; Daten</p>
+      <header class="sticky top-4 z-40 mb-8">
+        <div class="nav-pill rounded-full flex items-center gap-3 pl-2 pr-4 py-1.5">
+          <button data-onclick="navigateTo|home" class="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" title="Zurück zum Hub">
+            <i data-lucide="arrow-left" class="w-4.5 h-4.5"></i>
+          </button>
+          <div class="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-400">
+            <i data-lucide="settings" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h1 class="text-sm font-semibold tracking-tight text-white">Einstellungen</h1>
+            <p class="text-[11px] text-slate-500">Personalisierung, Benachrichtigungen &amp; Daten</p>
+          </div>
         </div>
       </header>
 
@@ -410,7 +412,7 @@
           <button data-onclick="closeOnboarding" class="p-1.5 rounded-lg text-slate-500 hover:text-white transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
         </div>
         <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-4">
-          <div id="onboarding-progress" class="h-full bg-gradient-to-r from-indigo-500 to-teal-400 transition-all duration-300" style="width: 0%"></div>
+          <div id="onboarding-progress" class="h-full bg-teal-500 transition-all duration-300" style="width: 0%"></div>
         </div>
         <div id="onboarding-body" class="min-h-[140px] text-sm text-slate-300"></div>
         <div class="flex items-center justify-between mt-5">
@@ -441,19 +443,20 @@
     </div>
 
     <!-- HEADER: Navigation and location switching -->
-    <header class="relative z-30 glass-panel rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-lg">
+    <header class="sticky top-4 z-40 mb-8">
+    <div class="nav-pill rounded-2xl p-3 flex flex-col sm:flex-row gap-3 items-center justify-between">
       <div class="flex items-center gap-3">
         <!-- Back to Hub -->
-        <button data-onclick="navigateTo|home" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Zurück zum Hub">
+        <button data-onclick="navigateTo|home" class="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors" title="Zurück zum Hub">
           <i data-lucide="arrow-left" class="w-4.5 h-4.5"></i>
         </button>
         <!-- Logo Icon -->
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20">
-          <i data-lucide="home" class="w-5 h-5"></i>
+        <div class="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400">
+          <i data-lucide="home" class="w-4.5 h-4.5"></i>
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">ClimateFlow</h1>
+            <h1 class="text-lg font-semibold tracking-tight text-white">ClimateFlow</h1>
           </div>
           <p class="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
             <span class="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_8px_#14b8a6] animate-pulse" id="status-dot"></span>
@@ -532,6 +535,7 @@
           </div>
         </div>
       </div>
+    </div>
     </header>
 
     <!-- MAIN VIEW: LOCATION DETAILED DASHBOARD -->
@@ -562,7 +566,7 @@
             <div>
               <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Innentemperatur</p>
               <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-4xl font-bold tracking-tight text-white" id="kpi-temp-in">--.-</span>
+                <span class="text-4xl font-semibold tracking-tight text-white font-mono tabular-nums" id="kpi-temp-in">--.-</span>
                 <span class="text-2xl font-medium text-slate-400">°C</span>
               </div>
               <p class="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
@@ -574,7 +578,6 @@
               <i data-lucide="thermometer" class="w-6 h-6"></i>
             </div>
           </div>
-          <div class="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-orange-500/5 to-transparent pointer-events-none"></div>
           <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-10">
             <span class="flex items-center gap-1 text-slate-400">
               Comfort: <span id="kpi-temp-comfort" class="font-semibold text-teal-400">Optimal</span>
@@ -591,7 +594,7 @@
             <div>
               <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Innenluftfeuchtigkeit</p>
               <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-4xl font-bold tracking-tight text-white" id="kpi-humidity-in">--.-</span>
+                <span class="text-4xl font-semibold tracking-tight text-white font-mono tabular-nums" id="kpi-humidity-in">--.-</span>
                 <span class="text-2xl font-medium text-slate-400">%</span>
               </div>
               <p class="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
@@ -603,7 +606,6 @@
               <i data-lucide="droplets" class="w-6 h-6"></i>
             </div>
           </div>
-          <div class="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-blue-500/5 to-transparent pointer-events-none"></div>
           <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-10">
             <span class="flex items-center gap-1 text-slate-400">
               Qualität: <span id="kpi-humidity-comfort" class="font-semibold text-emerald-400">Optimal</span>
@@ -620,7 +622,7 @@
             <div>
               <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Außenklima (Wetter)</p>
               <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-4xl font-bold tracking-tight text-white" id="kpi-temp-out">--.-</span>
+                <span class="text-4xl font-semibold tracking-tight text-white font-mono tabular-nums" id="kpi-temp-out">--.-</span>
                 <span class="text-2xl font-medium text-slate-400">°C</span>
               </div>
               <p class="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1">
@@ -632,7 +634,6 @@
               <i data-lucide="cloud-sun" class="w-6 h-6"></i>
             </div>
           </div>
-          <div class="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-teal-500/5 to-transparent pointer-events-none"></div>
           <div class="flex items-center justify-between text-xs mt-4 pt-3 border-t border-slate-800/60 z-10">
             <span class="flex items-center gap-1 text-slate-400" id="weather-desc">
               Bewölkt
@@ -689,7 +690,7 @@
                   <span class="font-bold text-white" id="abs-hum-in">--.- g/m³</span>
                 </div>
                 <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
-                  <div class="bg-gradient-to-r from-teal-500 to-indigo-500 h-full rounded-full transition-all duration-500" id="bar-abs-hum-in" style="width: 0%"></div>
+                  <div class="bg-teal-500 h-full rounded-full transition-all duration-500" id="bar-abs-hum-in" style="width: 0%"></div>
                 </div>
               </div>
 
@@ -699,7 +700,7 @@
                   <span class="font-bold text-white" id="abs-hum-out">--.- g/m³</span>
                 </div>
                 <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
-                  <div class="bg-gradient-to-r from-blue-500 to-indigo-400 h-full rounded-full transition-all duration-500" id="bar-abs-hum-out" style="width: 0%"></div>
+                  <div class="bg-blue-500 h-full rounded-full transition-all duration-500" id="bar-abs-hum-out" style="width: 0%"></div>
                 </div>
               </div>
 
@@ -799,7 +800,7 @@
               </div>
               <div class="flex items-center gap-3">
                 <div class="flex-1 bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800">
-                  <div class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-emerald-500 to-emerald-400" id="comfort-score-bar" style="width: 0%"></div>
+                  <div class="h-full rounded-full transition-all duration-500 bg-emerald-500" id="comfort-score-bar" style="width: 0%"></div>
                 </div>
                 <p class="text-sm font-bold text-white mt-0.5 w-8 text-right" id="comfort-score-value">--</p>
               </div>
@@ -856,7 +857,7 @@
               <span class="font-bold text-white" id="mold-bar-label">--%</span>
             </div>
             <div class="w-full bg-slate-900 h-2.5 rounded-full overflow-hidden border border-slate-800 relative">
-              <div class="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-emerald-500 to-emerald-400" id="mold-bar" style="width: 0%"></div>
+              <div class="h-full rounded-full transition-all duration-500 bg-emerald-500" id="mold-bar" style="width: 0%"></div>
               <div class="absolute top-0 bottom-0 w-px bg-red-400/70" style="left: 80%"></div>
             </div>
           </div>
@@ -953,7 +954,7 @@
 
           <div id="chart-legend-static" class="mt-4 pt-4 border-t border-slate-800/60 flex flex-wrap justify-center gap-6 text-xs text-slate-400">
             <div class="flex items-center gap-2">
-              <span class="w-3 h-0.5 bg-gradient-to-r from-orange-400 to-orange-500 rounded"></span>
+              <span class="w-3 h-0.5 bg-orange-400 rounded"></span>
               <span>Innentemperatur (°C)</span>
             </div>
             <div class="flex items-center gap-2">

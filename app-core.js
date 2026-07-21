@@ -1163,12 +1163,12 @@
       bar.style.width = `${surfaceRh}%`;
 
       const badgeBase = 'px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1';
-      const barBase = 'h-full rounded-full transition-all duration-500 bg-gradient-to-r';
+      const barBase = 'h-full rounded-full transition-all duration-500';
 
       if (surfaceRhRaw >= 100) {
         badge.className = `${badgeBase} bg-red-500/10 border border-red-500/20 text-red-400`;
         badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span><span>Kondensat!</span>';
-        bar.className = `${barBase} from-red-500 to-red-400`;
+        bar.className = `${barBase} bg-red-500`;
         desc.innerText = `Achtung: Der Taupunkt der Raumluft (${dewPoint.toFixed(1)} °C) liegt über der geschätzten Temperatur kalter Wandstellen (${surfaceTemp.toFixed(1)} °C) – dort schlägt sich aktuell Wasser nieder. Feuchte dringend senken (siehe Lüftungsberater) und den Raum stärker heizen.`;
         sendPush(
           'ClimateFlow Kondensat-Warnung',
@@ -1180,7 +1180,7 @@
       } else if (surfaceRhRaw >= 80) {
         badge.className = `${badgeBase} bg-orange-500/10 border border-orange-500/20 text-orange-400`;
         badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span><span>Erhöht</span>';
-        bar.className = `${barBase} from-orange-500 to-red-400`;
+        bar.className = `${barBase} bg-orange-500`;
         desc.innerText = `An kalten Wandstellen liegt die Luftfeuchte bei ca. ${surfaceRh.toFixed(0)} % – ab 80 % kann Schimmel wachsen. Raumfeuchte senken (Lüftungsberater beachten) und Außenwände nicht durch Möbel verdecken.`;
         sendPush(
           'ClimateFlow Schimmel-Warnung',
@@ -1192,12 +1192,12 @@
       } else if (surfaceRhRaw >= 70) {
         badge.className = `${badgeBase} bg-amber-500/10 border border-amber-500/20 text-amber-400`;
         badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500"></span><span>Beobachten</span>';
-        bar.className = `${barBase} from-amber-500 to-orange-400`;
+        bar.className = `${barBase} bg-amber-500`;
         desc.innerText = `Die Wandfeuchte liegt bei ca. ${surfaceRh.toFixed(0)} % – noch unkritisch, aber nicht weit von der 80-%-Schwelle. Regelmäßiges Stoßlüften hält das Risiko niedrig.`;
       } else {
         badge.className = `${badgeBase} bg-emerald-500/10 border border-emerald-500/20 text-emerald-400`;
         badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>Gering</span>';
-        bar.className = `${barBase} from-emerald-500 to-emerald-400`;
+        bar.className = `${barBase} bg-emerald-500`;
         desc.innerText = `Alles im grünen Bereich: Selbst an kalten Wandstellen bleibt die Luftfeuchte mit ca. ${surfaceRh.toFixed(0)} % deutlich unter der Schimmelschwelle von 80 %.`;
       }
     }

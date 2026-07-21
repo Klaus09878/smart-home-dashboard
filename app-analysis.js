@@ -3,6 +3,13 @@
 // Klassische Skripte teilen den globalen Scope; Reihenfolge in index.html
 // entspricht der urspruenglichen Dateireihenfolge (app-main.js zuletzt).
 
+    // Chart-Chrome aus den Design-Tokens lesen (Plan6-3): Achsen/Tooltip folgen
+    // damit dem aktiven Theme (hell/dunkel) statt hartkodierter Dark-Werte.
+    function chartToken(name, alpha) {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return alpha != null ? `oklch(${v} / ${alpha})` : `oklch(${v})`;
+    }
+
     // ============ Komfort-Score (0–100) ============
     // Bewertet das aktuelle Raumklima über die getestete Kernfunktion
     // comfortScore (lib/core.js) — inkl. Schimmelrisiko-Abzug, falls Wetterdaten da.
@@ -24,11 +31,11 @@
         return;
       }
 
-      let label = 'Sehr gut', color = 'text-emerald-400', barColor = 'from-emerald-500 to-emerald-400';
-      if (score < 40) { label = 'Schlecht'; color = 'text-red-400'; barColor = 'from-red-500 to-red-400'; }
-      else if (score < 60) { label = 'Mäßig'; color = 'text-orange-400'; barColor = 'from-orange-500 to-orange-400'; }
-      else if (score < 80) { label = 'Okay'; color = 'text-amber-400'; barColor = 'from-amber-500 to-amber-400'; }
-      else if (score < 95) { label = 'Gut'; color = 'text-teal-400'; barColor = 'from-teal-500 to-teal-400'; }
+      let label = 'Sehr gut', color = 'text-emerald-400', barColor = 'bg-emerald-500';
+      if (score < 40) { label = 'Schlecht'; color = 'text-red-400'; barColor = 'bg-red-500'; }
+      else if (score < 60) { label = 'Mäßig'; color = 'text-orange-400'; barColor = 'bg-orange-500'; }
+      else if (score < 80) { label = 'Okay'; color = 'text-amber-400'; barColor = 'bg-amber-500'; }
+      else if (score < 95) { label = 'Gut'; color = 'text-teal-400'; barColor = 'bg-teal-500'; }
 
       valEl.innerText = score;
       valEl.className = `text-sm font-bold mt-0.5 ${color}`;
@@ -38,7 +45,7 @@
       }
       if (barEl) {
         barEl.style.width = `${score}%`;
-        barEl.className = `h-full rounded-full transition-all duration-500 bg-gradient-to-r ${barColor}`;
+        barEl.className = `h-full rounded-full transition-all duration-500 ${barColor}`;
       }
     }
 
@@ -406,12 +413,12 @@
           interaction: { mode: 'index', intersect: false },
           plugins: {
             // Im Vergleichsmodus zeigt Chart.js die Legende (4 Serien, 2 Standorte)
-            legend: { display: appState.compareMode, labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12 } },
+            legend: { display: appState.compareMode, labels: { color: chartToken('--sh-ink-3'), font: { size: 10 }, boxWidth: 12 } },
             tooltip: {
-              backgroundColor: 'rgba(15, 23, 42, 0.95)',
-              titleColor: '#f8fafc',
-              bodyColor: '#cbd5e1',
-              borderColor: 'rgba(255,255,255,0.06)',
+              backgroundColor: chartToken('--sh-surface', 0.96),
+              titleColor: chartToken('--sh-ink'),
+              bodyColor: chartToken('--sh-ink-2'),
+              borderColor: chartToken('--sh-rule'),
               borderWidth: 1,
               padding: 10,
               usePointStyle: true,
@@ -444,9 +451,9 @@
               // Achse läuft bis "jetzt": ein Sensor-Stillstand ist als leerer
               // Bereich am rechten Rand sofort sichtbar
               max: Date.now(),
-              grid: { color: 'rgba(255, 255, 255, 0.02)' },
+              grid: { color: chartToken('--sh-rule', 0.35) },
               ticks: {
-                color: '#64748b',
+                color: chartToken('--sh-ink-4'),
                 font: { size: 10 },
                 maxTicksLimit: 7,
                 callback: val => {
@@ -460,17 +467,17 @@
             yTemp: {
               type: 'linear',
               position: 'left',
-              title: { display: true, text: 'Temperatur (°C)', color: '#64748b', font: { size: 10, weight: 'bold' } },
-              grid: { color: 'rgba(255, 255, 255, 0.03)' },
-              ticks: { color: '#94a3b8', callback: val => val.toFixed(1) + '°' }
+              title: { display: true, text: 'Temperatur (°C)', color: chartToken('--sh-ink-4'), font: { size: 10, weight: 'bold' } },
+              grid: { color: chartToken('--sh-rule', 0.4) },
+              ticks: { color: chartToken('--sh-ink-3'), callback: val => val.toFixed(1) + '°' }
             },
             yHum: {
               type: 'linear',
               position: 'right',
-              title: { display: true, text: 'Luftfeuchtigkeit (%)', color: '#64748b', font: { size: 10, weight: 'bold' } },
+              title: { display: true, text: 'Luftfeuchtigkeit (%)', color: chartToken('--sh-ink-4'), font: { size: 10, weight: 'bold' } },
               grid: { drawOnChartArea: false },
               min: 0, max: 100,
-              ticks: { color: '#94a3b8', callback: val => val.toFixed(0) + '%' }
+              ticks: { color: chartToken('--sh-ink-3'), callback: val => val.toFixed(0) + '%' }
             }
           }
         }
