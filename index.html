@@ -48,7 +48,7 @@
       <i data-lucide="wind" class="w-6 h-6 text-teal-400"></i>
     </div>
     <div class="text-center">
-      <p class="text-base font-bold text-white tracking-tight" id="loading-text">Klimadaten werden geladen...</p>
+      <p class="text-base font-bold text-white tracking-tight" id="loading-text">Klimadaten werden geladen…</p>
       <p class="text-xs text-slate-500 mt-1">Messwerte werden geladen …</p>
     </div>
   </div>
@@ -113,7 +113,7 @@
               <p class="text-6xl sm:text-7xl leading-none font-semibold tracking-tight text-white font-mono tabular-nums" id="hub-clock">--:--</p>
               <p class="text-xs text-slate-400 mt-2 flex items-center gap-1.5 sm:justify-end">
                 <i data-lucide="cloud-sun" class="w-3.5 h-3.5 text-teal-400"></i>
-                <span id="hub-weather-text">Wetter wird geladen...</span>
+                <span id="hub-weather-text">Wetter wird geladen…</span>
               </p>
             </div>
           </div>
@@ -164,7 +164,7 @@
             <div id="todo-list" class="flex flex-col gap-1 max-h-40 overflow-y-auto pr-1 mb-2"></div>
             <form data-onsubmit="addTodo|$event" class="flex gap-1.5">
               <input id="todo-input" type="text" maxlength="120" placeholder="Neuer Eintrag …"
-                class="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-teal-500/50 focus:outline-none">
+                class="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:border-teal-500/50">
               <button type="submit" class="px-3 py-1.5 rounded-full bg-teal-500 text-accent-ink hover:bg-teal-600 transition-colors" title="Hinzufügen">
                 <i data-lucide="plus" class="w-3.5 h-3.5"></i>
               </button>
@@ -476,14 +476,14 @@
         <div class="relative w-full sm:w-auto" id="nav-weather-picker">
           <button id="location-btn" data-onclick="toggleLocationModal" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-sm font-medium flex items-center justify-between sm:justify-start gap-2.5 transition-colors text-slate-200">
             <i data-lucide="map-pin" class="w-4 h-4 text-teal-400"></i>
-            <span id="current-location-name">Standort wählen...</span>
+            <span id="current-location-name">Standort wählen…</span>
             <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-500"></i>
           </button>
           
           <!-- Quick search panel dropdown -->
           <div id="location-dropdown" class="hidden absolute right-0 mt-2 w-72 rounded-xl panel shadow-2xl z-dropdown p-3 flex flex-col gap-2">
             <div class="relative">
-              <input type="text" id="city-search" placeholder="Stadt suchen..." data-onkeyup="searchCity|$event" class="w-full px-3 py-2 bg-slate-900/90 border border-slate-800 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 rounded-lg text-sm outline-none text-slate-200 placeholder-slate-500 transition-colors">
+              <input type="text" id="city-search" placeholder="Stadt suchen…" data-onkeyup="searchCity|$event" class="w-full px-3 py-2 bg-slate-900/90 border border-slate-800 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 rounded-lg text-sm outline-none text-slate-200 placeholder-slate-500 transition-colors">
               <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute right-3 top-2.5"></i>
             </div>
             <div id="search-results" class="max-h-40 overflow-y-auto flex flex-col gap-1 text-xs text-slate-400 mt-1">
@@ -665,7 +665,7 @@
             </div>
             <div class="px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-slate-900 border border-slate-800" id="ventilation-badge">
               <span class="w-2 h-2 rounded-full bg-slate-500"></span>
-              <span>Berechne...</span>
+              <span>Berechne…</span>
             </div>
           </div>
 
@@ -677,7 +677,7 @@
                 <span class="text-xs font-bold mt-1 text-slate-400 transition-colors duration-500" id="ventilation-verdict">Unklar</span>
               </div>
               <h3 class="text-sm font-semibold mt-4 text-center text-slate-200" id="ventilation-title">Feuchtigkeitsausgleich</h3>
-              <p class="text-xs text-slate-400 mt-1 text-center max-w-[200px]" id="ventilation-short-desc">Lade Klimadaten...</p>
+              <p class="text-xs text-slate-400 mt-1 text-center max-w-[200px]" id="ventilation-short-desc">Lade Klimadaten…</p>
             </div>
 
             <!-- Absolute Humidity Visualizer -->
@@ -712,12 +712,12 @@
 
           <div class="mt-4 pt-3 border-t border-slate-800/60 flex items-start gap-2 text-xs text-slate-400">
             <i data-lucide="info" class="w-4 h-4 text-teal-400 shrink-0"></i>
-            <span id="ventilation-tip">Warte auf Berechnungen...</span>
+            <span id="ventilation-tip">Warte auf Berechnungen…</span>
           </div>
           <!-- Lüftungs-Erfolgskontrolle: letztes erkanntes Stoßlüften (48 h) -->
           <div class="mt-2 pt-2 border-t border-slate-800/40 flex items-start gap-2 text-xs text-slate-400">
             <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i>
-            <span id="vent-success">Analysiere Messreihe...</span>
+            <span id="vent-success">Analysiere Messreihe…</span>
           </div>
           <!-- Feuchte-Trend-Prognose (P7) -->
           <div id="vent-trend-row" class="hidden mt-2 pt-2 border-t border-slate-800/40 flex items-start gap-2 text-xs text-slate-400">
@@ -832,7 +832,7 @@
             </div>
             <div class="px-2.5 py-1 rounded-full text-xs font-semibold tracking-wider flex items-center gap-1 bg-slate-900 border border-slate-800" id="mold-badge">
               <span class="w-2 h-2 rounded-full bg-slate-500"></span>
-              <span>Berechne...</span>
+              <span>Berechne…</span>
             </div>
           </div>
 
@@ -862,7 +862,7 @@
             </div>
           </div>
 
-          <p class="text-xs text-slate-400 bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/40 mt-auto" id="mold-desc">Lade Klimadaten...</p>
+          <p class="text-xs text-slate-400 bg-slate-900/50 p-2.5 rounded-xl border border-slate-800/40 mt-auto" id="mold-desc">Lade Klimadaten…</p>
           <p class="text-[10px] text-slate-500 mt-2">*Näherung: Oberflächentemperatur kritischer Wandstellen über Temperaturfaktor f<sub>Rsi</sub> = 0,7 (DIN 4108-2) aus Innen- und Außentemperatur.</p>
         </div>
 
@@ -890,7 +890,7 @@
 
           <div class="mt-4 pt-3 border-t border-slate-800/60 flex items-start gap-2 text-xs text-slate-300">
             <i data-lucide="clock" class="w-4 h-4 text-teal-400 shrink-0"></i>
-            <span id="vent-forecast-summary">Warte auf Wetterdaten...</span>
+            <span id="vent-forecast-summary">Warte auf Wetterdaten…</span>
           </div>
         </div>
 
@@ -971,7 +971,7 @@
 
       <!-- Langzeit-Archiv: tägliche Aggregate aus Cloudflare D1 -->
       <section data-widget="cf-archive" class="panel rounded-2xl shadow-lg transition-[opacity,box-shadow] duration-300">
-        <button data-onclick="toggleArchiveCollapse" class="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none">
+        <button data-onclick="toggleArchiveCollapse" class="w-full px-6 py-4 flex items-center justify-between text-left">
           <div class="flex items-center gap-2">
             <i data-lucide="database" class="w-5 h-5 text-teal-400"></i>
             <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider text-[11px]">Langzeit-Archiv (Tageswerte)</h2>
@@ -983,7 +983,7 @@
             <p class="text-xs text-slate-400">Tägliche Min/Mittel/Max-Werte aus der Cloud-Datenbank — überlebt das ThingSpeak-Limit von 8000 Einträgen.</p>
             <div class="shrink-0 flex items-center gap-2">
               <!-- Jahresvergleich (Plan4-17): zweite Jahres-Temperaturkurve als Overlay -->
-              <select id="archive-compare-year" data-onchange="setArchiveCompareYear|$value" class="px-2 py-1.5 rounded-lg text-xs bg-slate-900 border border-slate-800 text-slate-300 focus:border-teal-500/50 focus:outline-none" title="Ein zweites Jahr zum Vergleich einblenden">
+              <select id="archive-compare-year" data-onchange="setArchiveCompareYear|$value" class="px-2 py-1.5 rounded-lg text-xs bg-slate-900 border border-slate-800 text-slate-300 focus:border-teal-500/50" title="Ein zweites Jahr zum Vergleich einblenden">
                 <option value="">Vergleich: aus</option>
               </select>
               <button data-onclick="openPicker|archive-import-input" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-colors flex items-center gap-1.5" title="ThingSpeak-CSV-Export rückwirkend ins Archiv importieren">
@@ -1015,7 +1015,7 @@
 
       <!-- Collapsible Historical Feed Data Table -->
       <section data-widget="cf-table" class="panel rounded-2xl shadow-lg transition-[opacity,box-shadow] duration-300">
-        <button data-onclick="toggleTableCollapse" class="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none">
+        <button data-onclick="toggleTableCollapse" class="w-full px-6 py-4 flex items-center justify-between text-left">
           <div class="flex items-center gap-2">
             <i data-lucide="list" class="w-5 h-5 text-blue-400"></i>
             <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider text-[11px]">Rohdaten-Tabelle (Neueste 10 Einträge)</h2>
@@ -1037,7 +1037,7 @@
               </thead>
               <tbody id="feed-table-body" class="divide-y divide-slate-850">
                 <tr>
-                  <td colspan="5" class="p-4 text-center text-slate-500">Lade Tabellendaten...</td>
+                  <td colspan="5" class="p-4 text-center text-slate-500">Lade Tabellendaten…</td>
                 </tr>
               </tbody>
             </table>
@@ -1066,10 +1066,10 @@
             <p class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Wohlfühl-Temperatur (°C)</p>
             <div class="grid grid-cols-2 gap-3">
               <label class="text-xs text-slate-400">Min
-                <input type="number" step="0.5" id="th-temp-min" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50 focus:outline-none">
+                <input type="number" step="0.5" id="th-temp-min" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50">
               </label>
               <label class="text-xs text-slate-400">Max
-                <input type="number" step="0.5" id="th-temp-max" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50 focus:outline-none">
+                <input type="number" step="0.5" id="th-temp-max" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50">
               </label>
             </div>
           </div>
@@ -1077,10 +1077,10 @@
             <p class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Wohlfühl-Luftfeuchte (%)</p>
             <div class="grid grid-cols-2 gap-3">
               <label class="text-xs text-slate-400">Min
-                <input type="number" step="1" id="th-hum-min" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50 focus:outline-none">
+                <input type="number" step="1" id="th-hum-min" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50">
               </label>
               <label class="text-xs text-slate-400">Max
-                <input type="number" step="1" id="th-hum-max" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50 focus:outline-none">
+                <input type="number" step="1" id="th-hum-max" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:border-teal-500/50">
               </label>
             </div>
           </div>

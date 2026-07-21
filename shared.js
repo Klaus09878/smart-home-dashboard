@@ -147,12 +147,12 @@ function modalPrompt(opts = {}) {
       const hint = f.hint ? `<span class="block text-[10px] text-slate-500 mt-0.5">${escapeHtml(f.hint)}</span>` : '';
       if (f.type === 'select') {
         const os = (f.options || []).map(o => `<option value="${escapeHtml(String(o.value))}" ${String(o.value) === String(f.value) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('');
-        return `<label class="block mb-3"><span class="text-xs text-slate-400">${escapeHtml(f.label)}</span><select id="${id}" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:border-teal-500/50 focus:outline-none">${os}</select>${hint}</label>`;
+        return `<label class="block mb-3"><span class="text-xs text-slate-400">${escapeHtml(f.label)}</span><select id="${id}" class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:border-teal-500/50">${os}</select>${hint}</label>`;
       }
       if (f.type === 'checkbox') {
         return `<label class="flex items-center gap-2 mb-3 cursor-pointer text-sm text-slate-200"><input type="checkbox" id="${id}" ${f.value ? 'checked' : ''} class="accent-teal-500"> ${escapeHtml(f.label)}</label>`;
       }
-      return `<label class="block mb-3"><span class="text-xs text-slate-400">${escapeHtml(f.label)}</span><input type="${f.type || 'text'}" id="${id}" value="${f.value != null ? escapeHtml(String(f.value)) : ''}" placeholder="${escapeHtml(f.placeholder || '')}" ${f.type === 'number' ? 'inputmode="decimal"' : ''} class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-teal-500/50 focus:outline-none">${hint}</label>`;
+      return `<label class="block mb-3"><span class="text-xs text-slate-400">${escapeHtml(f.label)}</span><input type="${f.type || 'text'}" id="${id}" value="${f.value != null ? escapeHtml(String(f.value)) : ''}" placeholder="${escapeHtml(f.placeholder || '')}" ${f.type === 'number' ? 'inputmode="decimal"' : ''} class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-teal-500/50">${hint}</label>`;
     }).join('');
     overlay.innerHTML = `
       <div class="panel rounded-2xl p-6 shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto">

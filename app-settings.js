@@ -39,7 +39,7 @@
       return `<label class="bg-slate-900/50 border border-slate-800/60 rounded-xl p-3 block">
         <span class="text-sm text-slate-200">${escapeHtml(label)}</span>
         <span class="block text-[11px] text-slate-500 mb-1.5">${hint ? escapeHtml(hint) : ''}</span>
-        <select data-onchange="${handler}|${key}|$value" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:border-teal-500/50 focus:outline-none">${os}</select>
+        <select data-onchange="${handler}|${key}|$value" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:border-teal-500/50">${os}</select>
       </label>`;
     }
 

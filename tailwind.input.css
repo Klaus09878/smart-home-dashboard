@@ -4,7 +4,11 @@
 
 /* Hallmark · genre: modern-minimal · theme: custom "Instrument" (dual paper)
  * design-system: design.md · designed-as-app · macrostructure: Workbench (App-Shell)
- * pre-emit critique: P4 H4 E4 S4 R5 V4
+ * nav: N5 (floating pill) · footer: Ft2 (inline single line)
+ * pre-emit critique: P5 H4 E5 S4 R5 V4
+ * slop-test (58 gates, genre modern-minimal): pass · contrast: pass (40-41)
+ *   · tokens: pass (48) · motion: pass (10,12,14,27) · icons: pass (30, Lucide)
+ *   · nav/footer: pass (42-43) · mobile: pass (34,49-57) · honest: pass (46)
  *
  * ============ Design-Tokens (Plan6-2) ============
  * OKLCH-Komponenten (L C H) als Custom Properties — Tailwind mappt slate/teal/

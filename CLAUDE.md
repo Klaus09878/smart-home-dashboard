@@ -2,7 +2,7 @@
 
 Multi-Projekt-SPA auf Cloudflare Pages (statisch + Functions), Mehrbenutzer-Login via `functions/_middleware.js`: Session-Cookie vom Login-Screen `login.html` (Plan5-5, HMAC; optional Env-Var `SESSION_SECRET`), Basic Auth (`AUTH_USER`/`AUTH_PASS` + `AUTH_USERS`) bleibt API-/Übergangs-Fallback, alternativ Cloudflare Access. Deploy: Push auf `main`. Alles Deutsch.
 
-**Design-System (Runde 6, VERBINDLICH — Details in `design.md`):** „Instrument"/modern-minimal auf Basis des gevendorten hallmark-Skills (`.claude/skills/hallmark/`). OKLCH-**Tokens** in `tailwind.input.css` (`:root` dunkel, `html.light` = Token-Flip); `tailwind.config.js` mappt die `slate`/`teal`/`white`-Klassen und Radien darauf. **NIE rohe Farbwerte einführen — Token ergänzen.** EIN Teal-Akzent + semantische Statusfarben; Messwerte/Uhrzeiten `font-mono tabular-nums`; keine Emojis als UI-Sprache, keine Verlaufs-Deko, keine Glow-Blobs, kein Panel-Glas (Flächen = `.panel`, interaktiv + `.card-hover`; `.nav-pill` für Floating-Toolbars, einziger erlaubter Blur). Chart-Chrome über `chartToken()` (shared.js) — gilt für ALLE Chart.js-Diagramme.
+**Design-System (Runde 6, VERBINDLICH — Details in `design.md`):** „Instrument"/modern-minimal auf Basis des gevendorten hallmark-Skills (`.claude/skills/hallmark/`). OKLCH-**Tokens** in `tailwind.input.css` (`:root` dunkel, `html.light` = Token-Flip); `tailwind.config.js` mappt die `slate`/`teal`/`white`-Klassen und Radien darauf. **NIE rohe Farbwerte einführen — Token ergänzen.** EIN Teal-Akzent + semantische Statusfarben; Messwerte/Uhrzeiten `font-mono tabular-nums`; keine Emojis als UI-Sprache, keine Verlaufs-Deko, keine Glow-Blobs, kein Panel-Glas (Flächen = `.panel`, interaktiv + `.card-hover`; `.nav-pill` für Floating-Toolbars, einziger erlaubter Blur). Chart-/Viz-Farben über `chartToken()` + `viz.<rolle>()` (shared.js) — gilt für ALLE Chart.js-Diagramme, Leaflet-Routen und Heatmaps; nie rohe Hex/rgb. Vor jedem Design-Deploy den 58-Gate-Slop-Test des hallmark-Skills fahren (Stamp im `tailwind.input.css`-Kopf).
 
 **Pläne:** Runde 1, `PLAN2.md`–`PLAN6.md` (Redesign-Runde) sind vollständig umgesetzt — Arbeitsweise für künftige Runden: ein Punkt = ein Commit mit Prefix `PlanN-M:`, Arbeitsregeln am Anfang der jeweiligen Plandatei.
 
@@ -29,7 +29,7 @@ Multi-Projekt-SPA auf Cloudflare Pages (statisch + Functions), Mehrbenutzer-Logi
 
 ## Nicht-offensichtliche Regeln
 1. **Nach jeder Klassen-Änderung in HTML/app.js/gpx.js/shared.js:** `npm run build:css` und `tailwind.css` mitcommitten (Tailwind scannt auch JS-Template-Strings).
-2. **Bei Änderungen an gecachten Dateien:** `CACHE_NAME` in `sw.js` hochzählen (aktuell `smarthub-v77`; Shell-Liste dort pflegen).
+2. **Bei Änderungen an gecachten Dateien:** `CACHE_NAME` in `sw.js` hochzählen (aktuell `smarthub-v80`; Shell-Liste dort pflegen).
 3. **Profilbezogene Einstellungen** immer über `Store` (siehe oben), nie roh. Die Pref-Bündel `app_prefs`, `chart_prefs`, `widget_prefs` (Plan4-9/10/11) NUR über ihre Getter `getAppPrefs()` / `getChartPrefs()` / `getWidgetPrefs()` lesen — die mergen die Defaults, damit neue Schlüssel abwärtskompatibel bleiben.
 4. **ThingSpeak-Daten:** Komma-Dezimal, Felder asynchron (field1=Temp, field2=Feuchte). Immer über `processRawFeeds`; nie annehmen, dass ein Eintrag beide Felder hat.
 5. **Open-Meteo:** immer `timeformat=unixtime`; `past_days=7&forecast_days=2` für Chart + Prognose.
