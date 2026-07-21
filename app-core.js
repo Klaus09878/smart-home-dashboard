@@ -274,7 +274,7 @@
       dropdown.classList.add('hidden');
 
       const nameEl = document.getElementById('current-location-name');
-      nameEl.innerText = 'Orte Standort...';
+      nameEl.innerText = 'Orte Standort…';
 
       if (!navigator.geolocation) {
         showNotification('Ortung nicht unterstützt.', 'error');
@@ -287,7 +287,7 @@
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
           
-          nameEl.innerText = 'Benenne Standort...';
+          nameEl.innerText = 'Benenne Standort…';
           
           let cityName = 'Mein Standort';
           try {
