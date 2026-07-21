@@ -1,7 +1,18 @@
 # Umsetzungsplan Runde 6 — Design-Redesign („Anti-AI-Slop", hallmark)
 
-> **Status: IN ARBEIT — Etappe 1 (Audit + Vorschläge) fertig, Freigabe-Gate nach dem
-> Hub-Probelauf.** Ziel: das „typisch Kindische"/KI-Generische aus dem Design entfernen,
+> **Status: ✅ umgesetzt** (Commits `Plan6-1` … `Plan6-5`). Verifiziert je Etappe:
+> `npm test` (109), `npm run lint`, `npm run test:e2e` (9/9); Screenshots aller
+> fünf Views in beiden Themes; `npm run perf` ohne Regress (docs/PERF.md,
+> Gerüst−DCL = 0 ms). Richtung nach zwei Feedback-Runden am Hub-Probelauf:
+> **„Instrument", modern-minimal, moderne Web-App-Signaturen** (hallmark N5
+> Floating-Pill-Nav, Token-System, Mono-Messwerte, EIN Teal-Akzent, flache
+> Panels statt Glas, Pill-CTAs, keine Emojis/Glows/Verläufe).
+> Verbindliches System: `design.md` (gesperrt). Restarbeiten für eine spätere
+> Runde: Kompat-Restblock in tailwind.input.css auflösen (unmigrierte Hues in
+> Detailbereichen von ClimateFlow/GPX), `.glass-panel` → `.panel` umbenennen,
+> Heatmap-/GPX-Chart-Chrome auf chartToken() umstellen.
+>
+> Ursprüngliches Ziel: das „typisch Kindische"/KI-Generische aus dem Design entfernen,
 > per Voll-Redesign auf Basis des gevendorten hallmark-Skills
 > (`.claude/skills/hallmark/`, MIT, Upstream `Nutlope/hallmark`). Arbeitsweise wie
 > immer: ein Punkt = ein Commit (`Plan6-N:`), Tests/build:css/SW-Bump je Etappe.

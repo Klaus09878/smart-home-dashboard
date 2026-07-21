@@ -134,3 +134,17 @@ Laufzeit) fällt der Gewinn entsprechend größer aus. Die vom Nutzer berichtete
 „bis zu ~10 Sekunden" setzten sich aus genau diesen Bausteinen zusammen:
 Await-Kette + render-blockende Fonts + 8000-Einträge-Feed + Erstbesuch-Reload
 des Service Workers — alle vier sind adressiert.
+
+### Messung 2026-07-21 (nach Redesign Runde 6, Plan6-5)
+
+| Metrik | Hub (index.html) | GPX (gpx.html) |
+|---|---|---|
+| Geruest sichtbar (#view-home) | 4529 ms | – |
+| DOMContentLoaded | 4529 ms | 5393 ms |
+| Requests | 28 | 16 |
+| Transfer | 914 KB | 991 KB |
+
+Kennzahl "Geruest − DOMContentLoaded" = **0 ms** — das Redesign (Token-System,
+flache Panels statt backdrop-blur, Floating-Toolbars) hat den Erststart nicht
+verschlechtert; die Blur-Entfernung senkt zusaetzlich die Paint-Kosten auf
+schwachen Geraeten (nur noch die Nav-Pille nutzt Blur).
