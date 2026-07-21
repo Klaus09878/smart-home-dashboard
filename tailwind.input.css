@@ -2,6 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hallmark · genre: modern-minimal · theme: custom "Instrument" (dual paper)
+ * design-system: design.md · designed-as-app · macrostructure: Workbench (App-Shell)
+ * pre-emit critique: P4 H4 E4 S4 R5 V4
+ *
+ * ============ Design-Tokens (Plan6-2) ============
+ * OKLCH-Komponenten (L C H) als Custom Properties — Tailwind mappt slate/teal/
+ * white darauf (tailwind.config.js) und kann so Alphawerte anwenden:
+ * oklch(var(--sh-*) / a). Heller Modus = reiner Token-Flip (html.light),
+ * KEINE Klassen-Remaps mehr fuer diese Farben. Neue Farben: Token ergaenzen,
+ * nie inline (design.md, hallmark-Regel "Locked tokens"). */
+:root {
+  /* Flaechen (dunkel = Default) */
+  --sh-paper:          15% 0.016 252;   /* Seite (slate-950) */
+  --sh-surface:        19.5% 0.016 252; /* Karten (slate-900/850) */
+  --sh-rule:           27% 0.015 252;   /* 1px-Linien + flache Chips (slate-800) */
+  --sh-rule-2:         34% 0.014 252;   /* Hover-Linien (slate-700) */
+  /* Schrift-Leiter */
+  --sh-ink:            96.5% 0.004 250; /* white / slate-100/200 */
+  --sh-ink-2:          80% 0.008 251;   /* slate-300 */
+  --sh-ink-3:          68% 0.010 251;   /* slate-400 */
+  --sh-ink-4:          56% 0.012 251;   /* slate-500 */
+  --sh-ink-5:          45% 0.012 251;   /* slate-600 */
+  /* Marken-Akzent (Teal) — der EINZIGE Deko-Akzent (hallmark: 1 Akzent) */
+  --sh-accent:         74% 0.115 183;   /* teal-400: Icons/Text auf dunkel */
+  --sh-accent-soft:    81% 0.085 183;   /* teal-200/300 */
+  --sh-accent-strong:  63% 0.115 184;   /* teal-500/600: Fuellungen/Borders */
+  --sh-accent-ink:     18% 0.040 200;   /* Text AUF Akzentfuellung */
+  /* Geometrie + Bewegung */
+  --sh-radius-card: 10px;
+  --sh-radius-control: 6px;
+  --sh-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+html.light {
+  --sh-paper:          96.5% 0.004 250;
+  --sh-surface:        99% 0.002 250;
+  --sh-rule:           88% 0.007 250;
+  --sh-rule-2:         79% 0.010 250;
+  --sh-ink:            21% 0.020 256;
+  --sh-ink-2:          34% 0.016 253;
+  --sh-ink-3:          44% 0.014 252;
+  --sh-ink-4:          52% 0.013 251;
+  --sh-ink-5:          62% 0.012 251;
+  --sh-accent:         49% 0.105 188;
+  --sh-accent-soft:    40% 0.090 190;
+  --sh-accent-strong:  46% 0.100 189;
+  --sh-accent-ink:     98% 0.010 180;
+}
+
+/* Sichtbarer Fokus-Ring (hallmark-Pflicht) — sofort, nie animiert */
+:focus-visible {
+  outline: 2px solid oklch(var(--sh-accent));
+  outline-offset: 2px;
+}
+
 /* ============ Outfit-Schrift lokal (Plan4-4) ============ */
 /* Frueher von Google Fonts render-blockend nachgeladen — jetzt aus vendor/fonts
    (latin-Subset, woff2). font-display: swap zeigt sofort die Fallback-Schrift.
@@ -14,72 +68,44 @@
 
 /* ============ Gemeinsame Custom-Styles aller Hub-Seiten ============ */
 
-/* Custom Scrollbar */
+/* Custom Scrollbar — Token-basiert, hell/dunkel automatisch */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: oklch(var(--sh-paper));
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: oklch(var(--sh-rule-2));
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: oklch(var(--sh-ink-5));
 }
 
-/* Glassmorphism */
+/* Panel-Flaechen (Plan6-2: frueher Glassmorphism — in jedem hallmark-Genre ein
+   AI-Tell. Jetzt flache Instrumenten-Flaeche mit 1px-Kante; der Klassenname
+   .glass-panel bleibt vorerst als Legacy-Alias, Umbenennung im Rollout.) */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: oklch(var(--sh-surface));
+  border: 1px solid oklch(var(--sh-rule));
 }
 .glass-card-hover {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.2s var(--sh-ease), transform 0.2s var(--sh-ease);
 }
 .glass-card-hover:hover {
-  transform: translateY(-2px);
-  border-color: rgba(20, 184, 166, 0.3);
-  box-shadow: 0 10px 25px -5px rgba(20, 184, 166, 0.1), 0 8px 10px -6px rgba(20, 184, 166, 0.1);
+  transform: translateY(-1px);
+  border-color: oklch(var(--sh-rule-2));
 }
 
-/* ============ Heller Modus (html.light, Punkt 10) ============ */
-/* Die App ist dunkel gestaltet; hier werden die zentralen Flächen/Textfarben
-   für den hellen Modus umgemappt. Akzentfarben (teal/orange/…) bleiben. */
-html.light body { background: #eef2f7 !important; color: #0f172a; }
-html.light .glass-panel {
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-}
-html.light .bg-slate-950,
-html.light .bg-slate-900,
-html.light .bg-slate-900\/90,
-html.light .bg-slate-900\/80,
-html.light .bg-slate-900\/70,
-html.light .bg-slate-900\/60,
-html.light .bg-slate-900\/50,
-html.light .bg-slate-900\/40,
-html.light .bg-slate-850 { background-color: #f8fafc !important; }
-/* Overlays/Backdrops (Loading, Modale): hell, aber weiter durchscheinend (Plan5-4) */
-html.light .bg-slate-950\/70,
-html.light .bg-slate-950\/80,
-html.light .bg-slate-950\/85,
-html.light .bg-slate-950\/90 { background-color: rgba(238, 242, 247, 0.88) !important; }
-html.light .bg-slate-800,
-html.light .bg-slate-800\/80,
-html.light .bg-slate-800\/70,
-html.light .bg-slate-800\/60,
-html.light .bg-slate-800\/50 { background-color: #e2e8f0 !important; }
-html.light .text-white { color: #0f172a !important; }
-/* …aber auf farbigen Verlaufs-Chips/-Buttons bleibt weisse Schrift weiss (Plan5-4) */
-html.light [class*="bg-gradient-to-"].text-white,
-html.light [class*="bg-gradient-to-"] .text-white { color: #ffffff !important; }
-/* Pastell-Akzente sind fuer dunklen Grund gedacht — im hellen Modus abdunkeln
-   (Plan5-4: LIVE-Badges, Status-Badge, Demo-Banner, Assistent-Button, …) */
-html.light .text-teal-100, html.light .text-teal-200, html.light .text-teal-300 { color: #0f766e !important; }
+/* ============ Heller Modus (html.light) ============ */
+/* Seit Plan6-2 laufen Flaechen/Schrift/Teal ueber die Token-Flips oben —
+   hier bleibt nur ein KOMPAT-REST fuer Farbtoene, die erst im Redesign-
+   Rollout (Plan6-3ff) auf Tokens/Semantik umgestellt werden. Nach dem
+   Rollout wird dieser Block geloescht. */
+html.light body { color: oklch(var(--sh-ink)); }
+/* Pastell-Toene unmigrierter Hues im hellen Modus abdunkeln (Plan5-4) */
 html.light .text-emerald-300 { color: #047857 !important; }
 html.light .text-sky-300 { color: #0369a1 !important; }
 html.light .text-blue-300 { color: #1d4ed8 !important; }
@@ -89,8 +115,6 @@ html.light .text-rose-200, html.light .text-rose-300 { color: #be123c !important
 html.light .text-red-100, html.light .text-red-200, html.light .text-red-300 { color: #b91c1c !important; }
 html.light .text-orange-200, html.light .text-orange-300 { color: #c2410c !important; }
 html.light .text-amber-200, html.light .text-amber-300 { color: #b45309 !important; }
-/* -400er-Akzente (Icons, Badges wie „Live") eine Stufe abdunkeln (Plan5-4) */
-html.light .text-teal-400 { color: #0d9488 !important; }
 html.light .text-emerald-400 { color: #059669 !important; }
 html.light .text-orange-400 { color: #ea580c !important; }
 html.light .text-red-400 { color: #dc2626 !important; }
@@ -99,30 +123,14 @@ html.light .text-indigo-400 { color: #4f46e5 !important; }
 html.light .text-blue-400 { color: #2563eb !important; }
 html.light .text-sky-400 { color: #0284c7 !important; }
 html.light .text-rose-400 { color: #e11d48 !important; }
-/* Hover-Farben: hover:text-white waere im hellen Modus unsichtbar (Plan5-4) */
-html.light .hover\:text-white:hover { color: #0f172a !important; }
-html.light .hover\:text-slate-200:hover, html.light .hover\:text-slate-300:hover { color: #334155 !important; }
-html.light .hover\:text-teal-200:hover, html.light .hover\:text-teal-300:hover, html.light .hover\:text-teal-400:hover { color: #0f766e !important; }
 html.light .hover\:text-red-300:hover, html.light .hover\:text-red-400:hover, html.light .hover\:text-rose-400:hover { color: #b91c1c !important; }
-html.light .text-slate-100,
-html.light .text-slate-200,
-html.light .text-slate-300 { color: #1e293b !important; }
-html.light .text-slate-400,
-html.light .text-slate-500 { color: #475569 !important; }
-html.light .text-slate-600 { color: #64748b !important; }
-html.light .border-slate-800,
-html.light .border-slate-800\/60,
-html.light .border-slate-850,
-html.light .border-slate-900,
-html.light .border-slate-700 { border-color: #cbd5e1 !important; }
-html.light .bg-clip-text.text-transparent { -webkit-text-fill-color: initial; color: #0f172a !important; }
-/* Hintergrund-Glows im hellen Modus abschwächen */
+/* Gradient-Text (nur noch gpx.html bis zum Rollout) lesbar machen */
+html.light .bg-clip-text.text-transparent { -webkit-text-fill-color: initial; color: oklch(var(--sh-ink)) !important; }
+/* Hintergrund-Glows (nur noch gpx/login bis zum Rollout) abschwaechen */
 html.light .blur-\[100px\] { opacity: 0.4; }
 /* Karte im hellen Modus nicht invertieren */
 html.light .leaflet-tile { filter: none; }
 html.light .leaflet-container { background: #e5e7eb; }
-html.light ::-webkit-scrollbar-track { background: #e2e8f0; }
-html.light ::-webkit-scrollbar-thumb { background: #94a3b8; }
 
 /* ============ Widget-Griffe nur im Bearbeiten-Modus (Plan5-1) ============ */
 /* Die Verschiebe-Griffe sind nur sichtbar (und damit greifbar), solange das

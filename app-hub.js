@@ -298,7 +298,7 @@
 
       listEl.innerHTML = '';
       if (visible.length === 0) {
-        listEl.innerHTML = '<p class="text-xs text-slate-500">Nichts zu tun 🎉</p>';
+        listEl.innerHTML = '<p class="text-xs text-slate-500">Nichts zu tun.</p>';
         return;
       }
       visible.forEach(t => {

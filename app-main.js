@@ -107,7 +107,7 @@
         const h = now.getHours();
         const greeting = h < 5 ? 'Gute Nacht' : h < 11 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend';
         const name = getProfileDisplayName();
-        greetEl.innerText = name ? `${greeting}, ${name} 👋` : `${greeting} 👋`;
+        greetEl.innerText = name ? `${greeting}, ${name}` : greeting;
       }
     }
 
