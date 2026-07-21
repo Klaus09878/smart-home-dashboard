@@ -329,7 +329,7 @@
         const dueBadge = t.dueMs
           ? `<span class="text-[9px] ${isOverdue ? 'text-red-400 font-semibold' : 'text-slate-500'}">${new Date(t.dueMs).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}${t.repeatDays ? ' ↻' : ''}</span>`
           : (t.repeatDays ? '<span class="text-[9px] text-slate-500">↻</span>' : '');
-        mid.innerHTML = `<span class="block truncate text-xs ${t.done ? 'line-through text-slate-600' : 'text-slate-300'}">${t.shared ? '<i data-lucide=\'users\' class=\'w-2.5 h-2.5 inline text-indigo-400\'></i> ' : ''}${escapeHtml(t.text)}</span>${dueBadge}`;
+        mid.innerHTML = `<span class="block truncate text-xs ${t.done ? 'line-through text-slate-600' : 'text-slate-300'}">${t.shared ? '<i data-lucide=\'users\' class=\'w-2.5 h-2.5 inline text-blue-400\'></i> ' : ''}${escapeHtml(t.text)}</span>${dueBadge}`;
 
         const opts = document.createElement('button');
         opts.className = 'tap-target-sm p-0.5 rounded text-slate-600 hover:text-teal-300 opacity-0 group-hover/todo:opacity-100 transition-opacity shrink-0';
@@ -582,7 +582,7 @@
       const from = now - 24 * 60 * 60 * 1000;
       const wp = getWidgetPrefs(); // Fenster + Anzahl einstellbar (Plan4-11)
       const horizon = now + wp.calHorizonDays * 24 * 60 * 60 * 1000;
-      const colors = ['bg-orange-400', 'bg-indigo-400'];
+      const colors = ['bg-orange-400', 'bg-blue-400'];
       const feeds = [Store.get('ical_url'), Store.get('ical_url2')].filter(Boolean);
 
       let all = [];

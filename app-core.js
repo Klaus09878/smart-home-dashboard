@@ -1041,7 +1041,7 @@
       else if (code === 45 || code === 48) { icon = 'cloud-fog'; colorClass = 'text-slate-400'; }
       else if (code >= 51 && code <= 82) { icon = 'cloud-rain'; colorClass = 'text-blue-400'; }
       else if (code >= 71 && code <= 75) { icon = 'snowflake'; colorClass = 'text-sky-300'; }
-      else if (code >= 95) { icon = 'cloud-lightning'; colorClass = 'text-indigo-400'; }
+      else if (code >= 95) { icon = 'cloud-lightning'; colorClass = 'text-blue-400'; }
 
       container.className = `w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center ${colorClass}`;
       container.innerHTML = `<i data-lucide="${icon}" class="w-6 h-6"></i>`;

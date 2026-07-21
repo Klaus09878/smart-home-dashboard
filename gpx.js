@@ -942,7 +942,7 @@ function updateRecordingUI() {
   const pauseBtn = document.getElementById('record-pause-btn');
   const r = state.rec;
   const active = !!(r && r.active);
-  if (btn) btn.classList.toggle('text-rose-400', active);
+  if (btn) btn.classList.toggle('text-red-400', active);
   if (bar) bar.classList.toggle('hidden', !active);
   if (!active) return;
   const dur = Math.floor((Date.now() - r.startMs) / 1000);
@@ -951,7 +951,7 @@ function updateRecordingUI() {
   if (stats) stats.textContent = `${fmtDuration(dur)} · ${fmtDist(dist)} · ${r.points.length} Punkte${still ? ' · steht still' : ''}`;
   if (label) label.innerHTML = r.paused
     ? '<span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Pausiert'
-    : '<span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span> Aufzeichnung läuft';
+    : '<span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span> Aufzeichnung läuft';
   if (pauseBtn) pauseBtn.textContent = r.paused ? 'Weiter' : 'Pause';
 }
 
@@ -1437,7 +1437,9 @@ function drawElevationChart(act) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+          backgroundColor: chartToken('--sh-surface', 0.96),
+          titleColor: chartToken('--sh-ink'),
+          bodyColor: chartToken('--sh-ink-2'),
           callbacks: {
             title: items => `km ${items[0].parsed.x.toFixed(1)}`,
             label: item => `${Math.round(item.parsed.y)} m ü. M.`
@@ -1447,12 +1449,12 @@ function drawElevationChart(act) {
       scales: {
         x: {
           type: 'linear',
-          grid: { color: 'rgba(255,255,255,0.03)' },
-          ticks: { color: '#64748b', font: { size: 10 }, callback: v => `${v.toFixed(0)} km` }
+          grid: { color: chartToken('--sh-rule', 0.4) },
+          ticks: { color: chartToken('--sh-ink-4'), font: { size: 10 }, callback: v => `${v.toFixed(0)} km` }
         },
         y: {
-          grid: { color: 'rgba(255,255,255,0.04)' },
-          ticks: { color: '#94a3b8', font: { size: 10 }, callback: v => `${v} m` }
+          grid: { color: chartToken('--sh-rule', 0.45) },
+          ticks: { color: chartToken('--sh-ink-3'), font: { size: 10 }, callback: v => `${v} m` }
         }
       }
     }

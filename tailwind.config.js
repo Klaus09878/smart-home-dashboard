@@ -44,6 +44,42 @@ module.exports = {
         // Text AUF Akzentfuellungen (Pill-CTAs): dunkel auf hellem Teal (dark
         // mode) bzw. hell auf tiefem Teal (light mode) — nie remapped-white.
         'accent-ink': 'oklch(var(--sh-accent-ink) / <alpha-value>)',
+        // Semantik-/Datenfarben (Plan6-6): 100-300 = soft, 400 = Basis,
+        // 500 = Fuellung/Rand — hell/dunkel per Token-Flip.
+        emerald: {
+          300: 'oklch(var(--sh-ok-soft) / <alpha-value>)',
+          400: 'oklch(var(--sh-ok) / <alpha-value>)',
+          500: 'oklch(var(--sh-ok-strong) / <alpha-value>)',
+        },
+        amber: {
+          200: 'oklch(var(--sh-warn-soft) / <alpha-value>)',
+          300: 'oklch(var(--sh-warn-soft) / <alpha-value>)',
+          400: 'oklch(var(--sh-warn) / <alpha-value>)',
+          500: 'oklch(var(--sh-warn-strong) / <alpha-value>)',
+        },
+        red: {
+          100: 'oklch(var(--sh-alert-soft) / <alpha-value>)',
+          200: 'oklch(var(--sh-alert-soft) / <alpha-value>)',
+          300: 'oklch(var(--sh-alert-soft) / <alpha-value>)',
+          400: 'oklch(var(--sh-alert) / <alpha-value>)',
+          500: 'oklch(var(--sh-alert-strong) / <alpha-value>)',
+        },
+        orange: {
+          200: 'oklch(var(--sh-data-warm-soft) / <alpha-value>)',
+          300: 'oklch(var(--sh-data-warm-soft) / <alpha-value>)',
+          400: 'oklch(var(--sh-data-warm) / <alpha-value>)',
+          500: 'oklch(var(--sh-data-warm-strong) / <alpha-value>)',
+        },
+        blue: {
+          300: 'oklch(var(--sh-data-cool-soft) / <alpha-value>)',
+          400: 'oklch(var(--sh-data-cool) / <alpha-value>)',
+          500: 'oklch(var(--sh-data-cool-strong) / <alpha-value>)',
+        },
+        sky: {
+          300: 'oklch(var(--sh-data-sky-soft) / <alpha-value>)',
+          400: 'oklch(var(--sh-data-sky) / <alpha-value>)',
+          500: 'oklch(var(--sh-data-sky-strong) / <alpha-value>)',
+        },
       },
       // Straffere, benannte Radien (hallmark: Einheits-Blob-Radius ist ein Tell).
       // rounded-2xl = Karten, rounded-xl/-lg = Controls; rounded-full bleibt.

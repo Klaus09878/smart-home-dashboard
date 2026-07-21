@@ -90,7 +90,7 @@
               <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
               Widgets anpassen
             </button>
-            <div id="widget-settings" class="hidden absolute right-0 top-full mt-2 z-[500] glass-panel rounded-xl p-3 shadow-2xl w-56">
+            <div id="widget-settings" class="hidden absolute right-0 top-full mt-2 z-[500] panel rounded-xl p-3 shadow-2xl w-56">
               <p class="text-[10px] text-slate-500 uppercase font-semibold mb-2">Widgets ein-/ausblenden</p>
               <div id="widget-settings-list" class="flex flex-col gap-1.5 text-xs text-slate-300"></div>
               <p class="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-800/60">Reihenfolge: Widgets am Griff-Symbol ziehen.</p>
@@ -135,7 +135,7 @@
           </div>
 
           <!-- Widget: 3-Tage-Wettervorschau -->
-          <div data-widget="forecast" class="glass-panel rounded-2xl p-5 relative">
+          <div data-widget="forecast" class="panel rounded-2xl p-5 relative">
             <button class="widget-grip tap-target absolute top-2 right-2 p-1 rounded text-slate-500 hover:text-slate-300 cursor-grab" title="Widget verschieben (ziehen)">
               <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </button>
@@ -152,7 +152,7 @@
           </div>
 
           <!-- Widget: To-do-Liste (lokal, localStorage) -->
-          <div data-widget="todo" class="glass-panel rounded-2xl p-5 relative">
+          <div data-widget="todo" class="panel rounded-2xl p-5 relative">
             <button class="widget-grip tap-target absolute top-2 right-2 p-1 rounded text-slate-500 hover:text-slate-300 cursor-grab" title="Widget verschieben (ziehen)">
               <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </button>
@@ -172,7 +172,7 @@
           </div>
 
           <!-- Widget: Kalender (.ics-Feed über /api/ical) -->
-          <div data-widget="calendar" class="glass-panel rounded-2xl p-5 relative">
+          <div data-widget="calendar" class="panel rounded-2xl p-5 relative">
             <button class="widget-grip tap-target absolute top-2 right-2 p-1 rounded text-slate-500 hover:text-slate-300 cursor-grab" title="Widget verschieben (ziehen)">
               <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </button>
@@ -197,7 +197,7 @@
 
         <div class="grid grid-cols-1 gap-4">
           <!-- Projektzeile: ClimateFlow — Instrumentenzeile mit Messwert-Spalten (Plan6-2b) -->
-          <button data-onclick="navigateTo|climate" class="glass-panel glass-card-hover rounded-2xl p-5 text-left group cursor-pointer flex flex-col md:flex-row md:items-center gap-5 w-full">
+          <button data-onclick="navigateTo|climate" class="panel card-hover rounded-2xl p-5 text-left group cursor-pointer flex flex-col md:flex-row md:items-center gap-5 w-full">
             <div class="flex items-center gap-4 md:w-80 shrink-0">
               <div class="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400 shrink-0">
                 <i data-lucide="wind" class="w-5 h-5"></i>
@@ -225,7 +225,7 @@
           </button>
 
           <!-- Projektzeile: GPX-Viewer -->
-          <button data-onclick="goToGpx" class="glass-panel glass-card-hover rounded-2xl p-5 text-left group cursor-pointer flex flex-col md:flex-row md:items-center gap-5 w-full">
+          <button data-onclick="goToGpx" class="panel card-hover rounded-2xl p-5 text-left group cursor-pointer flex flex-col md:flex-row md:items-center gap-5 w-full">
             <div class="flex items-center gap-4 md:w-80 shrink-0">
               <div class="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400 shrink-0">
                 <i data-lucide="map" class="w-5 h-5"></i>
@@ -282,7 +282,7 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-5xl w-full mx-auto pb-8">
 
         <!-- Profil -->
-        <section class="glass-panel rounded-2xl p-5 shadow-lg">
+        <section class="panel rounded-2xl p-5 shadow-lg">
           <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
             <i data-lucide="user-circle" class="w-4 h-4 text-teal-400"></i> Profil
           </h2>
@@ -290,18 +290,18 @@
         </section>
 
         <!-- Einrichtungs-Assistent -->
-        <section class="glass-panel rounded-2xl p-5 shadow-lg">
+        <section class="panel rounded-2xl p-5 shadow-lg">
           <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
-            <i data-lucide="wand-2" class="w-4 h-4 text-indigo-400"></i> Einrichtung
+            <i data-lucide="wand-2" class="w-4 h-4 text-blue-400"></i> Einrichtung
           </h2>
           <p class="text-xs text-slate-400 mb-3" id="onboarding-status">Geführte Ersteinrichtung: Push, Schwellwerte, Kalender &amp; Ziele.</p>
-          <button data-onclick="openOnboarding" class="px-4 py-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-200 hover:bg-indigo-500/25 text-sm font-semibold transition-colors flex items-center gap-2">
+          <button data-onclick="openOnboarding" class="px-4 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-200 hover:bg-blue-500/25 text-sm font-semibold transition-colors flex items-center gap-2">
             <i data-lucide="sparkles" class="w-4 h-4"></i> Assistent starten
           </button>
         </section>
 
         <!-- Verhalten & Anzeige (Plan4-9): Intervalle, Chart- und Widget-Feinconfig -->
-        <section class="glass-panel rounded-2xl p-5 shadow-lg lg:col-span-2" id="settings-behavior">
+        <section class="panel rounded-2xl p-5 shadow-lg lg:col-span-2" id="settings-behavior">
           <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
             <i data-lucide="sliders-horizontal" class="w-4 h-4 text-teal-400"></i> Verhalten &amp; Anzeige
           </h2>
@@ -309,7 +309,7 @@
         </section>
 
         <!-- Benachrichtigungen (P4) -->
-        <section class="glass-panel rounded-2xl p-5 shadow-lg lg:col-span-2">
+        <section class="panel rounded-2xl p-5 shadow-lg lg:col-span-2">
           <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
             <i data-lucide="bell" class="w-4 h-4 text-orange-400"></i> Benachrichtigungen
           </h2>
@@ -341,7 +341,7 @@
         </section>
 
         <!-- Standorte -->
-        <section class="glass-panel rounded-2xl p-5 shadow-lg lg:col-span-2">
+        <section class="panel rounded-2xl p-5 shadow-lg lg:col-span-2">
           <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
             <i data-lucide="home" class="w-4 h-4 text-emerald-400"></i> Standorte
           </h2>
@@ -349,7 +349,7 @@
         </section>
 
         <!-- Kalender -->
-        <section class="glass-panel rounded-2xl p-5 shadow-lg">
+        <section class="panel rounded-2xl p-5 shadow-lg">
           <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
             <i data-lucide="calendar" class="w-4 h-4 text-slate-500"></i> Kalender
           </h2>
@@ -361,16 +361,16 @@
         </section>
 
         <!-- Ziele -->
-        <section class="glass-panel rounded-2xl p-5 shadow-lg">
+        <section class="panel rounded-2xl p-5 shadow-lg">
           <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
-            <i data-lucide="target" class="w-4 h-4 text-rose-400"></i> GPX-Ziele
+            <i data-lucide="target" class="w-4 h-4 text-red-400"></i> GPX-Ziele
           </h2>
           <p class="text-xs text-slate-400 mb-3" id="settings-goals-state">–</p>
           <button data-onclick="editHubGoals" class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs text-slate-200 transition-colors">Ziele bearbeiten</button>
         </section>
 
         <!-- System (P15, in Phase 3 befüllt) -->
-        <section class="glass-panel rounded-2xl p-5 shadow-lg lg:col-span-2">
+        <section class="panel rounded-2xl p-5 shadow-lg lg:col-span-2">
           <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
             <i data-lucide="activity" class="w-4 h-4 text-sky-400"></i> System &amp; Diagnose
             <button data-onclick="loadHealth" class="ml-auto px-2.5 py-1 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-300 transition-colors">Aktualisieren</button>
@@ -379,7 +379,7 @@
         </section>
 
         <!-- Daten -->
-        <section class="glass-panel rounded-2xl p-5 shadow-lg lg:col-span-2">
+        <section class="panel rounded-2xl p-5 shadow-lg lg:col-span-2">
           <h2 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
             <i data-lucide="database" class="w-4 h-4 text-slate-400"></i> Daten &amp; Widgets
           </h2>
@@ -406,9 +406,9 @@
 
     <!-- Onboarding-Assistent (P16) -->
     <div id="onboarding-modal" class="hidden fixed inset-0 z-[1600] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4" data-onbackdrop="closeOnboarding">
-      <div class="glass-panel rounded-2xl p-6 shadow-2xl w-full max-w-md">
+      <div class="panel rounded-2xl p-6 shadow-2xl w-full max-w-md">
         <div class="flex items-center justify-between mb-1">
-          <h3 class="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="sparkles" class="w-5 h-5 text-indigo-400"></i> Einrichtung</h3>
+          <h3 class="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="sparkles" class="w-5 h-5 text-blue-400"></i> Einrichtung</h3>
           <button data-onclick="closeOnboarding" class="p-1.5 rounded-lg text-slate-500 hover:text-white transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
         </div>
         <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mb-4">
@@ -417,7 +417,7 @@
         <div id="onboarding-body" class="min-h-[140px] text-sm text-slate-300"></div>
         <div class="flex items-center justify-between mt-5">
           <button id="onboarding-skip" data-onclick="onboardingNext|true" class="text-xs text-slate-500 hover:text-slate-300 transition-colors">Überspringen</button>
-          <button id="onboarding-next" data-onclick="onboardingNext|false" class="px-4 py-2 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-200 hover:bg-indigo-500/30 text-sm font-semibold transition-colors">Weiter</button>
+          <button id="onboarding-next" data-onclick="onboardingNext|false" class="px-4 py-2 rounded-xl bg-blue-500/20 border border-blue-500/40 text-blue-200 hover:bg-blue-500/30 text-sm font-semibold transition-colors">Weiter</button>
         </div>
       </div>
     </div>
@@ -481,7 +481,7 @@
           </button>
           
           <!-- Quick search panel dropdown -->
-          <div id="location-dropdown" class="hidden absolute right-0 mt-2 w-72 rounded-xl glass-panel shadow-2xl z-50 p-3 flex flex-col gap-2">
+          <div id="location-dropdown" class="hidden absolute right-0 mt-2 w-72 rounded-xl panel shadow-2xl z-50 p-3 flex flex-col gap-2">
             <div class="relative">
               <input type="text" id="city-search" placeholder="Stadt suchen..." data-onkeyup="searchCity|$event" class="w-full px-3 py-2 bg-slate-900/90 border border-slate-800 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/30 rounded-lg text-sm outline-none text-slate-200 placeholder-slate-500 transition-all">
               <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute right-3 top-2.5"></i>
@@ -525,7 +525,7 @@
           <button data-onclick="toggleClimateSettings" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Karten anpassen (ein-/ausblenden, ordnen)">
             <i data-lucide="layout-grid" class="w-4.5 h-4.5"></i>
           </button>
-          <div id="cf-settings" class="hidden absolute right-0 top-full mt-2 z-[500] glass-panel border border-slate-800 rounded-xl p-3 shadow-2xl w-64">
+          <div id="cf-settings" class="hidden absolute right-0 top-full mt-2 z-[500] panel border border-slate-800 rounded-xl p-3 shadow-2xl w-64">
             <label class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-800 cursor-pointer text-xs text-slate-300 hover:text-white transition-colors">
               <input type="checkbox" id="cf-density-toggle" data-onchange="toggleCfCompact" class="accent-teal-500 shrink-0">
               <span>Kompakt-Modus <span class="text-slate-500">(Detailkarten einklappen)</span></span>
@@ -561,7 +561,7 @@
       <section data-widget="cf-kpi" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         
         <!-- Inside Temp Card -->
-        <div class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md">
+        <div class="panel card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md">
           <div class="flex items-start justify-between">
             <div>
               <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Innentemperatur</p>
@@ -589,7 +589,7 @@
         </div>
 
         <!-- Inside Humidity Card -->
-        <div class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md">
+        <div class="panel card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md">
           <div class="flex items-start justify-between">
             <div>
               <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Innenluftfeuchtigkeit</p>
@@ -617,7 +617,7 @@
         </div>
 
         <!-- Outside Weather Card -->
-        <div class="glass-panel glass-card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md sm:col-span-2 lg:col-span-1">
+        <div class="panel card-hover rounded-2xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[160px] shadow-md sm:col-span-2 lg:col-span-1">
           <div class="flex items-start justify-between">
             <div>
               <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Außenklima (Wetter)</p>
@@ -654,7 +654,7 @@
       <section data-widget="cf-analytics" class="grid grid-cols-1 lg:grid-cols-5 gap-6">
         
         <!-- Ventilation Advisor Card (Col span 3) -->
-        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col justify-between lg:col-span-3 min-h-[300px]">
+        <div class="panel rounded-2xl p-6 shadow-lg flex flex-col justify-between lg:col-span-3 min-h-[300px]">
           <div class="flex items-start justify-between mb-4">
             <div>
               <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -737,10 +737,10 @@
         </div>
 
         <!-- 24h Climate Statistics (Col span 2) -->
-        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col justify-between lg:col-span-2 min-h-[300px]">
+        <div class="panel rounded-2xl p-6 shadow-lg flex flex-col justify-between lg:col-span-2 min-h-[300px]">
           <div>
             <h2 class="text-lg font-bold text-white flex items-center gap-2 mb-1">
-              <i data-lucide="bar-chart-3" class="w-5 h-5 text-indigo-400"></i>
+              <i data-lucide="bar-chart-3" class="w-5 h-5 text-blue-400"></i>
               Historische Analyse (24h)
             </h2>
             <p class="text-xs text-slate-400">Statistische Auswertung der Raumwerte der letzten 24 Stunden.</p>
@@ -781,8 +781,8 @@
                   <p class="text-[10px] text-slate-500 uppercase font-semibold">Min</p>
                   <p class="text-sm font-bold text-amber-500 mt-0.5" id="stat-hum-min">--%</p>
                 </div>
-                <div class="bg-slate-900/60 border border-indigo-500/20 rounded-xl p-2 shadow-sm shadow-indigo-500/5">
-                  <p class="text-[10px] text-indigo-400 uppercase font-semibold">Mittel</p>
+                <div class="bg-slate-900/60 border border-blue-500/20 rounded-xl p-2 shadow-sm shadow-blue-500/5">
+                  <p class="text-[10px] text-blue-400 uppercase font-semibold">Mittel</p>
                   <p class="text-sm font-bold text-white mt-0.5" id="stat-hum-avg">--%</p>
                 </div>
                 <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2">
@@ -821,7 +821,7 @@
       <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <!-- Dew Point & Mold Risk Card -->
-        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col">
+        <div class="panel rounded-2xl p-6 shadow-lg flex flex-col">
           <div class="flex items-start justify-between mb-4">
             <div>
               <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -867,7 +867,7 @@
         </div>
 
         <!-- Ventilation Window Forecast Card -->
-        <div class="glass-panel rounded-2xl p-6 shadow-lg flex flex-col">
+        <div class="panel rounded-2xl p-6 shadow-lg flex flex-col">
           <div class="mb-4">
             <h2 class="text-lg font-bold text-white flex items-center gap-2">
               <i data-lucide="calendar-clock" class="w-5 h-5 text-teal-400"></i>
@@ -897,7 +897,7 @@
       </section>
 
       <!-- Wochen-Muster-Heatmap (Plan4-16): Stunde x Wochentag -->
-      <section data-widget="cf-pattern" class="glass-panel rounded-2xl p-6 shadow-lg">
+      <section data-widget="cf-pattern" class="panel rounded-2xl p-6 shadow-lg">
         <div class="flex items-center justify-between gap-3 mb-1">
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
             <i data-lucide="calendar-clock" class="w-5 h-5 text-teal-400"></i>
@@ -918,7 +918,7 @@
       </section>
 
       <!-- Visualisation: Interactive Chart.js Section -->
-      <section data-widget="cf-chart" class="glass-panel rounded-2xl p-6 shadow-lg">
+      <section data-widget="cf-chart" class="panel rounded-2xl p-6 shadow-lg">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
             <h2 class="text-lg font-bold text-white flex items-center gap-2">
@@ -962,7 +962,7 @@
               <span>Außentemperatur (°C)</span>
             </div>
             <div class="flex items-center gap-2">
-              <span class="w-3 h-1 border-t border-dashed border-indigo-400"></span>
+              <span class="w-3 h-1 border-t border-dashed border-blue-400"></span>
               <span>Innenluftfeuchtigkeit (%)</span>
             </div>
           </div>
@@ -970,7 +970,7 @@
       </section>
 
       <!-- Langzeit-Archiv: tägliche Aggregate aus Cloudflare D1 -->
-      <section data-widget="cf-archive" class="glass-panel rounded-2xl shadow-lg transition-all duration-300">
+      <section data-widget="cf-archive" class="panel rounded-2xl shadow-lg transition-all duration-300">
         <button data-onclick="toggleArchiveCollapse" class="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none">
           <div class="flex items-center gap-2">
             <i data-lucide="database" class="w-5 h-5 text-teal-400"></i>
@@ -1014,10 +1014,10 @@
       </section>
 
       <!-- Collapsible Historical Feed Data Table -->
-      <section data-widget="cf-table" class="glass-panel rounded-2xl shadow-lg transition-all duration-300">
+      <section data-widget="cf-table" class="panel rounded-2xl shadow-lg transition-all duration-300">
         <button data-onclick="toggleTableCollapse" class="w-full px-6 py-4 flex items-center justify-between text-left focus:outline-none">
           <div class="flex items-center gap-2">
-            <i data-lucide="list" class="w-5 h-5 text-indigo-400"></i>
+            <i data-lucide="list" class="w-5 h-5 text-blue-400"></i>
             <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider text-[11px]">Rohdaten-Tabelle (Neueste 10 Einträge)</h2>
           </div>
           <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition-transform duration-300" id="table-arrow"></i>
@@ -1049,7 +1049,7 @@
 
     <!-- Modal: Ziel-/Schwellwerte pro Standort (öffnet über das Regler-Symbol) -->
     <div id="threshold-modal" class="hidden fixed inset-0 z-[1500] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4" data-onbackdrop="closeThresholdSettings">
-      <div class="glass-panel rounded-2xl p-6 shadow-2xl w-full max-w-md border border-slate-800">
+      <div class="panel rounded-2xl p-6 shadow-2xl w-full max-w-md border border-slate-800">
         <div class="flex items-start justify-between mb-1">
           <h2 class="text-lg font-bold text-white flex items-center gap-2">
             <i data-lucide="sliders-horizontal" class="w-5 h-5 text-teal-400"></i>

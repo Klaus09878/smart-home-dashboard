@@ -74,7 +74,7 @@ function showToast(message, type = 'success', action = null, durationMs = 4000) 
   };
 
   const toast = document.createElement('div');
-  toast.className = `glass-panel rounded-xl px-4 py-3 text-sm shadow-lg border ${colors[type] || colors.info} flex items-center gap-3 animate-fade-in max-w-sm pointer-events-auto`;
+  toast.className = `panel rounded-xl px-4 py-3 text-sm shadow-lg border ${colors[type] || colors.info} flex items-center gap-3 animate-fade-in max-w-sm pointer-events-auto`;
 
   const span = document.createElement('span');
   span.innerText = message;
@@ -114,7 +114,7 @@ function modalConfirm(opts = {}) {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.innerHTML = `
-      <div class="glass-panel rounded-2xl p-6 shadow-2xl w-full max-w-sm">
+      <div class="panel rounded-2xl p-6 shadow-2xl w-full max-w-sm">
         <h3 class="text-lg font-bold text-white mb-2">${escapeHtml(title)}</h3>
         <p class="text-sm text-slate-300 mb-5 whitespace-pre-line">${escapeHtml(message)}</p>
         <div class="flex justify-end gap-2">
@@ -155,7 +155,7 @@ function modalPrompt(opts = {}) {
       return `<label class="block mb-3"><span class="text-xs text-slate-400">${escapeHtml(f.label)}</span><input type="${f.type || 'text'}" id="${id}" value="${f.value != null ? escapeHtml(String(f.value)) : ''}" placeholder="${escapeHtml(f.placeholder || '')}" ${f.type === 'number' ? 'inputmode="decimal"' : ''} class="mt-1 w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:border-teal-500/50 focus:outline-none">${hint}</label>`;
     }).join('');
     overlay.innerHTML = `
-      <div class="glass-panel rounded-2xl p-6 shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto">
+      <div class="panel rounded-2xl p-6 shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto">
         <h3 class="text-lg font-bold text-white mb-1">${escapeHtml(title)}</h3>
         ${description ? `<p class="text-xs text-slate-400 mb-4">${escapeHtml(description)}</p>` : '<div class="mb-2"></div>'}
         <form>${fieldHtml}
@@ -257,6 +257,15 @@ async function apiFetch(path, options = {}) {
     throw e;
   }
   return res.json();
+}
+
+
+// ============ Chart-Chrome aus Design-Tokens (Plan6-6) ============
+// Achsen/Tooltips der Chart.js-Diagramme folgen dem aktiven Theme, statt
+// hartkodierter Dark-Werte. Nutzung: chartToken('--sh-ink-3'[, alpha]).
+function chartToken(name, alpha) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return alpha != null ? `oklch(${v} / ${alpha})` : `oklch(${v})`;
 }
 
 // ============ CSV-Download-Helfer ============

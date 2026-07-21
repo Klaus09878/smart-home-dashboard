@@ -2,8 +2,8 @@
 
 Verbindliches Design-System (hallmark `redesign`, Multi-Page-Flow, Runde 6).
 Jede View-Umgestaltung liest DIESE Datei; nicht pro Seite neu erfinden —
-erweitern/ändern nur hier. **Status: Entwurf bis zur Screenshot-Freigabe des
-Hub-Probelaufs (Plan6-2); danach gesperrt.**
+erweitern/ändern nur hier. **Status: GESPERRT
+(Rollout Plan6-2…6-6 abgeschlossen) — Änderungen nur über diese Datei.**
 
 ## Genre
 
@@ -48,8 +48,8 @@ werden im Rollout entfernt. Neue Farben NIE inline — Token ergänzen.
 
 ## Flächen & Geometrie
 
-- Panels: `--sh-surface` + 1px `--sh-rule` (Klasse `.glass-panel`, wird im
-  Rollout zu `.panel` umbenannt). KEIN backdrop-blur, KEINE Glow-Blobs,
+- Panels: `--sh-surface` + 1px `--sh-rule` (Klasse `.panel`, interaktive
+  Karten zusätzlich `.card-hover`). KEIN backdrop-blur, KEINE Glow-Blobs,
   KEINE Verlaufs-Chips/-Buttons, KEINE Standard-Schatten auf Karten.
 - Radien: Karten `--sh-radius-card` (10px, `rounded-2xl`), Controls
   `--sh-radius-control` (6px, `rounded-lg/-xl`), Pillen nur `rounded-full`

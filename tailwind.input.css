@@ -29,6 +29,14 @@
   --sh-accent-soft:    81% 0.085 183;   /* teal-200/300 */
   --sh-accent-strong:  63% 0.115 184;   /* teal-500/600: Fuellungen/Borders */
   --sh-accent-ink:     18% 0.040 200;   /* Text AUF Akzentfuellung */
+  /* Semantische Status-/Datenfarben (Plan6-6): ok/warn/alert nur mit
+     Bedeutung; warm/cool/sky als Datenfarben (GPX-Typen, Meter, Chart) */
+  --sh-ok:          72% 0.130 162; --sh-ok-soft:        80% 0.100 162; --sh-ok-strong:        62% 0.140 162;
+  --sh-warn:        80% 0.130 80;  --sh-warn-soft:      86% 0.100 84;  --sh-warn-strong:      70% 0.140 74;
+  --sh-alert:       70% 0.170 25;  --sh-alert-soft:     78% 0.120 25;  --sh-alert-strong:     58% 0.200 27;
+  --sh-data-warm:   75% 0.150 55;  --sh-data-warm-soft: 82% 0.110 60;  --sh-data-warm-strong: 66% 0.170 50;
+  --sh-data-cool:   72% 0.120 252; --sh-data-cool-soft: 80% 0.090 252; --sh-data-cool-strong: 60% 0.160 255;
+  --sh-data-sky:    75% 0.100 225; --sh-data-sky-soft:  81% 0.080 225; --sh-data-sky-strong:  64% 0.120 230;
   /* Geometrie + Bewegung */
   --sh-radius-card: 12px;
   --sh-radius-control: 8px;
@@ -51,6 +59,12 @@ html.light {
   --sh-accent-soft:    40% 0.090 190;
   --sh-accent-strong:  46% 0.100 189;
   --sh-accent-ink:     98% 0.010 180;
+  --sh-ok:          46% 0.120 162; --sh-ok-soft:        40% 0.100 163; --sh-ok-strong:        50% 0.130 161;
+  --sh-warn:        55% 0.120 72;  --sh-warn-soft:      47% 0.100 74;  --sh-warn-strong:      60% 0.130 70;
+  --sh-alert:       51% 0.170 27;  --sh-alert-soft:     44% 0.150 27;  --sh-alert-strong:     55% 0.190 27;
+  --sh-data-warm:   55% 0.150 50;  --sh-data-warm-soft: 47% 0.130 52;  --sh-data-warm-strong: 58% 0.160 46;
+  --sh-data-cool:   49% 0.140 255; --sh-data-cool-soft: 43% 0.120 255; --sh-data-cool-strong: 51% 0.170 257;
+  --sh-data-sky:    50% 0.110 232; --sh-data-sky-soft:  44% 0.100 233; --sh-data-sky-strong:  53% 0.120 235;
   --sh-shadow-card: 0 1px 2px oklch(35% 0.02 250 / 0.05), 0 12px 32px -24px oklch(35% 0.02 250 / 0.25);
   --sh-shadow-pop: 0 4px 12px oklch(35% 0.02 250 / 0.08), 0 24px 48px -24px oklch(35% 0.02 250 / 0.3);
 }
@@ -89,18 +103,18 @@ html.light {
   background: oklch(var(--sh-ink-5));
 }
 
-/* Panel-Flaechen (Plan6-2: frueher Glassmorphism — in jedem hallmark-Genre ein
-   AI-Tell. Jetzt flache Instrumenten-Flaeche mit 1px-Kante; der Klassenname
-   .glass-panel bleibt vorerst als Legacy-Alias, Umbenennung im Rollout.) */
-.glass-panel {
+/* Panel-Flaechen (Plan6-2/6-6: frueher Glassmorphism ".glass-panel" — in jedem
+   hallmark-Genre ein AI-Tell. Jetzt flache Instrumenten-Flaeche mit 1px-Kante,
+   seit Plan6-6 ehrlich ".panel"/".card-hover" benannt.) */
+.panel {
   background: oklch(var(--sh-surface));
   border: 1px solid oklch(var(--sh-rule));
   box-shadow: var(--sh-shadow-card);
 }
-.glass-card-hover {
+.card-hover {
   transition: border-color 0.2s var(--sh-ease), transform 0.2s var(--sh-ease), box-shadow 0.2s var(--sh-ease);
 }
-.glass-card-hover:hover {
+.card-hover:hover {
   transform: translateY(-2px);
   border-color: oklch(var(--sh-rule-2));
   box-shadow: var(--sh-shadow-pop);
@@ -117,38 +131,11 @@ html.light {
   box-shadow: var(--sh-shadow-pop);
 }
 
-/* ============ Heller Modus (html.light) ============ */
-/* Seit Plan6-2 laufen Flaechen/Schrift/Teal ueber die Token-Flips oben —
-   hier bleibt nur ein KOMPAT-REST fuer Farbtoene, die erst im Redesign-
-   Rollout (Plan6-3ff) auf Tokens/Semantik umgestellt werden. Nach dem
-   Rollout wird dieser Block geloescht. */
-html.light body { color: oklch(var(--sh-ink)); }
-/* Pastell-Toene unmigrierter Hues im hellen Modus abdunkeln (Plan5-4) */
-html.light .text-emerald-300 { color: #047857 !important; }
-html.light .text-sky-300 { color: #0369a1 !important; }
-html.light .text-blue-300 { color: #1d4ed8 !important; }
-html.light .text-indigo-200, html.light .text-indigo-300 { color: #4338ca !important; }
-html.light .text-violet-300 { color: #6d28d9 !important; }
-html.light .text-rose-200, html.light .text-rose-300 { color: #be123c !important; }
-html.light .text-red-100, html.light .text-red-200, html.light .text-red-300 { color: #b91c1c !important; }
-html.light .text-orange-200, html.light .text-orange-300 { color: #c2410c !important; }
-html.light .text-amber-200, html.light .text-amber-300 { color: #b45309 !important; }
-html.light .text-emerald-400 { color: #059669 !important; }
-html.light .text-orange-400 { color: #ea580c !important; }
-html.light .text-red-400 { color: #dc2626 !important; }
-html.light .text-amber-400 { color: #d97706 !important; }
-html.light .text-indigo-400 { color: #4f46e5 !important; }
-html.light .text-blue-400 { color: #2563eb !important; }
-html.light .text-sky-400 { color: #0284c7 !important; }
-html.light .text-rose-400 { color: #e11d48 !important; }
-html.light .hover\:text-red-300:hover, html.light .hover\:text-red-400:hover, html.light .hover\:text-rose-400:hover { color: #b91c1c !important; }
-/* Gradient-Text (nur noch gpx.html bis zum Rollout) lesbar machen */
-html.light .bg-clip-text.text-transparent { -webkit-text-fill-color: initial; color: oklch(var(--sh-ink)) !important; }
-/* Hintergrund-Glows (nur noch gpx/login bis zum Rollout) abschwaechen */
-html.light .blur-\[100px\] { opacity: 0.4; }
-/* Karte im hellen Modus nicht invertieren */
+/* ============ Heller Modus: Rest (Plan6-6) ============ */
+/* Alle Farben laufen ueber die Token-Flips oben — hier bleibt nur die
+   Leaflet-Sonderbehandlung (Karte im hellen Modus nicht invertieren). */
 html.light .leaflet-tile { filter: none; }
-html.light .leaflet-container { background: #e5e7eb; }
+html.light .leaflet-container { background: oklch(var(--sh-rule)); }
 
 /* ============ Widget-Griffe nur im Bearbeiten-Modus (Plan5-1) ============ */
 /* Die Verschiebe-Griffe sind nur sichtbar (und damit greifbar), solange das

@@ -3,13 +3,6 @@
 // Klassische Skripte teilen den globalen Scope; Reihenfolge in index.html
 // entspricht der urspruenglichen Dateireihenfolge (app-main.js zuletzt).
 
-    // Chart-Chrome aus den Design-Tokens lesen (Plan6-3): Achsen/Tooltip folgen
-    // damit dem aktiven Theme (hell/dunkel) statt hartkodierter Dark-Werte.
-    function chartToken(name, alpha) {
-      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-      return alpha != null ? `oklch(${v} / ${alpha})` : `oklch(${v})`;
-    }
-
     // ============ Komfort-Score (0–100) ============
     // Bewertet das aktuelle Raumklima über die getestete Kernfunktion
     // comfortScore (lib/core.js) — inkl. Schimmelrisiko-Abzug, falls Wetterdaten da.
@@ -543,7 +536,7 @@
       const btn = document.getElementById('btn-compare');
       if (!btn) return;
       btn.className = appState.compareMode
-        ? 'px-3.5 py-1.5 rounded-xl border border-violet-500/30 bg-violet-500/10 text-violet-300 text-xs font-semibold transition-all'
+        ? 'px-3.5 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-300 text-xs font-semibold transition-all'
         : 'px-3.5 py-1.5 rounded-xl border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold transition-all';
       const staticLegend = document.getElementById('chart-legend-static');
       if (staticLegend) staticLegend.classList.toggle('hidden', appState.compareMode);
@@ -715,7 +708,7 @@
         row.innerHTML = `
           <td class="p-3 font-mono">${formatDate(feed.time)} ${formatTime(feed.time)}</td>
           <td class="p-3 text-orange-400 font-semibold">${feed.temp.toFixed(1)} °C</td>
-          <td class="p-3 text-indigo-400 font-semibold">${feed.humidity.toFixed(0)} %</td>
+          <td class="p-3 text-blue-400 font-semibold">${feed.humidity.toFixed(0)} %</td>
           <td class="p-3 text-slate-400">${ah.toFixed(2)} g/m³</td>
           ${extraTds}
           <td class="p-3 text-right font-mono text-slate-500">${feed.id}</td>

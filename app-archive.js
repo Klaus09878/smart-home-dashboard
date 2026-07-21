@@ -129,7 +129,7 @@
       recEl.innerHTML =
         (rec.warmest ? card('Wärmster Tag', `${rec.warmest.value.toFixed(1)} °C`, fmtDay(rec.warmest.day), 'text-orange-400') : '') +
         (rec.coldest ? card('Kältester Tag', `${rec.coldest.value.toFixed(1)} °C`, fmtDay(rec.coldest.day), 'text-blue-400') : '') +
-        (rec.wettest ? card('Feuchtester Tag', `${rec.wettest.value.toFixed(0)} %`, fmtDay(rec.wettest.day), 'text-indigo-400') : '') +
+        (rec.wettest ? card('Feuchtester Tag', `${rec.wettest.value.toFixed(0)} %`, fmtDay(rec.wettest.day), 'text-blue-400') : '') +
         (rec.bestComfort ? card('Bester Komfort', `${rec.bestComfort.score}/100`, fmtDay(rec.bestComfort.day), 'text-emerald-400') : '') +
         card('Wohlfühl-Serie', `${rec.comfortStreak} Tage`, 'am Stück', 'text-teal-400');
       recEl.classList.remove('hidden');
@@ -307,7 +307,7 @@
           const hasNote = rec && rec.note;
           const title = rec ? `${dayKey}: Ø ${rec.tAvg.toFixed(1)} °C${rec.hAvg != null ? `, ${rec.hAvg.toFixed(0)} %` : ''}${hasNote ? ` — ${rec.note}` : ''}` : `${dayKey}: keine Daten`;
           // Tage mit Notiz (P3-7) bekommen einen weissen Rahmen
-          const noteStyle = hasNote ? 'box-shadow:inset 0 0 0 1px rgba(255,255,255,.75);' : '';
+          const noteStyle = hasNote ? `box-shadow:inset 0 0 0 1px ${chartToken('--sh-ink', 0.75)};` : '';
           cells += `<div data-day="${dayKey}" title="${title.replace(/"/g, '&quot;')}" class="aspect-square rounded-[3px] ${rec ? 'cursor-pointer hover:ring-1 hover:ring-white/40' : ''}" style="background:${color};${noteStyle}"></div>`;
         }
         grid += `<div class="flex items-center gap-1.5">
@@ -409,12 +409,12 @@
             responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
-              legend: { display: true, labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12 } },
-              tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.95)', titleColor: '#f8fafc', bodyColor: '#cbd5e1' }
+              legend: { display: true, labels: { color: chartToken('--sh-ink-3'), font: { size: 10 }, boxWidth: 12 } },
+              tooltip: { backgroundColor: chartToken('--sh-surface', 0.96), titleColor: chartToken('--sh-ink'), bodyColor: chartToken('--sh-ink-2') }
             },
             scales: {
-              x: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 12 } },
-              y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#94a3b8', callback: v => `${v}°` } }
+              x: { grid: { color: chartToken('--sh-rule', 0.35) }, ticks: { color: chartToken('--sh-ink-4'), font: { size: 10 }, maxTicksLimit: 12 } },
+              y: { grid: { color: chartToken('--sh-rule', 0.4) }, ticks: { color: chartToken('--sh-ink-3'), callback: v => `${v}°` } }
             }
           }
         };
@@ -447,8 +447,8 @@
           interaction: { mode: 'index', intersect: false },
           onClick: (evt, els) => { if (els && els.length) showArchiveDayDetail(els[0].index); },
           plugins: {
-            legend: { display: true, labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12 } },
-            tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.95)', titleColor: '#f8fafc', bodyColor: '#cbd5e1' }
+            legend: { display: true, labels: { color: chartToken('--sh-ink-3'), font: { size: 10 }, boxWidth: 12 } },
+            tooltip: { backgroundColor: chartToken('--sh-surface', 0.96), titleColor: chartToken('--sh-ink'), bodyColor: chartToken('--sh-ink-2') }
           },
           scales: {
             x: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#64748b', font: { size: 10 }, maxTicksLimit: 10 } },
@@ -485,7 +485,7 @@
       const overlay = document.createElement('div');
       overlay.className = 'fixed inset-0 z-[1700] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in';
       overlay.innerHTML = `
-        <div class="glass-panel rounded-2xl p-6 shadow-2xl w-full max-w-sm">
+        <div class="panel rounded-2xl p-6 shadow-2xl w-full max-w-sm">
           <div class="flex items-center justify-between mb-3">
             <h3 class="text-base font-bold text-white">${dayLabel}</h3>
             <button data-x class="p-1.5 rounded-lg text-slate-500 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
@@ -493,7 +493,7 @@
           <div class="grid grid-cols-3 gap-2 text-center">
             <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2"><p class="text-[10px] text-slate-500 uppercase">Temp Ø</p><p class="text-sm font-bold text-white">${num(r.t_avg, 1, ' °C')}</p></div>
             <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2"><p class="text-[10px] text-slate-500 uppercase">Min/Max</p><p class="text-sm font-bold text-white">${num(r.t_min, 0)}/${num(r.t_max, 0)}°</p></div>
-            <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2"><p class="text-[10px] text-slate-500 uppercase">Feuchte Ø</p><p class="text-sm font-bold text-indigo-400">${num(r.h_avg, 0, ' %')}</p></div>
+            <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2"><p class="text-[10px] text-slate-500 uppercase">Feuchte Ø</p><p class="text-sm font-bold text-blue-400">${num(r.h_avg, 0, ' %')}</p></div>
           </div>
           <div class="mt-2 text-center"><span class="text-xs text-slate-400">Komfort-Score: </span><span class="text-sm font-bold text-emerald-400">${score ?? '–'}/100</span>${r.samples ? ` <span class="text-[10px] text-slate-500">· ${r.samples} Messungen</span>` : ''}</div>
           ${cmp}

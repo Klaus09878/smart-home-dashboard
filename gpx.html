@@ -56,7 +56,7 @@
       </div>
 
       <div class="flex items-center gap-2">
-        <button id="record-btn" data-onclick="toggleRecording" class="hidden p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-rose-400 transition-colors" title="Tour live aufzeichnen (GPS)">
+        <button id="record-btn" data-onclick="toggleRecording" class="hidden p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-red-400 transition-colors" title="Tour live aufzeichnen (GPS)">
           <i data-lucide="circle-dot" class="w-4.5 h-4.5"></i>
         </button>
         <button id="btn-heatmap" data-onclick="toggleHeatmap" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Heatmap: alle Routen übereinander auf der Karte">
@@ -78,22 +78,22 @@
     </header>
 
     <!-- Live-Aufzeichnungs-Statusleiste (P2-13) -->
-    <div id="record-status" class="hidden glass-panel rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 border border-rose-500/30 bg-rose-500/5">
-      <span id="record-label" class="flex items-center gap-2 text-sm text-rose-300 font-semibold">
-        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+    <div id="record-status" class="hidden panel rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 border border-red-500/30 bg-red-500/5">
+      <span id="record-label" class="flex items-center gap-2 text-sm text-red-300 font-semibold">
+        <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
         Aufzeichnung läuft
       </span>
       <span id="record-stats" class="text-xs text-slate-300 font-mono">0:00 · 0,0 km · 0 Punkte</span>
       <div class="flex items-center gap-2">
         <button data-onclick="recordPhoto" title="Foto aufnehmen" class="p-1.5 rounded-lg bg-slate-900/70 border border-slate-700 text-slate-300 hover:text-white transition-colors"><i data-lucide="camera" class="w-4 h-4"></i></button>
         <button id="record-pause-btn" data-onclick="togglePauseRecording" class="px-3 py-1.5 rounded-lg bg-slate-900/70 border border-slate-700 text-slate-200 hover:border-slate-600 text-xs font-semibold transition-colors">Pause</button>
-        <button data-onclick="toggleRecording" class="px-3 py-1.5 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-200 hover:bg-rose-500/30 text-xs font-semibold transition-colors">Stopp &amp; speichern</button>
+        <button data-onclick="toggleRecording" class="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-red-200 hover:bg-red-500/30 text-xs font-semibold transition-colors">Stopp &amp; speichern</button>
       </div>
       <input type="file" id="rec-photo-input" accept="image/*" capture="environment" class="hidden" data-onchange="onRecPhotoPicked|$event">
     </div>
 
     <!-- Dropzone (auch Empty State) -->
-    <div id="dropzone" class="glass-panel rounded-2xl p-8 border-2 border-dashed border-slate-700/80 flex flex-col items-center justify-center text-center transition-all cursor-pointer" data-onclick="openPicker|file-input">
+    <div id="dropzone" class="panel rounded-2xl p-8 border-2 border-dashed border-slate-700/80 flex flex-col items-center justify-center text-center transition-all cursor-pointer" data-onclick="openPicker|file-input">
       <div class="w-14 h-14 rounded-2xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 mb-3">
         <i data-lucide="route" class="w-7 h-7"></i>
       </div>
@@ -106,7 +106,7 @@
     <main id="main-area" class="hidden flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
 
       <!-- Aktivitäten-Liste -->
-      <section class="glass-panel rounded-2xl p-4 shadow-lg lg:col-span-1 flex flex-col max-h-[700px]">
+      <section class="panel rounded-2xl p-4 shadow-lg lg:col-span-1 flex flex-col max-h-[700px]">
         <h2 class="text-sm font-bold text-slate-200 uppercase tracking-wider text-[11px] px-2 py-2 flex items-center gap-2">
           <i data-lucide="list" class="w-4 h-4 text-orange-400"></i>
           Aktivitäten
@@ -184,7 +184,7 @@
       <section class="lg:col-span-2 flex flex-col gap-6">
 
         <!-- Titel + Aktionen -->
-        <div class="glass-panel rounded-2xl p-5 shadow-lg flex flex-wrap items-center justify-between gap-3">
+        <div class="panel rounded-2xl p-5 shadow-lg flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-3 min-w-0">
             <div class="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center text-orange-400 shrink-0" id="detail-icon">
               <i data-lucide="bike" class="w-5 h-5"></i>
@@ -195,7 +195,7 @@
             </div>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
-            <select id="compare-select" data-onchange="setCompare|$value" class="px-3 py-2 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-indigo-500 max-w-[180px]" title="Zweite Tour zum Vergleich einblenden">
+            <select id="compare-select" data-onchange="setCompare|$value" class="px-3 py-2 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-blue-500 max-w-[180px]" title="Zweite Tour zum Vergleich einblenden">
               <option value="">Vergleich: aus</option>
             </select>
             <select id="detail-type" data-onchange="changeActivityType|$value" class="px-3 py-2 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-slate-200 outline-none focus:border-teal-500">
@@ -217,7 +217,7 @@
         </div>
 
         <!-- Karte -->
-        <div class="glass-panel rounded-2xl p-2 shadow-lg overflow-hidden relative">
+        <div class="panel rounded-2xl p-2 shadow-lg overflow-hidden relative">
           <button id="btn-speed-color" data-onclick="toggleSpeedColor" class="absolute top-4 right-4 z-[1000] px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900/90 border border-slate-800 text-slate-300 hover:border-slate-600 transition-all" title="Route nach Geschwindigkeit einfärben (blau = langsam, rot = schnell)">
             Tempo-Färbung
           </button>
@@ -226,34 +226,34 @@
 
         <!-- Statistiken -->
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div class="glass-panel rounded-2xl p-3 text-center">
+          <div class="panel rounded-2xl p-3 text-center">
             <p class="text-[10px] text-slate-500 uppercase font-semibold">Distanz</p>
             <p class="text-base font-bold text-white mt-0.5" id="stat-dist">–</p>
           </div>
-          <div class="glass-panel rounded-2xl p-3 text-center">
+          <div class="panel rounded-2xl p-3 text-center">
             <p class="text-[10px] text-slate-500 uppercase font-semibold">Dauer</p>
             <p class="text-base font-bold text-white mt-0.5" id="stat-duration">–</p>
           </div>
-          <div class="glass-panel rounded-2xl p-3 text-center">
+          <div class="panel rounded-2xl p-3 text-center">
             <p class="text-[10px] text-slate-500 uppercase font-semibold">Ø Tempo</p>
             <p class="text-base font-bold text-teal-400 mt-0.5" id="stat-avg">–</p>
           </div>
-          <div class="glass-panel rounded-2xl p-3 text-center">
+          <div class="panel rounded-2xl p-3 text-center">
             <p class="text-[10px] text-slate-500 uppercase font-semibold">Max Tempo</p>
             <p class="text-base font-bold text-orange-400 mt-0.5" id="stat-max">–</p>
           </div>
-          <div class="glass-panel rounded-2xl p-3 text-center">
+          <div class="panel rounded-2xl p-3 text-center">
             <p class="text-[10px] text-slate-500 uppercase font-semibold">Anstieg</p>
             <p class="text-base font-bold text-emerald-400 mt-0.5" id="stat-gain">–</p>
           </div>
-          <div class="glass-panel rounded-2xl p-3 text-center">
+          <div class="panel rounded-2xl p-3 text-center">
             <p class="text-[10px] text-slate-500 uppercase font-semibold">Höhe min/max</p>
-            <p class="text-base font-bold text-indigo-400 mt-0.5" id="stat-ele">–</p>
+            <p class="text-base font-bold text-blue-400 mt-0.5" id="stat-ele">–</p>
           </div>
         </div>
 
         <!-- Notiz & Bedingungen (P14: Textnotiz + Wetter beim Start) -->
-        <div class="glass-panel rounded-2xl p-5 shadow-lg">
+        <div class="panel rounded-2xl p-5 shadow-lg">
           <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-2">
             <i data-lucide="notebook-pen" class="w-4 h-4 text-teal-400"></i>
             Notiz &amp; Bedingungen
@@ -281,7 +281,7 @@
         </div>
 
         <!-- Strecken-Bestzeiten (P12: wiederkehrende Strecken) -->
-        <div class="glass-panel rounded-2xl p-5 shadow-lg hidden" id="segments-card">
+        <div class="panel rounded-2xl p-5 shadow-lg hidden" id="segments-card">
           <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-1">
             <i data-lucide="trophy" class="w-4 h-4 text-amber-400"></i>
             Strecken-Bestzeiten
@@ -296,9 +296,9 @@
         </div>
 
         <!-- Höhenprofil -->
-        <div class="glass-panel rounded-2xl p-5 shadow-lg" id="elevation-card">
+        <div class="panel rounded-2xl p-5 shadow-lg" id="elevation-card">
           <h3 class="text-sm font-bold text-white flex items-center gap-2 mb-3">
-            <i data-lucide="mountain" class="w-4 h-4 text-indigo-400"></i>
+            <i data-lucide="mountain" class="w-4 h-4 text-blue-400"></i>
             Höhenprofil
           </h3>
           <div class="w-full relative h-[180px]">
