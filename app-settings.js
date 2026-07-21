@@ -912,7 +912,7 @@
 
       const topic = getNtfyTopic();
       const contents = {
-        intro: `<p class="mb-2">Willkommen${getProfileDisplayName() ? ', ' + escapeHtml(getProfileDisplayName()) : ''}! 👋</p>
+        intro: `<p class="mb-2">Willkommen${getProfileDisplayName() ? ', ' + escapeHtml(getProfileDisplayName()) : ''}!</p>
           <p class="text-slate-400">In wenigen Schritten richten wir Push-Benachrichtigungen, dein Wohlfühlband, den Kalender und deine Ziele ein. Du kannst jeden Schritt überspringen.</p>`,
         ntfy: `<p class="font-semibold text-white mb-1">1 · Push-Benachrichtigungen</p>
           <p class="text-slate-400 mb-3">Lade die kostenlose <strong>ntfy</strong>-App und abonniere ein geheimes Topic. Trag denselben Namen hier ein.</p>
@@ -928,7 +928,7 @@
         goals: `<p class="font-semibold text-white mb-1">4 · GPX-Ziele (optional)</p>
           <p class="text-slate-400 mb-3">Setze ein Wochen-/Jahresziel in km für den GPX-Viewer.</p>
           <button data-onclick="obEditGoals" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-200">Ziele setzen</button>`,
-        done: `<p class="font-semibold text-white mb-1">Fertig! 🎉</p>
+        done: `<p class="font-semibold text-white mb-1">Fertig!</p>
           <p class="text-slate-400">Du kannst alles jederzeit in den Einstellungen anpassen. Viel Freude mit deinem Smart Home Hub!</p>`
       };
       body.innerHTML = contents[step] || '';

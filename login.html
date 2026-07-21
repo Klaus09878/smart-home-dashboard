@@ -23,17 +23,11 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden">
 
-  <!-- Dezente Hintergrund-Glows wie im Hub -->
-  <div class="fixed inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-    <div class="absolute -top-32 -left-32 w-96 h-96 bg-teal-500/10 rounded-full blur-[100px]"></div>
-    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px]"></div>
-  </div>
-
   <main class="min-h-screen flex items-center justify-center p-4">
     <div class="glass-panel rounded-2xl shadow-2xl p-8 w-full max-w-sm relative">
       <div class="flex flex-col items-center text-center mb-6">
-        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-400 to-indigo-500 flex items-center justify-center shadow-lg mb-4">
-          <i data-lucide="home" class="w-7 h-7 text-white"></i>
+        <div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
+          <i data-lucide="home" class="w-6 h-6 text-teal-400"></i>
         </div>
         <h1 class="text-xl font-bold text-white tracking-tight">Smart Home Hub</h1>
         <p class="text-xs text-slate-400 mt-1">Bitte melde dich mit deinem Profil an.</p>
@@ -54,7 +48,7 @@
         </label>
         <p id="login-error" class="hidden text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2"></p>
         <button id="login-submit" type="submit"
-          class="mt-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-white text-sm font-semibold shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+          class="mt-1 px-4 py-2.5 rounded-full bg-teal-500 hover:bg-teal-600 text-accent-ink text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
           <i data-lucide="log-in" class="w-4 h-4"></i> Anmelden
         </button>
       </form>

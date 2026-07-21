@@ -551,11 +551,12 @@ function renderRecords() {
     distanceKm: (a.distM || 0) / 1000, movingSec: a.movingSec || 0, ascent: a.elevGain || 0
   }));
   const rec = personalRecords(adapted);
+  // Lucide-Icons statt Emojis (Plan6-4, design.md: keine Emojis als UI-Sprache)
   const items = [
-    { icon: '🏅', title: 'Längste Tour', r: rec.longest },
-    { icon: '⛰️', title: 'Meiste Höhenmeter', r: rec.mostAscent },
-    { icon: '⚡', title: 'Schnellster Schnitt', r: rec.fastest },
-    { icon: '🔥', title: 'Stärkste Woche', r: rec.biggestWeek }
+    { icon: 'award', title: 'Längste Tour', r: rec.longest },
+    { icon: 'mountain', title: 'Meiste Höhenmeter', r: rec.mostAscent },
+    { icon: 'zap', title: 'Schnellster Schnitt', r: rec.fastest },
+    { icon: 'flame', title: 'Stärkste Woche', r: rec.biggestWeek }
   ].filter(it => it.r);
   if (!items.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
   el.classList.remove('hidden');
@@ -563,12 +564,13 @@ function renderRecords() {
   items.forEach(it => {
     const card = document.createElement('div');
     card.className = 'bg-slate-900/60 border border-slate-800/60 rounded-xl p-2' + (it.r.id ? ' cursor-pointer hover:border-slate-600 transition-colors' : '');
-    card.innerHTML = `<p class="text-[10px] text-slate-500 uppercase font-semibold">${it.icon} ${it.title}</p>`
-      + `<p class="text-sm font-bold text-white mt-0.5">${it.r.label}</p>`
+    card.innerHTML = `<p class="text-[10px] text-slate-500 uppercase font-semibold flex items-center gap-1"><i data-lucide="${it.icon}" class="w-3 h-3"></i> ${it.title}</p>`
+      + `<p class="text-sm font-bold text-white mt-0.5 font-mono tabular-nums">${it.r.label}</p>`
       + `<p class="text-[10px] text-slate-400 truncate">${escapeHtml(it.r.name || '')}</p>`;
     if (it.r.id) card.onclick = () => selectActivity(it.r.id);
     el.appendChild(card);
   });
+  updateIcons();
 }
 
 // ============ Kalender & Streaks ============
@@ -591,7 +593,7 @@ function renderCalendar() {
   if (streakEl) {
     const { current, longest } = computeStreaks([...activityDays], toLocalDayKey(Date.now()));
     streakEl.innerHTML = current > 0
-      ? `🔥 Aktuelle Serie: <strong class="text-orange-300">${current} Tag${current === 1 ? '' : 'e'}</strong> · Längste: ${longest}`
+      ? `Aktuelle Serie: <strong class="text-white">${current} Tag${current === 1 ? '' : 'e'}</strong> · Längste: ${longest}`
       : `Aktuelle Serie: 0 Tage${longest > 0 ? ` · Längste: ${longest}` : ''}`;
   }
 
