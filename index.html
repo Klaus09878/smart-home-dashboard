@@ -58,22 +58,20 @@
     
     <!-- ============ VIEW: HOME (Navigations-Hub) ============ -->
     <div id="view-home" class="hidden flex-1 flex-col animate-fade-in">
-      <header class="glass-panel rounded-2xl p-4 mb-8 flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400">
-          <i data-lucide="layout-grid" class="w-5 h-5"></i>
+      <!-- Werkzeugleiste: schmal, direkt auf dem Papier, Hairline statt Karte (Plan6-2b) -->
+      <header class="flex items-center gap-3 pb-4 mb-8 border-b border-slate-800">
+        <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400">
+          <i data-lucide="layout-grid" class="w-4 h-4"></i>
         </div>
-        <div>
-          <h1 class="text-xl font-bold tracking-tight text-white">Smart Home Hub</h1>
-          <p class="text-xs text-slate-400 mt-0.5">Zentrale Übersicht aller Projekte</p>
-        </div>
+        <h1 class="text-base font-semibold tracking-tight text-white">Smart Home Hub</h1>
         <div class="ml-auto flex items-center gap-2">
           <!-- Aktives Login-Profil -->
-          <span id="profile-badge" class="hidden items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-900/70 border border-slate-800 text-xs text-slate-300" title="Angemeldetes Profil">
+          <span id="profile-badge" class="hidden items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-800 text-xs text-slate-300" title="Angemeldetes Profil">
             <i data-lucide="user" class="w-3.5 h-3.5 text-teal-400"></i>
             <span id="profile-badge-name">–</span>
           </span>
           <!-- Zentrale Einstellungen -->
-          <button data-onclick="navigateTo|settings" class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Einstellungen">
+          <button data-onclick="navigateTo|settings" class="p-2 rounded-lg border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white transition-colors" title="Einstellungen">
             <i data-lucide="settings" class="w-4.5 h-4.5"></i>
           </button>
         </div>
@@ -83,34 +81,50 @@
 
         <!-- Widget-Bereich: Reihenfolge per Drag & Drop (Griff-Symbol), Sichtbarkeit
              über „Widgets anpassen" — beides in localStorage (applyWidgetLayout) -->
-        <div id="hub-widgets" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Übersicht</p>
+          <div class="relative">
+            <button data-onclick="toggleWidgetSettings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-all flex items-center gap-1.5">
+              <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+              Widgets anpassen
+            </button>
+            <div id="widget-settings" class="hidden absolute right-0 top-full mt-2 z-[500] glass-panel rounded-xl p-3 shadow-2xl w-56">
+              <p class="text-[10px] text-slate-500 uppercase font-semibold mb-2">Widgets ein-/ausblenden</p>
+              <div id="widget-settings-list" class="flex flex-col gap-1.5 text-xs text-slate-300"></div>
+              <p class="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-800/60">Reihenfolge: Widgets am Griff-Symbol ziehen.</p>
+            </div>
+          </div>
+        </div>
+        <div id="hub-widgets" class="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5 mb-10">
 
-          <!-- Widget: Uhr, Datum, Begrüßung, Wetter jetzt -->
-          <div data-widget="clock" class="glass-panel rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 md:col-span-3 relative">
+          <!-- Widget: Uhr, Datum, Begrüßung, Wetter jetzt — freier Typo-Block
+               auf dem Papier statt Karte (Plan6-2b, Instrumentenkopf) -->
+          <div data-widget="clock" class="md:col-span-3 relative flex flex-col sm:flex-row sm:items-end justify-between gap-4 py-1">
             <button class="widget-grip tap-target absolute top-2 right-2 p-1 rounded text-slate-500 hover:text-slate-300 cursor-grab" title="Widget verschieben (ziehen)">
               <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </button>
-            <div class="text-center sm:text-left">
-              <h2 class="text-2xl font-bold text-white tracking-tight" id="hub-greeting">Willkommen</h2>
+            <div>
+              <h2 class="text-3xl font-semibold text-white tracking-tight" id="hub-greeting">Willkommen</h2>
               <p class="text-sm text-slate-400 mt-1" id="hub-date">–</p>
             </div>
-            <div class="text-center sm:text-right">
-              <p class="text-5xl font-semibold tracking-tight text-white font-mono tabular-nums" id="hub-clock">--:--</p>
-              <p class="text-xs text-slate-400 mt-1.5 flex items-center gap-1.5 justify-center sm:justify-end">
+            <div class="sm:text-right">
+              <p class="text-6xl leading-none font-semibold tracking-tight text-white font-mono tabular-nums" id="hub-clock">--:--</p>
+              <p class="text-xs text-slate-400 mt-2 flex items-center gap-1.5 sm:justify-end">
                 <i data-lucide="cloud-sun" class="w-3.5 h-3.5 text-teal-400"></i>
                 <span id="hub-weather-text">Wetter wird geladen...</span>
               </p>
             </div>
           </div>
 
-          <!-- Widget: Status-Briefing ("Ist alles okay?") -->
-          <div data-widget="briefing" class="glass-panel rounded-2xl p-5 md:col-span-3 relative">
+          <!-- Widget: Status-Briefing ("Ist alles okay?") — Konturstreifen statt
+               gefuellter Karte: Flaechen-Varianz statt Einheitskarton (Plan6-2b) -->
+          <div data-widget="briefing" class="border border-slate-800 rounded-xl px-4 py-3 md:col-span-3 relative">
             <button class="widget-grip tap-target absolute top-2 right-2 p-1 rounded text-slate-500 hover:text-slate-300 cursor-grab" title="Widget verschieben (ziehen)">
               <i data-lucide="grip-vertical" class="w-3.5 h-3.5"></i>
             </button>
-            <div class="flex items-center gap-2 mb-3">
-              <i data-lucide="activity" class="w-4 h-4 text-teal-400"></i>
-              <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider text-[11px]">Status</h3>
+            <div class="flex items-center gap-2 mb-2">
+              <i data-lucide="activity" class="w-4 h-4 text-slate-500"></i>
+              <h3 class="font-bold text-slate-200 uppercase tracking-wider text-[11px]">Status</h3>
               <span id="briefing-badge" class="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">wird geprüft…</span>
             </div>
             <div id="briefing-list" class="flex flex-col gap-1.5">
@@ -175,75 +189,62 @@
 
         </div>
 
-        <div class="flex items-center justify-between mb-4">
-          <p class="text-sm text-slate-400">Wähle ein Projekt, um loszulegen.</p>
-          <div class="relative">
-            <button data-onclick="toggleWidgetSettings" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 transition-all flex items-center gap-1.5">
-              <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
-              Widgets anpassen
-            </button>
-            <div id="widget-settings" class="hidden absolute right-0 top-full mt-2 z-[500] glass-panel border border-slate-800 rounded-xl p-3 shadow-2xl w-56">
-              <p class="text-[10px] text-slate-500 uppercase font-semibold mb-2">Widgets ein-/ausblenden</p>
-              <div id="widget-settings-list" class="flex flex-col gap-1.5 text-xs text-slate-300"></div>
-              <p class="text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-800/60">Reihenfolge: Widgets am Griff-Symbol ziehen.</p>
-            </div>
-          </div>
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Projekte</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
-          <!-- Tile: ClimateFlow -->
-          <button data-onclick="navigateTo|climate" class="glass-panel glass-card-hover rounded-2xl p-6 text-left group cursor-pointer">
-            <div class="flex items-start justify-between mb-5">
-              <div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400">
-                <i data-lucide="wind" class="w-7 h-7"></i>
+        <div class="grid grid-cols-1 gap-4">
+          <!-- Projektzeile: ClimateFlow — Instrumentenzeile mit Messwert-Spalten (Plan6-2b) -->
+          <button data-onclick="navigateTo|climate" class="glass-panel glass-card-hover rounded-2xl p-5 text-left group cursor-pointer flex flex-col md:flex-row md:items-center gap-5 w-full">
+            <div class="flex items-center gap-4 md:w-80 shrink-0">
+              <div class="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400 shrink-0">
+                <i data-lucide="wind" class="w-5 h-5"></i>
               </div>
-              <span class="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-slate-500 uppercase"><span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>Live</span>
+              <div class="min-w-0">
+                <h3 class="text-base font-semibold text-white flex items-center gap-2">ClimateFlow
+                  <span class="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-slate-500 uppercase"><span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>Live</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Klima, Luftfeuchte &amp; Lüftungsberater beider Standorte</p>
+              </div>
             </div>
-            <h3 class="text-lg font-bold text-white mb-1.5">ClimateFlow</h3>
-            <p class="text-xs text-slate-400 leading-relaxed">Smart-Home-Klimadashboard: Temperatur, Luftfeuchtigkeit und intelligenter Lüftungsberater für beide Standorte in Echtzeit.</p>
-
-            <!-- Live preview of both locations -->
-            <div class="grid grid-cols-2 gap-2 mt-4">
-              <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
+            <div class="flex-1 grid grid-cols-2 md:divide-x md:divide-slate-800 gap-3 md:gap-0">
+              <div class="md:px-6">
                 <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider truncate flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 inline-block shrink-0" id="hub-prev-gillian-dot"></span><span id="hub-prev-gillian-name">Gillian</span></p>
-                <p class="text-base font-semibold text-white mt-0.5 font-mono tabular-nums"><span id="hub-prev-gillian-temp">--.- °C</span></p>
-                <p class="text-[10px] text-slate-400 mt-0.5"><span id="hub-prev-gillian-hum">-- %</span> · <span id="hub-prev-gillian-time">--</span></p>
+                <p class="text-xl font-semibold text-white mt-1 font-mono tabular-nums"><span id="hub-prev-gillian-temp">--.- °C</span></p>
+                <p class="text-[11px] text-slate-400 mt-0.5"><span id="hub-prev-gillian-hum">-- %</span> · <span id="hub-prev-gillian-time">--</span></p>
               </div>
-              <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
+              <div class="md:px-6">
                 <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider truncate flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-slate-600 inline-block shrink-0" id="hub-prev-sean-dot"></span><span id="hub-prev-sean-name">Sean</span></p>
-                <p class="text-base font-semibold text-white mt-0.5 font-mono tabular-nums"><span id="hub-prev-sean-temp">--.- °C</span></p>
-                <p class="text-[10px] text-slate-400 mt-0.5"><span id="hub-prev-sean-hum">-- %</span> · <span id="hub-prev-sean-time">--</span></p>
+                <p class="text-xl font-semibold text-white mt-1 font-mono tabular-nums"><span id="hub-prev-sean-temp">--.- °C</span></p>
+                <p class="text-[11px] text-slate-400 mt-0.5"><span id="hub-prev-sean-hum">-- %</span> · <span id="hub-prev-sean-time">--</span></p>
               </div>
             </div>
-
-            <div class="flex items-center gap-1.5 mt-5 text-xs font-semibold text-teal-400">
-              <span>Dashboard öffnen</span>
-              <i data-lucide="arrow-right" class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform"></i>
-            </div>
+            <i data-lucide="arrow-right" class="hidden md:block w-4 h-4 text-slate-500 group-hover:text-teal-400 group-hover:translate-x-1 transition-all shrink-0"></i>
           </button>
 
-          <!-- Tile: GPX-Viewer -->
-          <button data-onclick="goToGpx" class="glass-panel glass-card-hover rounded-2xl p-6 text-left group cursor-pointer">
-            <div class="flex items-start justify-between mb-5">
-              <div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400">
-                <i data-lucide="map" class="w-7 h-7"></i>
+          <!-- Projektzeile: GPX-Viewer -->
+          <button data-onclick="goToGpx" class="glass-panel glass-card-hover rounded-2xl p-5 text-left group cursor-pointer flex flex-col md:flex-row md:items-center gap-5 w-full">
+            <div class="flex items-center gap-4 md:w-80 shrink-0">
+              <div class="w-11 h-11 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-teal-400 shrink-0">
+                <i data-lucide="map" class="w-5 h-5"></i>
               </div>
-              <span class="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-slate-500 uppercase"><span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>Live</span>
+              <div class="min-w-0">
+                <h3 class="text-base font-semibold text-white flex items-center gap-2">GPX-Viewer
+                  <span class="flex items-center gap-1.5 text-[10px] font-semibold tracking-wider text-slate-500 uppercase"><span class="w-1.5 h-1.5 rounded-full bg-teal-400"></span>Live</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Touren, Höhenprofil, Tempo &amp; Statistiken</p>
+              </div>
             </div>
-            <h3 class="text-lg font-bold text-white mb-1.5">GPX-Viewer</h3>
-            <p class="text-xs text-slate-400 leading-relaxed">Trainings analysieren: GPX-Dateien hochladen (Rad, Motorrad, Laufen, Spazieren) und Route, Höhenprofil, Tempo &amp; Statistiken auswerten.</p>
-
-            <!-- Live preview: letzte Tour & Wochenleistung -->
-            <div class="grid grid-cols-2 gap-2 mt-4">
-              <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
+            <div class="flex-1 grid grid-cols-2 md:divide-x md:divide-slate-800 gap-3 md:gap-0">
+              <div class="md:px-6 min-w-0">
                 <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Letzte Tour</p>
-                <p class="text-base font-bold text-white mt-0.5 truncate" id="hub-gpx-last">–</p>
-                <p class="text-[10px] text-slate-400 mt-0.5 truncate" id="hub-gpx-last-info">Noch keine Touren</p>
+                <p class="text-xl font-semibold text-white mt-1 truncate" id="hub-gpx-last">–</p>
+                <p class="text-[11px] text-slate-400 mt-0.5 truncate" id="hub-gpx-last-info">Noch keine Touren</p>
               </div>
-              <div class="bg-slate-900/60 border border-slate-800/60 rounded-xl p-2.5">
+              <div class="md:px-6">
                 <p class="text-[10px] text-slate-500 font-semibold uppercase tracking-wider">Diese Woche</p>
-                <p class="text-base font-semibold text-white mt-0.5 font-mono tabular-nums" id="hub-gpx-week">0 km</p>
-                <p class="text-[10px] text-slate-400 mt-0.5 truncate" id="hub-gpx-count">0 Aktivitäten</p>
+                <p class="text-xl font-semibold text-white mt-1 font-mono tabular-nums" id="hub-gpx-week">0 km</p>
+                <p class="text-[11px] text-slate-400 mt-0.5 truncate" id="hub-gpx-count">0 Aktivitäten</p>
                 <!-- Wochenziel-Fortschritt (gpx_goals, P10) -->
                 <div id="hub-gpx-goal-wrap" class="hidden mt-1.5">
                   <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800">
@@ -253,11 +254,7 @@
                 </div>
               </div>
             </div>
-
-            <div class="flex items-center gap-1.5 mt-5 text-xs font-semibold text-teal-400">
-              <span>Viewer öffnen</span>
-              <i data-lucide="arrow-right" class="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform"></i>
-            </div>
+            <i data-lucide="arrow-right" class="hidden md:block w-4 h-4 text-slate-500 group-hover:text-teal-400 group-hover:translate-x-1 transition-all shrink-0"></i>
           </button>
         </div>
       </div>
