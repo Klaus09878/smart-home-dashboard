@@ -155,7 +155,7 @@ export async function onRequestGet(context) {
       // D1-Hygiene (Punkt 9): verwaiste Dedupe-Zeilen (> 30 Tage, außer Heartbeat)
       // und alte To-do-Tombstones (> 30 Tage gelöscht) entfernen.
       const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-      await env.DB.prepare("DELETE FROM alert_state WHERE key != 'cron_heartbeat' AND last_sent < ?").bind(cutoff).run();
+      await env.DB.prepare("DELETE FROM alert_state WHERE key NOT IN ('cron_heartbeat', 'backup_heartbeat') AND last_sent < ?").bind(cutoff).run();
       try { await env.DB.prepare('DELETE FROM todos WHERE deleted = 1 AND updated_at < ?').bind(cutoff).run(); } catch (e) { /* todos evtl. nicht vorhanden */ }
       // Login-Fehlversuchszaehler (P2-5): Zeilen aelter als 1 h entfernen
       try { await env.DB.prepare('DELETE FROM auth_fails WHERE first_ms < ?').bind(Date.now() - 60 * 60 * 1000).run(); } catch (e) { /* auth_fails evtl. noch nicht vorhanden */ }
@@ -166,6 +166,24 @@ export async function onRequestGet(context) {
 
   const report = { checkedAt: new Date().toISOString(), recipients: recipients.map(r => r.profile), locations: {}, notified: [] };
   const now = Date.now();
+
+  // Backup-Totmannschalter (Plan7-6): liefen frueher Backups (Heartbeat vorhanden)
+  // und wurde seit > 3 Tagen keins mehr VERIFIZIERT geschrieben, einmal warnen.
+  // Kein Heartbeat = Backups nie eingerichtet → keine Warnung (kein Fehlalarm).
+  if (env.DB) {
+    try {
+      const bb = await env.DB.prepare("SELECT last_sent FROM alert_state WHERE key = 'backup_heartbeat'").first();
+      if (bb && bb.last_sent && (now - bb.last_sent) > 3 * 24 * 60 * 60 * 1000) {
+        const days = Math.round((now - bb.last_sent) / 86400000);
+        report.notified.push(...await dispatch(env, recipients, 'backup', 'backup-stale', () => ({
+          title: 'Backup ausgeblieben',
+          body: `Seit ${days} Tagen wurde kein verifiziertes Server-Backup mehr erstellt. Bitte den Backup-Cron (/api/backup-dump) pruefen.`,
+          tags: 'warning,floppy_disk'
+        })));
+      }
+    } catch (e) { /* Totmannschalter ist best effort */ }
+  }
+
   const channels = await loadChannels(env);
 
   // Fuer den Morgen-Digest (P3-5) waehrend der Schleife eingesammelt

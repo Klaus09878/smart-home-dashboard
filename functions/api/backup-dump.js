@@ -93,6 +93,27 @@ export async function onRequestGet(context) {
   const key = `backup/d1-${new Date().toISOString().substring(0, 10)}.json`;
   await env.MEDIA.put(key, JSON.stringify(backup), { httpMetadata: { contentType: 'application/json' } });
 
+  // Verifikation (Plan7-6): den Dump sofort zuruecklesen, parsen und Tabellen +
+  // Zeilenzahlen gegenpruefen. Ein still korrupter/leerer Dump ist gefaehrlicher
+  // als gar keiner — deshalb wird der Heartbeat NUR bei verifiziertem Backup
+  // gesetzt (die Diagnose zeigt so die Zeit des letzten GUTEN Backups).
+  let verified = false;
+  try {
+    const back = await env.MEDIA.get(key);
+    const parsed = back ? JSON.parse(await back.text()) : null;
+    verified = !!(parsed && parsed.tables
+      && Object.keys(parsed.tables).length === Object.keys(tables).length
+      && Object.entries(tables).every(([n, rows]) => rows === null
+        ? parsed.tables[n] === null
+        : Array.isArray(parsed.tables[n]) && parsed.tables[n].length === rows.length));
+  } catch (e) { verified = false; }
+  if (verified) {
+    try {
+      await env.DB.exec('CREATE TABLE IF NOT EXISTS alert_state (key TEXT PRIMARY KEY, last_sent INTEGER)');
+      await env.DB.prepare('INSERT OR REPLACE INTO alert_state (key, last_sent) VALUES (?, ?)').bind('backup_heartbeat', Date.now()).run();
+    } catch (e) { /* Heartbeat best effort */ }
+  }
+
   let deleted = 0;
   try {
     const list = await env.MEDIA.list({ prefix: 'backup/d1-' });
@@ -104,7 +125,7 @@ export async function onRequestGet(context) {
 
   const counts = {};
   for (const [name, rows] of Object.entries(tables)) counts[name] = rows === null ? null : rows.length;
-  return json({ ok: true, key, tables: counts, deleted });
+  return json({ ok: true, key, verified, tables: counts, deleted });
 }
 
 export async function onRequestPost(context) {

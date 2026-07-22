@@ -45,6 +45,7 @@ export async function onRequestGet(context) {
       TS_KEY_SEAN: !!env.TS_KEY_SEAN
     },
     lastCron: null,
+    lastBackup: null,
     channels: {},
     counts: {},
     errors: [],
@@ -56,6 +57,12 @@ export async function onRequestGet(context) {
     try {
       const hb = await env.DB.prepare("SELECT last_sent FROM alert_state WHERE key = 'cron_heartbeat'").first();
       if (hb) out.lastCron = hb.last_sent;
+    } catch (e) { /* Tabelle evtl. noch nicht angelegt */ }
+
+    // Letztes verifiziertes Server-Backup (Plan7-6)
+    try {
+      const bb = await env.DB.prepare("SELECT last_sent FROM alert_state WHERE key = 'backup_heartbeat'").first();
+      if (bb) out.lastBackup = bb.last_sent;
     } catch (e) { /* Tabelle evtl. noch nicht angelegt */ }
 
     // To-dos ohne Tombstones zählen (deleted=0)

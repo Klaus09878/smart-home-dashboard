@@ -544,13 +544,14 @@
       { key: 'errors',  label: 'App-Fehler',          icon: 'bug' },
       { key: 'weekly',  label: 'Klima-Wochenbericht', icon: 'bar-chart-3' },
       { key: 'monthly', label: 'GPX-Monatsbericht',   icon: 'route' },
-      { key: 'todo',    label: 'To-do-Erinnerungen',  icon: 'check-square' }
+      { key: 'todo',    label: 'To-do-Erinnerungen',  icon: 'check-square' },
+      { key: 'backup',  label: 'Backup ausgeblieben',  icon: 'database' }
     ];
     const NOTIFY_DEFAULTS = {
       types: {
         sensor: { on: true }, mold: { on: true, threshold: 80 }, frost: { on: true, threshold: 0 },
         heat: { on: true, threshold: 30 }, co2: { on: false, threshold: 1200 }, dwd: { on: true }, window: { on: true }, digest: { on: false }, vent: { on: false },
-        errors: { on: true }, weekly: { on: true }, monthly: { on: true }, todo: { on: true }
+        errors: { on: true }, weekly: { on: true }, monthly: { on: true }, todo: { on: true }, backup: { on: true }
       },
       quiet: { on: false, from: 22, to: 7 }
     };
@@ -860,6 +861,13 @@
         rows.push(`<div>${hrs <= 8 ? dot(true) : warn} Letzter Warn-Check: vor ${hrs} h ${hrs > 8 ? '(sollte ≤ 6 h sein → Cron prüfen)' : ''}</div>`);
       } else {
         rows.push(`<div>${warn} Letzter Warn-Check: noch nie (Cron-Job auf /api/check-alerts einrichten)</div>`);
+      }
+      // Letztes verifiziertes Server-Backup (Plan7-6)
+      if (h.lastBackup) {
+        const bh = Math.round((Date.now() - h.lastBackup) / 3600000);
+        rows.push(`<div>${bh <= 48 ? dot(true) : warn} Letztes Backup (verifiziert): vor ${bh} h ${bh > 48 ? '(> 48 h → Backup-Cron prüfen)' : ''}</div>`);
+      } else {
+        rows.push(`<div>${warn} Letztes Backup: noch nie (Cron-Job auf /api/backup-dump einrichten, R2-Binding nötig)</div>`);
       }
       if (h.channels) {
         Object.entries(h.channels).forEach(([loc, info]) => {

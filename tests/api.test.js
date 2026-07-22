@@ -253,6 +253,10 @@ test('backup-dump: Dump nach R2, Liste, Restore in frische DB', async () => {
 
   const dumped = await jsonOf(await call(dump, ctx('GET', '/api/backup-dump', { env, auth: 'test' })));
   assert.ok(dumped.ok && dumped.key);
+  // Plan7-6: frischer Dump wird zurueckgelesen + verifiziert, Heartbeat gesetzt
+  assert.strictEqual(dumped.verified, true, 'frischer Dump sollte verifiziert sein');
+  const hb = await env.DB.prepare("SELECT last_sent FROM alert_state WHERE key = 'backup_heartbeat'").first();
+  assert.ok(hb && hb.last_sent > 0, 'backup_heartbeat sollte nach verifiziertem Dump gesetzt sein');
 
   const listed = await jsonOf(await call(dump, ctx('GET', '/api/backup-dump?list=1', { env, auth: 'test' })));
   assert.ok(listed.dumps.some(d => d.key === dumped.key));
