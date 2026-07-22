@@ -195,6 +195,31 @@ export async function onRequestGet(context) {
     if (!apiKey) { report.locations[locId] = { error: `Read-Key für ${locId} nicht konfiguriert` }; continue; }
     const R = report.locations[locId] = {};
 
+    // Mehr-Tages-Feuchte-Trend (Plan7-8): Fruehwarnung, wenn der Tages-Schnitt
+    // seit 3 Tagen ANHALTEND steigt (letzter Tag = Fenster-Hoch). Logik = Quelle
+    // der Wahrheit lib/core.js dailyTrend, hier bewusst inline (eigenstaendiges
+    // Bundle). DB-basiert → auch bei Feed-Ausfall aktiv.
+    if (env.DB) {
+      try {
+        const { results } = await env.DB
+          .prepare('SELECT day, h_avg FROM climate_daily WHERE loc = ? AND h_avg IS NOT NULL ORDER BY day DESC LIMIT 4')
+          .bind(locId).all();
+        const seg = (results || []).slice().reverse();
+        if (seg.length === 4) {
+          const first = seg[0].h_avg, last = seg[3].h_avg;
+          const isPeak = seg.every(r => r.h_avg <= last);
+          if ((last - first) >= 8 && isPeak) {
+            R.humidityTrend = { from: Math.round(first), to: Math.round(last) };
+            report.notified.push(...await dispatch(env, recipients, 'trend', `trend:${locId}`, () => ({
+              title: 'Feuchte-Trend',
+              body: `Die Luftfeuchte bei „${loc.label || locId}" steigt seit 3 Tagen (${Math.round(first)}% → ${Math.round(last)}%). Regelmaessiges Lueften beugt Schimmel vor.`,
+              tags: 'droplet'
+            })));
+          }
+        }
+      } catch (e) { /* Trend best effort */ }
+    }
+
     try {
       // ---- Innenwerte (ThingSpeak) ----
       const res = await fetch(`https://api.thingspeak.com/channels/${loc.channel}/feeds.json?api_key=${apiKey}&results=400`);

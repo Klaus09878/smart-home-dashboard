@@ -545,13 +545,14 @@
       { key: 'weekly',  label: 'Klima-Wochenbericht', icon: 'bar-chart-3' },
       { key: 'monthly', label: 'GPX-Monatsbericht',   icon: 'route' },
       { key: 'todo',    label: 'To-do-Erinnerungen',  icon: 'check-square' },
-      { key: 'backup',  label: 'Backup ausgeblieben',  icon: 'database' }
+      { key: 'backup',  label: 'Backup ausgeblieben',  icon: 'database' },
+      { key: 'trend',   label: 'Feuchte-Trend (Frühwarnung)', icon: 'trending-up' }
     ];
     const NOTIFY_DEFAULTS = {
       types: {
         sensor: { on: true }, mold: { on: true, threshold: 80 }, frost: { on: true, threshold: 0 },
         heat: { on: true, threshold: 30 }, co2: { on: false, threshold: 1200 }, dwd: { on: true }, window: { on: true }, digest: { on: false }, vent: { on: false },
-        errors: { on: true }, weekly: { on: true }, monthly: { on: true }, todo: { on: true }, backup: { on: true }
+        errors: { on: true }, weekly: { on: true }, monthly: { on: true }, todo: { on: true }, backup: { on: true }, trend: { on: true }
       },
       quiet: { on: false, from: 22, to: 7 }
     };

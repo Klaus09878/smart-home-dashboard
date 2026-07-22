@@ -103,10 +103,18 @@
       const el = document.getElementById('archive-insights');
       if (!el) return;
       const ins = monthlyInsights(rows);
-      if (!ins) { el.classList.add('hidden'); return; }
+      const sentences = ins ? ins.sentences.slice() : [];
+      // Mehr-Tages-Feuchte-Trend (Plan7-8) — sichtbar auch ohne Cron/Push.
+      const trend = dailyTrend(rows);
+      if (trend && trend.field === 'h_avg') {
+        sentences.unshift(trend.direction === 'up'
+          ? `Die Luftfeuchte steigt seit ${trend.days} Tagen an (${trend.fromValue} % → ${trend.toValue} %) — regelmäßiges Lüften beugt Schimmel vor.`
+          : `Die Luftfeuchte sinkt seit ${trend.days} Tagen (${trend.fromValue} % → ${trend.toValue} %).`);
+      }
+      if (!sentences.length) { el.classList.add('hidden'); return; }
       el.classList.remove('hidden');
-      el.innerHTML = `<p class="text-[10px] uppercase font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5"><i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-400"></i> Monats-Einblick</p>`
-        + ins.sentences.map(s => `<p class="text-slate-300 leading-relaxed">${escapeHtml(s)}</p>`).join('');
+      el.innerHTML = `<p class="text-[10px] uppercase font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5"><i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-400"></i> Einblick</p>`
+        + sentences.map(s => `<p class="text-slate-300 leading-relaxed">${escapeHtml(s)}</p>`).join('');
       updateIcons();
     }
 

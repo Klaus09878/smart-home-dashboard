@@ -34,7 +34,7 @@ test('Einstellungen: Regeln + Theme-Umschalter', async ({ page }) => {
   await waitReady(page);
   await expect(page.locator('#settings-behavior')).toBeVisible(); // Verhalten & Anzeige (Plan4-9)
   await expect(page.locator('#behavior-list select')).toHaveCount(7); // Intervalle, Chart, Widget-Feinconfig (Plan4-9/10/11)
-  await expect(page.locator('#notify-rules > div')).toHaveCount(14); // 14 Regeltypen (inkl. CO₂, DWD, Fenster, Digest, Backup-Totmannschalter Plan7-6)
+  await expect(page.locator('#notify-rules > div')).toHaveCount(15); // 15 Regeltypen (inkl. Backup Plan7-6, Feuchte-Trend Plan7-8)
   // Theme umschalten
   await page.click('button:has-text("umschalten")');
   await expect(page.locator('html')).toHaveClass(/light/);

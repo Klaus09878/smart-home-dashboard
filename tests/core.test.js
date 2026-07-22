@@ -391,6 +391,29 @@ test('trendForecast: steigende Feuchte erreicht Schwelle in der Zukunft', () => 
   assert.strictEqual(core.trendForecast([{ time: new Date(t0), humidity: 50 }]), null);
 });
 
+test('dailyTrend: erkennt anhaltend steigende Feuchte, ignoriert Rauschen', () => {
+  const t = core.dailyTrend([
+    { day: '2026-01-01', h_avg: 58 }, { day: '2026-01-02', h_avg: 63 },
+    { day: '2026-01-03', h_avg: 68 }, { day: '2026-01-04', h_avg: 72 }
+  ]);
+  assert.ok(t && t.direction === 'up', 'Anstieg sollte erkannt werden');
+  assert.strictEqual(t.delta, 14);
+  assert.strictEqual(t.toValue, 72);
+  assert.strictEqual(t.days, 3);
+  // Netto-Delta < minDelta → kein Trend
+  assert.strictEqual(core.dailyTrend([
+    { day: '2026-01-01', h_avg: 60 }, { day: '2026-01-02', h_avg: 61 },
+    { day: '2026-01-03', h_avg: 62 }, { day: '2026-01-04', h_avg: 63 }
+  ]), null);
+  // letzter Tag ist NICHT das Fenster-Hoch (Rauschen) → kein anhaltender Trend
+  assert.strictEqual(core.dailyTrend([
+    { day: '2026-01-01', h_avg: 60 }, { day: '2026-01-02', h_avg: 75 },
+    { day: '2026-01-03', h_avg: 65 }, { day: '2026-01-04', h_avg: 69 }
+  ]), null);
+  // zu wenige Tage → null
+  assert.strictEqual(core.dailyTrend([{ day: '2026-01-01', h_avg: 60 }]), null);
+});
+
 test('expandRecurring: wöchentlich expandiert im Fenster, EXDATE ausgenommen', () => {
   const events = [{
     startMs: Date.UTC(2026, 6, 7, 10, 0, 0), // Di 07.07.2026 12:00 Berlin ~ 10:00Z

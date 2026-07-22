@@ -22,7 +22,8 @@ export const DEFAULT_RULES = {
     weekly:  { on: true, dedupeH: 120 },  // max. 1 Wochenbericht / 5 Tage
     monthly: { on: true, dedupeH: 480 },  // max. 1 Monatsbericht / 20 Tage
     todo:    { on: true, dedupeH: 24 },
-    backup:  { on: true, dedupeH: 24 }    // Backup-Totmannschalter (Plan7-6)
+    backup:  { on: true, dedupeH: 24 },   // Backup-Totmannschalter (Plan7-6)
+    trend:   { on: true, dedupeH: 24 }    // Mehr-Tages-Feuchte-Trend (Plan7-8)
   },
   quiet: { on: false, from: 22, to: 7 }
 };
