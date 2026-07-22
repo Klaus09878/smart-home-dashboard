@@ -1388,7 +1388,13 @@ function drawElevationChart(act) {
   const hasEle = act.eleMin !== null;
   document.getElementById('no-elevation-hint').classList.toggle('hidden', hasEle);
   document.getElementById('elevationChart').style.display = hasEle ? '' : 'none';
-  if (!hasEle) { if (state.chart) { state.chart.destroy(); state.chart = null; } return; }
+  if (!hasEle) {
+    if (state.chart) { state.chart.destroy(); state.chart = null; }
+    const box = document.getElementById('elevationChart').parentElement;
+    const w = box && box.nextElementSibling;
+    if (w && w.classList && w.classList.contains('chart-a11y')) w.classList.add('hidden');
+    return;
+  }
 
   const ctx = document.getElementById('elevationChart').getContext('2d');
   const grad = ctx.createLinearGradient(0, 0, 0, 180);
@@ -1458,6 +1464,12 @@ function drawElevationChart(act) {
         }
       }
     }
+  });
+  // Barrierefreiheit (Plan7-1): aria-Zusammenfassung + zuschaltbare Datentabelle
+  makeChartAccessible(state.chart, {
+    title: 'Hoehenprofil' + (act.name ? ' – ' + act.name : ''),
+    xHeader: 'Distanz (km)',
+    xFormat: km => 'km ' + String(Math.round(km * 10) / 10).replace('.', ',')
   });
 }
 

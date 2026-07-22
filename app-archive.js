@@ -419,6 +419,7 @@
         };
         if (appState.archiveChart) appState.archiveChart.destroy();
         appState.archiveChart = new Chart(ctx, cfg);
+        makeChartAccessible(appState.archiveChart, { title: 'Jahresvergleich (Ø-Temperatur)', xHeader: 'Datum' });
         return;
       }
 
@@ -459,6 +460,7 @@
 
       if (appState.archiveChart) appState.archiveChart.destroy();
       appState.archiveChart = new Chart(ctx, config);
+      makeChartAccessible(appState.archiveChart, { title: 'Klima-Langzeitarchiv', xHeader: 'Datum' });
     }
 
     // Tagesdetail beim Klick auf einen Archiv-Tag (Punkt 21): Werte + Komfort +

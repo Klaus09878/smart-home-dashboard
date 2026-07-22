@@ -488,6 +488,12 @@
 
       if (appState.chartInstance) appState.chartInstance.destroy();
       appState.chartInstance = new Chart(ctx, config);
+      // Barrierefreiheit (Plan7-1): aria-Zusammenfassung + zuschaltbare Datentabelle
+      makeChartAccessible(appState.chartInstance, {
+        title: 'Klimadiagramm',
+        xHeader: 'Zeit',
+        xFormat: ms => `${formatDate(new Date(ms))} ${formatTime(new Date(ms))}`
+      });
     }
 
     // Aktiven Zeitraum-Button hervorheben (aus setChartTimeframe extrahiert,

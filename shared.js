@@ -32,6 +32,102 @@ function formatRelativeTime(date) {
   return `am ${formatDate(date)} um ${formatTime(date)}`;
 }
 
+// ============ Chart-Barrierefreiheit (Plan7-1) ============
+// Ein <canvas> ist fuer Screenreader vollstaendig opak — axe und Lighthouse
+// pruefen den Inhalt nicht. Diese Funktion gibt einem Chart.js-Diagramm (a) eine
+// aria-Zusammenfassung (role="img": Min/Max/zuletzt je Serie) und (b) eine
+// zuschaltbare Datentabelle mit denselben ECHTEN Werten. Fuer {x,y}-Punktreihen
+// werden die Zeilen ueber die vereinigten x-Werte gebildet (korrekt auch bei
+// verschiedenen Zeitbasen, z. B. Vergleichsmodus); fuer Wertearrays index-weise
+// gegen chart.data.labels bzw. opts.xValues. Die Tabelle wird erst beim Aufklappen
+// gebaut (lazy) und bei sehr vielen Punkten gleichmaessig auf 400 Zeilen reduziert
+// (klar beschriftet — kein Erfinden, nur eine Teilmenge echter Zeilen).
+function makeChartAccessible(chart, opts) {
+  opts = opts || {};
+  if (!chart || !chart.canvas) return;
+  const canvas = chart.canvas;
+  const series = (chart.data.datasets || []).filter(d => d && d.label && Array.isArray(d.data));
+  const title = opts.title || 'Diagramm';
+  const yOf = p => (p == null ? null : (typeof p === 'object' ? p.y : p));
+  const round1 = n => Math.round(n * 10) / 10;
+  const numFmt = n => (n == null || Number.isNaN(n)) ? '–' : String(round1(n)).replace('.', ',');
+  const xFormat = typeof opts.xFormat === 'function' ? opts.xFormat : (x => String(x));
+
+  const chartBox = canvas.parentElement;
+  const host = chartBox && chartBox.parentElement;
+  if (!series.length || !host) return;
+
+  // x-basiert (Punktreihen {x,y}) oder index-basiert (Wertearrays)?
+  const firstPt = series[0].data.find(p => p != null);
+  const xKeyed = !!(firstPt && typeof firstPt === 'object' && 'x' in firstPt);
+  let keys, xLabelFor, valueFor;
+  if (xKeyed) {
+    const set = new Set();
+    series.forEach(d => d.data.forEach(p => { if (p && p.x != null) set.add(p.x); }));
+    keys = [...set].sort((a, b) => a - b);
+    xLabelFor = k => xFormat(k);
+    valueFor = series.map(d => { const m = new Map(); d.data.forEach(p => { if (p && p.x != null) m.set(p.x, yOf(p)); }); return k => (m.has(k) ? m.get(k) : null); });
+  } else {
+    const labels = Array.isArray(opts.xValues) ? opts.xValues
+      : (Array.isArray(chart.data.labels) ? chart.data.labels : series[0].data.map((_, i) => i + 1));
+    keys = labels.map((_, i) => i);
+    xLabelFor = i => String(labels[i]);
+    valueFor = series.map(d => i => yOf(d.data[i]));
+  }
+
+  // aria-Zusammenfassung am Canvas
+  const parts = series.map(d => {
+    const ys = d.data.map(yOf).filter(y => y != null && !Number.isNaN(y));
+    if (!ys.length) return `${d.label}: keine Daten`;
+    return `${d.label}: ${round1(Math.min(...ys))} bis ${round1(Math.max(...ys))}, zuletzt ${round1(ys[ys.length - 1])}`;
+  });
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', `${title}. ${keys.length} Datenpunkte. ${parts.join('; ')}.`);
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function buildTable() {
+    const MAX = 400;
+    let rowKeys = keys, note = '';
+    if (keys.length > MAX) {
+      const step = keys.length / MAX;
+      rowKeys = [];
+      for (let i = 0; i < keys.length; i += step) rowKeys.push(keys[Math.floor(i)]);
+      note = ` (${rowKeys.length} von ${keys.length} Zeilen, gleichmaessig verteilt)`;
+    }
+    let h = `<table class="w-full text-[11px] text-slate-300 border-collapse"><caption class="text-left text-slate-500 pb-1">${esc(title)}${note}</caption><thead><tr><th scope="col" class="text-left font-semibold text-slate-400 py-1 pr-3">${esc(opts.xHeader || 'x')}</th>`;
+    series.forEach(d => { h += `<th scope="col" class="text-right font-semibold text-slate-400 py-1 pr-3 whitespace-nowrap">${esc(d.label)}</th>`; });
+    h += '</tr></thead><tbody>';
+    rowKeys.forEach(k => {
+      h += `<tr><th scope="row" class="text-left font-normal text-slate-400 py-0.5 pr-3 whitespace-nowrap">${esc(xLabelFor(k))}</th>`;
+      valueFor.forEach(fn => { h += `<td class="text-right tabular-nums py-0.5 pr-3">${numFmt(fn(k))}</td>`; });
+      h += '</tr>';
+    });
+    return h + '</tbody></table>';
+  }
+
+  // Toggle + (lazy) Tabelle direkt hinter dem Chart-Wrapper anlegen/aktualisieren
+  let wrap = chartBox.nextElementSibling;
+  if (!wrap || !wrap.classList || !wrap.classList.contains('chart-a11y')) {
+    wrap = document.createElement('div');
+    wrap.className = 'chart-a11y mt-2';
+    wrap.innerHTML = '<button type="button" class="chart-a11y-toggle text-[11px] text-slate-400 hover:text-white underline decoration-dotted underline-offset-2" aria-expanded="false">Datentabelle anzeigen</button><div class="chart-a11y-table hidden overflow-x-auto mt-1" role="region"></div>';
+    host.insertBefore(wrap, chartBox.nextSibling);
+    wrap.querySelector('.chart-a11y-toggle').addEventListener('click', function () {
+      const box = wrap.querySelector('.chart-a11y-table');
+      const open = box.classList.toggle('hidden') === false;
+      this.setAttribute('aria-expanded', String(open));
+      this.textContent = open ? 'Datentabelle ausblenden' : 'Datentabelle anzeigen';
+      if (open && box.dataset.built !== wrap.dataset.rev) { box.innerHTML = wrap._buildTable(); box.dataset.built = wrap.dataset.rev; }
+    });
+  }
+  wrap.classList.remove('hidden');
+  wrap._buildTable = buildTable;
+  wrap.dataset.rev = String(Date.now());
+  const box = wrap.querySelector('.chart-a11y-table');
+  box.setAttribute('aria-label', `${title} als Datentabelle`);
+  if (!box.classList.contains('hidden')) { box.innerHTML = buildTable(); box.dataset.built = wrap.dataset.rev; }
+}
+
 // Open-Meteo Weather-Code → deutsche Beschreibung (Dashboard + GPX-Start-Wetter)
 function getWeatherDescription(code) {
   const codes = {

@@ -95,6 +95,21 @@ test('ClimateFlow: Chart + Lüftungsberater rendern (Demo-Daten)', async ({ page
   expect(errors, errors.join('\n')).toHaveLength(0);
 });
 
+test('ClimateFlow: Chart ist barrierefrei (aria + Datentabelle)', async ({ page }) => {
+  // Plan7-1: Canvas ist fuer Screenreader opak — role=img + aria-Zusammenfassung
+  // + zuschaltbare Datentabelle machen das Kernfeature zugaenglich.
+  await routeOpenMeteo(page);
+  await page.goto('/index.html#climate');
+  await waitReady(page);
+  const canvas = page.locator('#climateChart');
+  await expect(canvas).toHaveAttribute('role', 'img', { timeout: 15000 });
+  await expect(canvas).toHaveAttribute('aria-label', /Klimadiagramm/, { timeout: 15000 });
+  const toggle = page.locator('.chart-a11y-toggle').first();
+  await expect(toggle).toBeVisible();
+  await toggle.click();
+  await expect(page.locator('.chart-a11y-table table').first()).toBeVisible();
+});
+
 test('ClimateFlow: Chart-Karte klappt ein und aus', async ({ page }) => {
   await routeOpenMeteo(page);
   await page.goto('/index.html#climate');
