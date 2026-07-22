@@ -68,3 +68,14 @@ jobs:
           node-version: 22
       - name: Pages-Functions gegen echte workerd-Runtime pruefen
         run: node tests/functions-smoke.mjs
+
+  lighthouse:
+    name: Lighthouse-CI (A11y-Budget hart, Perf/BP als Warnung)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Lighthouse gegen Hub/GPX/Login
+        run: npx -y @lhci/cli@0.14.x autorun

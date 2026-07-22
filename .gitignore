@@ -8,6 +8,9 @@ playwright-report/
 .wrangler/
 .dev.vars
 
+# Lighthouse-CI-Reports (Improve-3)
+.lighthouseci/
+
 # Lokale Claude-Code-Konfiguration (Dev-Server für Preview) — aber gevendorte
 # Skills (Plan6-1: hallmark) sind Teil des Repos:
 .claude/*

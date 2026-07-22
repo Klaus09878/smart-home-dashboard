@@ -148,3 +148,14 @@ Kennzahl "Geruest − DOMContentLoaded" = **0 ms** — das Redesign (Token-Syste
 flache Panels statt backdrop-blur, Floating-Toolbars) hat den Erststart nicht
 verschlechtert; die Blur-Entfernung senkt zusaetzlich die Paint-Kosten auf
 schwachen Geraeten (nur noch die Nav-Pille nutzt Blur).
+
+### Lighthouse-CI (Improve-3, Runde 7)
+
+Ergaenzend zu `scripts/perf-audit.mjs` (misst Erststart-Timing unter Fast-3G/
+CPU-4x) laeuft jetzt Lighthouse-CI (`.lighthouserc.json`, CI-Job `lighthouse`)
+ueber Hub, GPX-Viewer und Login und liefert die *kategorisierten* Scores +
+Best-Practices-/A11y-Audits, die das Timing-Harness nicht abdeckt. Budgets:
+**Accessibility >= 0.90 hart (error)**, Best-Practices/Performance als **Warnung**
+(LHCI-Perf schwankt in CI — nur getrackt, nicht blockierend), SEO aus
+(auth-geschuetztes privates PWA). Referenzmessung Hub lokal: Performance ~76,
+Accessibility 100, Best-Practices ~96. Lokal: `CHROME_PATH=<chrome> npm run test:lighthouse`.

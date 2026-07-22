@@ -1,0 +1,24 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "node tests/static-server.js",
+      "startServerReadyPattern": "Test-Server auf",
+      "url": [
+        "http://localhost:8123/index.html",
+        "http://localhost:8123/gpx.html",
+        "http://localhost:8123/login.html"
+      ],
+      "numberOfRuns": 1,
+      "settings": { "chromeFlags": "--no-sandbox --headless=new" }
+    },
+    "assert": {
+      "assertions": {
+        "categories:accessibility": ["error", { "minScore": 0.9 }],
+        "categories:best-practices": ["warn", { "minScore": 0.9 }],
+        "categories:performance": ["warn", { "minScore": 0.5 }],
+        "categories:seo": "off"
+      }
+    },
+    "upload": { "target": "filesystem", "outputDir": ".lighthouseci" }
+  }
+}

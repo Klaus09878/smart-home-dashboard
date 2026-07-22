@@ -8,6 +8,7 @@
     "perf": "node scripts/perf-audit.mjs",
     "test:e2e": "playwright test",
     "test:functions": "node tests/functions-smoke.mjs",
+    "test:lighthouse": "npx -y @lhci/cli@0.14.x autorun",
     "build": "npm run test && npm run build:css"
   },
   "devDependencies": {
