@@ -80,7 +80,14 @@
     async function fetchFeeds(loc, { results = 8000, start = null } = {}) {
       const q = new URLSearchParams({ results: results.toString() });
       if (start) q.set('start', start);
-      return await apiFetch(`/api/feeds/${loc.id}?${q.toString()}`);
+      const data = await apiFetch(`/api/feeds/${loc.id}?${q.toString()}`);
+      // Plan7-5: Kam die Antwort aus dem Last-Known-Good-Cache (Live-Feed gerade
+      // nicht erreichbar, siehe Plan7-4)? Nur fuer den aktiven Standort ohne
+      // Backfill merken, damit der Stale-Banner die ehrliche Ursache zeigt.
+      if (!start && loc && loc.id === appState.activeLocId) {
+        appState.feedFromCache = (data && data._stale) ? (data._cachedAt || Date.now()) : null;
+      }
+      return data;
     }
 
     // Load custom names and weather configs (profilbezogen über Store)

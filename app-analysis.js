@@ -775,6 +775,17 @@
       checkSensor('Temperatur', upd.temp);
       checkSensor('Luftfeuchtigkeit', upd.humidity);
 
+      // Plan7-5: Werte aus dem Last-Known-Good-Cache (Plan7-4) → ehrliche Ursache
+      // zeigen (Live-Feed unterbrochen, NICHT zwingend Sensor/iPhone-Kurzbefehl)
+      // und keinen Sensor-Ausfall-Push ausloesen (das waere eine falsche Diagnose).
+      if (appState.feedFromCache) {
+        const since = new Date(appState.feedFromCache);
+        textEl.innerHTML = `<strong>Live-Feed unterbrochen bei „${getLocationName(appState.activeLocId)}":</strong> zeige letzte bekannte Werte${!isNaN(since.getTime()) ? ` (Stand ${formatRelativeTime(since)})` : ''}.`;
+        banner.classList.remove('hidden');
+        updateIcons();
+        return;
+      }
+
       if (problems.length > 0) {
         textEl.innerHTML = `<strong>Sensor-Ausfall bei „${getLocationName(appState.activeLocId)}":</strong> ${problems.join(' · ')} – bitte den iPhone-Kurzbefehl prüfen.`;
         banner.classList.remove('hidden');
