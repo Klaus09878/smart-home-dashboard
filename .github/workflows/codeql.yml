@@ -1,0 +1,34 @@
+# CodeQL-Sicherheitsscan (Improve-4) — statische Analyse des JavaScripts, mit
+# Fokus auf die Pages Functions (Auth: HMAC-Session-Cookies, PBKDF2, Brute-Force-
+# Zaehler, D1-SQL). Gratis, weil das Repo public ist; Befunde erscheinen im
+# Security-Tab (Code scanning alerts). Kein Code-Build noetig — CodeQL extrahiert
+# das JS direkt.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '27 4 * * 1' # woechentlich, Montag 04:27 UTC
+
+jobs:
+  analyze:
+    name: CodeQL analysieren (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: CodeQL initialisieren
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - name: Analyse
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"

@@ -166,11 +166,13 @@ Die Middleware lässt dann nur noch Anfragen mit Access-JWT durch; Basic Auth is
 ## Entwicklung
 
 ```bash
-npm test          # Kernlogik (lib/core.js) + Smoke-Test (Seiten-Konsistenz)
-npm run test:e2e  # Playwright-Browsertests (einmalig: npm ci && npx playwright install chromium)
-npm run build:css # Tailwind neu bauen — nach jeder Klassen-Änderung in HTML/JS nötig
-npm run perf      # Erststart-Messung (Fast-3G/CPU-4x, gemockte APIs) → siehe docs/PERF.md
-npm run build     # test + build:css (das führt auch der Cloudflare-Build aus)
+npm test             # Kernlogik (lib/core.js) + Smoke-Test (Seiten-Konsistenz)
+npm run test:e2e     # Playwright-Browsertests inkl. axe-A11y (tests/a11y.spec.js)
+npm run test:functions # Functions-Runtime-Smoke via wrangler pages dev (lädt 1× workerd)
+npm run test:lighthouse # Lighthouse-Budgets (CHROME_PATH setzen) → siehe docs/PERF.md
+npm run build:css    # Tailwind neu bauen — nach jeder Klassen-Änderung in HTML/JS nötig
+npm run perf         # Erststart-Messung (Fast-3G/CPU-4x, gemockte APIs) → docs/PERF.md
+npm run build        # test + build:css (das führt auch der Cloudflare-Build aus)
 ```
 
 **Performance des mobilen Erststarts** ([docs/PERF.md](docs/PERF.md)): Runde 4
@@ -179,8 +181,17 @@ lädt die Schrift lokal (kein render-blockendes Google Fonts), parallelisiert di
 Startsequenz, bündelt die Wetterabrufe und begrenzt den Erst-Feed-Load. Für
 startzeit-relevante Änderungen `npm run perf` vorher/nachher laufen lassen.
 
-Bei jedem Push/PR läuft die [CI](.github/workflows/ci.yml): Unit-/Smoke-Tests,
-E2E-Tests und eine Prüfung, dass das committete `tailwind.css` aktuell ist.
+**Automatisierte Checks** bei jedem Push/PR:
+- [CI](.github/workflows/ci.yml): Unit-/Smoke-Tests, ESLint, `tailwind.css`-Freshness,
+  Playwright-E2E **inkl. axe-Accessibility** (Struktur: Labels/ARIA/Tastatur),
+  **Functions-Runtime-Smoke** (`wrangler pages dev` gegen echte workerd-Runtime) und
+  **Lighthouse-CI** (Accessibility ≥ 0,90 hart; Best-Practices/Performance als Warnung).
+- [CodeQL](.github/workflows/codeql.yml): wöchentlicher Security-Scan des JavaScripts
+  (Fokus Auth/Functions) — Befunde im Security-Tab.
+
+Kontrast wird über die Lighthouse-A11y-Kategorie getrackt (nicht als harter axe-Gate):
+der vivid Teal-Akzent als kleiner Statustext trifft 4,5:1 nicht ohne Pastellierung —
+eine bewusst offene Design-Entscheidung.
 
 ## Roadmap
 
