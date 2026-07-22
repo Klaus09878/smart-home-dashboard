@@ -574,7 +574,7 @@
         row.className = 'flex items-center justify-between gap-2 bg-slate-900/50 border border-slate-800/60 rounded-xl px-3 py-2';
         const thHtml = t.thLabel
           ? `<span class="text-[11px] text-slate-400 flex items-center gap-1">${t.thLabel}
-               <input type="number" id="nr-th-${t.key}" value="${cfg.threshold ?? t.thDef}" class="w-16 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200" data-onchange="saveNotifyRulesFromUI"></span>`
+               <input type="number" id="nr-th-${t.key}" value="${cfg.threshold ?? t.thDef}" aria-label="${escapeHtml(t.label)}: ${escapeHtml(t.thLabel)}" class="w-16 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200" data-onchange="saveNotifyRulesFromUI"></span>`
           : '';
         // Digest-Feinconfig (Plan4-13): Button oeffnet Uhrzeit + Bausteine
         const cfgBtn = t.key === 'digest'
@@ -583,7 +583,7 @@
         // Entprell-Intervall pro Regel (Plan4-12): "max 1x / N h"
         const ddHtml = DEDUPE_EDITABLE.has(t.key)
           ? `<span class="text-[11px] text-slate-400 flex items-center gap-1" title="Mindestabstand gleicher Meldungen in Stunden">max&nbsp;1×/
-               <input type="number" min="1" max="168" id="nr-dd-${t.key}" value="${cfg.dedupeH ?? DEDUPE_DEFAULTS[t.key]}" class="w-14 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200" data-onchange="saveNotifyRulesFromUI"> h</span>`
+               <input type="number" min="1" max="168" id="nr-dd-${t.key}" value="${cfg.dedupeH ?? DEDUPE_DEFAULTS[t.key]}" aria-label="${escapeHtml(t.label)}: Mindestabstand in Stunden" class="w-14 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-slate-200" data-onchange="saveNotifyRulesFromUI"> h</span>`
           : '';
         row.innerHTML = `
           <label class="flex items-center gap-2 text-sm text-slate-200 cursor-pointer min-w-0">

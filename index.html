@@ -295,8 +295,8 @@
             <i data-lucide="wand-2" class="w-4 h-4 text-blue-400"></i> Einrichtung
           </h2>
           <p class="text-xs text-slate-400 mb-3" id="onboarding-status">Geführte Ersteinrichtung: Push, Schwellwerte, Kalender &amp; Ziele.</p>
-          <button data-onclick="openOnboarding" class="px-4 py-2 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-200 hover:bg-blue-500/25 text-sm font-semibold transition-colors flex items-center gap-2">
-            <i data-lucide="sparkles" class="w-4 h-4"></i> Assistent starten
+          <button data-onclick="openOnboarding" class="px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 hover:text-white hover:border-slate-600 text-sm font-semibold transition-colors flex items-center gap-2">
+            <i data-lucide="sparkles" class="w-4 h-4 text-teal-400"></i> Assistent starten
           </button>
         </section>
 
@@ -333,8 +333,8 @@
               Ruhezeit (keine Info-Pushes)
             </label>
             <span class="text-xs text-slate-400 flex items-center gap-1">von
-              <input type="number" id="quiet-from" min="0" max="23" class="w-14 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200" data-onchange="saveNotifyRulesFromUI"> Uhr bis
-              <input type="number" id="quiet-to" min="0" max="23" class="w-14 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200" data-onchange="saveNotifyRulesFromUI"> Uhr
+              <input type="number" id="quiet-from" min="0" max="23" aria-label="Ruhezeit von (Stunde)" class="w-14 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200" data-onchange="saveNotifyRulesFromUI"> Uhr bis
+              <input type="number" id="quiet-to" min="0" max="23" aria-label="Ruhezeit bis (Stunde)" class="w-14 bg-slate-900 border border-slate-800 rounded px-2 py-1 text-slate-200" data-onchange="saveNotifyRulesFromUI"> Uhr
             </span>
             <span class="text-[11px] text-slate-500">Sicherheits-Warnungen (Sensor/Schimmel/Frost) kommen trotzdem.</span>
           </div>
@@ -417,7 +417,7 @@
         <div id="onboarding-body" class="min-h-[140px] text-sm text-slate-300"></div>
         <div class="flex items-center justify-between mt-5">
           <button id="onboarding-skip" data-onclick="onboardingNext|true" class="text-xs text-slate-500 hover:text-slate-300 transition-colors">Überspringen</button>
-          <button id="onboarding-next" data-onclick="onboardingNext|false" class="px-4 py-2 rounded-xl bg-blue-500/20 border border-blue-500/40 text-blue-200 hover:bg-blue-500/30 text-sm font-semibold transition-colors">Weiter</button>
+          <button id="onboarding-next" data-onclick="onboardingNext|false" class="px-4 py-2 rounded-full bg-teal-500 text-accent-ink hover:bg-teal-600 text-sm font-semibold transition-colors">Weiter</button>
         </div>
       </div>
     </div>

@@ -26,7 +26,7 @@
   --sh-ink:            96.5% 0.004 250; /* white / slate-100/200 */
   --sh-ink-2:          80% 0.008 251;   /* slate-300 */
   --sh-ink-3:          68% 0.010 251;   /* slate-400 */
-  --sh-ink-4:          56% 0.012 251;   /* slate-500 */
+  --sh-ink-4:          62% 0.012 251;   /* slate-500 — gedaempfte Labels, ≥4.5:1 auf Surface (Improve-1) */
   --sh-ink-5:          45% 0.012 251;   /* slate-600 */
   /* Marken-Akzent (Teal) — der EINZIGE Deko-Akzent (hallmark: 1 Akzent) */
   --sh-accent:         74% 0.115 183;   /* teal-400: Icons/Text auf dunkel */
