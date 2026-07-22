@@ -6,6 +6,8 @@ Multi-Projekt-SPA auf Cloudflare Pages (statisch + Functions), Mehrbenutzer-Logi
 
 **Pläne:** Runde 1, `PLAN2.md`–`PLAN6.md` (Redesign-Runde) sind vollständig umgesetzt — Arbeitsweise für künftige Runden: ein Punkt = ein Commit mit Prefix `PlanN-M:`, Arbeitsregeln am Anfang der jeweiligen Plandatei.
 
+**Lokale Skills & Wissensdatenbank:** Domänen-Skills unter `.claude/skills/` kapseln die verbindlichen Detailregeln (die konkreten Regeln stehen dort, nicht hier doppelt) — `climateflow-data-quality` (Sensor/Feed/Chart/Formeln), `gpx-data-integrity` (Import/Sync/Merge/Export), `cloudflare-security-sync` (Functions/Auth/Secrets/Profiltrennung), `testing`/`design`: `web-quality-baseline` + `hallmark`. Der Lern-Workflow `knowledge-learning` bindet `docs/knowledge.md` ein: **vor** jeder größeren Aufgabe die passenden Einträge lesen, **nach** bestätigter Ursache + dauerhafter Prävention einen Eintrag ergänzen (nie Secrets/PII/Stacktraces).
+
 ## Profile & Einstellungs-Sync (WICHTIG)
 - Jedes Login-Passwort = eigenes **Profil**. `settings-sync.js` stellt `Store` bereit: profilbezogene Schlüssel `p_<profil>_<key>` in localStorage + Spiegel nach D1 (`/api/settings`, Offline-Queue, `updatedAt`-Merge). `/api/whoami` liefert das aktive Profil.
 - **Profilbezogene Einstellungen NIE roh über `localStorage` lesen/schreiben — immer `Store.get/set/getJSON/setJSON/remove`.** Gerätelokale Dinge (Dedupe-Zeitstempel `push_sent_*`, `gpx_pending_deletes`) bleiben bewusst bei rohem localStorage.
