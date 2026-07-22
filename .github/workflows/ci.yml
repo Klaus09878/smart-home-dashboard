@@ -46,7 +46,7 @@ jobs:
         run: npm run lint
 
   e2e:
-    name: Browser-E2E (Playwright)
+    name: Browser-E2E (Playwright, inkl. axe-A11y)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,5 +55,16 @@ jobs:
           node-version: 22
       - name: Abhaengigkeiten + Chromium installieren
         run: npm ci && npx playwright install chromium --with-deps
-      - name: E2E-Tests
+      - name: E2E-Tests (inkl. tests/a11y.spec.js)
         run: npm run test:e2e
+
+  functions-smoke:
+    name: Functions-Runtime-Smoke (wrangler)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pages-Functions gegen echte workerd-Runtime pruefen
+        run: node tests/functions-smoke.mjs

@@ -4,6 +4,10 @@ node_modules/
 test-results/
 playwright-report/
 
+# Wrangler-Lokalstate (Improve-2: `wrangler pages dev` fuer den Functions-Smoke)
+.wrangler/
+.dev.vars
+
 # Lokale Claude-Code-Konfiguration (Dev-Server für Preview) — aber gevendorte
 # Skills (Plan6-1: hallmark) sind Teil des Repos:
 .claude/*
