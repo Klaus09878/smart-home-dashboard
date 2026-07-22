@@ -150,3 +150,14 @@ test('GPX-Viewer lädt ohne Fehler', async ({ page }) => {
   await expect(page.locator('#dropzone')).toBeVisible();
   expect(errors, errors.join('\n')).toHaveLength(0);
 });
+
+test('Hub: Widget-Umsortierung per Tastatur bedienbar (Plan7-2)', async ({ page }) => {
+  // Reorder-Buttons sind echte, fokussierbare Buttons mit barrierefreiem Namen
+  // (Tastatur-Alternative zum Maus-Ziehen am Griff).
+  await routeOpenMeteo(page);
+  await page.goto('/index.html#home');
+  await waitReady(page);
+  await page.click('[data-onclick="toggleWidgetSettings"]');
+  await expect(page.locator('#widget-settings-list button[aria-label*="nach oben"]').first()).toBeVisible();
+  await expect(page.locator('#widget-settings-list button[aria-label*="nach unten"]').first()).toBeVisible();
+});

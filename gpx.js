@@ -1250,6 +1250,14 @@ function updateCompareSelect() {
 function ensureMap() {
   if (!state.map) {
     state.map = L.map('map', { zoomControl: true, attributionControl: true });
+    // Barrierefreiheit (Plan7-2): Leaflet macht den Container per Default
+    // fokussierbar (tabindex, Pfeiltasten pannen, +/- zoomt). role+aria-label
+    // geben ihm einen Namen und signalisieren AT, Tasten durchzureichen.
+    const mapEl = document.getElementById('map');
+    if (mapEl) {
+      mapEl.setAttribute('role', 'application');
+      mapEl.setAttribute('aria-label', 'Karte der Route. Mit den Pfeiltasten verschieben, mit Plus und Minus zoomen.');
+    }
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       // Die globale Referrer-Policy (_headers) ist no-referrer, aber die

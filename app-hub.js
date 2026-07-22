@@ -167,8 +167,10 @@
           if (cfg.reorderButtons) {
             const btns = document.createElement('div');
             btns.className = 'flex gap-0.5 shrink-0';
-            const up = document.createElement('button'); up.innerText = '▲'; up.className = 'px-1 text-slate-500 hover:text-white disabled:opacity-20'; up.disabled = idx === 0; up.onclick = () => move(id, -1);
-            const dn = document.createElement('button'); dn.innerText = '▼'; dn.className = 'px-1 text-slate-500 hover:text-white disabled:opacity-20'; dn.disabled = idx === order.length - 1; dn.onclick = () => move(id, 1);
+            // Tastatur-Alternative zum Griff-Ziehen (Plan7-2): echte Buttons mit
+            // barrierefreiem Namen (▲/▼ allein sagt AT nichts ueber Widget/Richtung).
+            const up = document.createElement('button'); up.type = 'button'; up.innerText = '▲'; up.className = 'px-1 text-slate-500 hover:text-white disabled:opacity-20'; up.disabled = idx === 0; up.setAttribute('aria-label', `${cfg.meta[id]} nach oben`); up.title = up.getAttribute('aria-label'); up.onclick = () => move(id, -1);
+            const dn = document.createElement('button'); dn.type = 'button'; dn.innerText = '▼'; dn.className = 'px-1 text-slate-500 hover:text-white disabled:opacity-20'; dn.disabled = idx === order.length - 1; dn.setAttribute('aria-label', `${cfg.meta[id]} nach unten`); dn.title = dn.getAttribute('aria-label'); dn.onclick = () => move(id, 1);
             btns.append(up, dn); row.appendChild(btns);
           }
           list.appendChild(row);
