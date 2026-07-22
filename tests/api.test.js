@@ -344,6 +344,36 @@ test('dispatch: erfolgreicher Versand landet in alert_log', async () => {
   assert.strictEqual(row.t, 'frost');
 });
 
+// ---- feeds/[locId]: Last-Known-Good bei ThingSpeak-Ausfall (Plan7-4) ----
+test('feeds: Last-Known-Good liefert letzte Werte bei ThingSpeak-Ausfall', async () => {
+  const mod = await loadEndpoint('api/feeds/[locId]');
+  const env = { DB: createD1(), TS_KEY_GILLIAN: 'k' };
+  const origFetch = global.fetch;
+  const origCaches = global.caches;
+  global.caches = { default: { match: async () => undefined, put: async () => {} } };
+  const okBody = JSON.stringify({ channel: { name: 'x' }, feeds: [{ created_at: '2026-01-01T00:00:00Z', field1: '21', field2: '50' }] });
+  const mkCtx = res => ({ ...ctx('GET', `/api/feeds/gillian?results=${res}`, { env }), params: { locId: 'gillian' }, waitUntil: p => { if (p && p.catch) p.catch(() => {}); return p; } });
+  try {
+    // 1) Erfolgreicher Abruf → wird in D1 (feed_cache) abgelegt
+    global.fetch = async () => new Response(okBody, { status: 200 });
+    const r1 = await call(mod, mkCtx('400'));
+    assert.strictEqual(r1.status, 200);
+    await new Promise(r => setTimeout(r, 25)); // waitUntil-Write flushen lassen
+    // 2) ThingSpeak faellt aus (502) → letzte bekannte Werte + _stale-Marker
+    global.fetch = async () => new Response('down', { status: 502 });
+    const r2 = await call(mod, mkCtx('400'));
+    assert.strictEqual(r2.status, 200, 'LKG sollte 200 liefern statt Fehler');
+    assert.strictEqual(r2.headers.get('X-Data-Source'), 'last-known-good');
+    const d2 = await r2.json();
+    assert.strictEqual(d2._stale, true);
+    assert.strictEqual(d2.feeds.length, 1);
+    // 3) Kein LKG fuer diese Abfrage (anderer results-Wert) → ehrlicher Fehler, kein Fake
+    global.fetch = async () => new Response('down', { status: 502 });
+    const r3 = await call(mod, mkCtx('9999'));
+    assert.strictEqual(r3.status, 502);
+  } finally { global.fetch = origFetch; global.caches = origCaches; }
+});
+
 // ---- Runner ----
 (async () => {
   console.log('functions/api – Server-Endpunkte (node:sqlite)');
