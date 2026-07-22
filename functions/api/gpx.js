@@ -58,6 +58,14 @@ export async function onRequest(context) {
       if (!row) return json({ error: 'Nicht gefunden' }, 404);
       return json(rowToActivity(row, true));
     }
+    if (url.searchParams.get('full')) {
+      // Voll-Export (Plan7-7): alle nicht-geloeschten Aktivitaeten MIT Punkten,
+      // fuer den Self-Service-Gesamtexport "Meine Daten".
+      const { results } = await env.DB
+        .prepare('SELECT * FROM gpx_activities WHERE deleted = 0 ORDER BY start_time DESC')
+        .all();
+      return json(results.map(r => rowToActivity(r, true)));
+    }
     // Liste ohne Punkte, inkl. Tombstones (nötig für den Lösch-Abgleich)
     const { results } = await env.DB
       .prepare('SELECT uid, name, type, start_time, dist_m, total_sec, moving_sec, avg_speed, max_speed, elev_gain, ele_min, ele_max, added_at, updated_at, deleted, note, start_weather FROM gpx_activities ORDER BY start_time DESC')

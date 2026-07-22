@@ -348,6 +348,22 @@ test('dispatch: erfolgreicher Versand landet in alert_log', async () => {
   assert.strictEqual(row.t, 'frost');
 });
 
+// ---- gpx: Voll-Export mit Punkten (Plan7-7) ----
+test('gpx: ?full=1 liefert nicht-geloeschte Aktivitaeten mit Punkten', async () => {
+  const mod = await loadEndpoint('api/gpx');
+  const env = { DB: createD1() };
+  await call(mod, ctx('POST', '/api/gpx', { env, auth: 'test', body: { uid: 'u1', name: 'Tour', points: [{ lat: 1, lon: 2 }], updatedAt: 100 } }));
+  // Normale Liste: ohne Punkte
+  const list = await jsonOf(await call(mod, ctx('GET', '/api/gpx', { env, auth: 'test' })));
+  const li = list.find(a => a.uid === 'u1');
+  assert.ok(li, 'Aktivitaet sollte in der Liste sein');
+  assert.strictEqual(li.points, undefined, 'Liste darf keine Punkte enthalten');
+  // Voll-Export: mit Punkten
+  const full = await jsonOf(await call(mod, ctx('GET', '/api/gpx?full=1', { env, auth: 'test' })));
+  const fa = full.find(a => a.uid === 'u1');
+  assert.ok(fa && Array.isArray(fa.points) && fa.points.length === 1, 'Voll-Export sollte Punkte enthalten');
+});
+
 // ---- feeds/[locId]: Last-Known-Good bei ThingSpeak-Ausfall (Plan7-4) ----
 test('feeds: Last-Known-Good liefert letzte Werte bei ThingSpeak-Ausfall', async () => {
   const mod = await loadEndpoint('api/feeds/[locId]');

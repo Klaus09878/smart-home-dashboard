@@ -754,12 +754,16 @@
       showNotification('Backup wird erstellt…');
       let climate = [];
       try { climate = await apiFetch('/api/climate'); } catch (e) { /* D1 evtl. aus → ohne Archiv */ }
+      // GPX-Aktivitaeten mit Punkten aus der Cloud (Plan7-7) — Voll-Export "Meine Daten".
+      let gpx = [];
+      try { gpx = await apiFetch('/api/gpx?full=1'); } catch (e) { /* D1 evtl. aus → ohne GPX */ }
       const backup = {
         format: 'smarthub-full-backup', version: 1, profile: Store.profile,
         exportedAt: new Date().toISOString(),
         settings: Store.exportAll(),
         todos: getTodos().filter(t => !t.deleted),
-        climate: Array.isArray(climate) ? climate : []
+        climate: Array.isArray(climate) ? climate : [],
+        gpx: Array.isArray(gpx) ? gpx : []
       };
       const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
       const a = document.createElement('a');
@@ -767,7 +771,7 @@
       a.download = `smarthub-full-backup-${Store.profile}-${new Date().toISOString().substring(0, 10)}.json`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-      showNotification(`Backup gesichert: ${Object.keys(backup.settings).length} Einstellungen, ${backup.todos.length} To-dos, ${backup.climate.length} Archiv-Tage.`);
+      showNotification(`Backup gesichert: ${Object.keys(backup.settings).length} Einstellungen, ${backup.todos.length} To-dos, ${backup.climate.length} Archiv-Tage, ${backup.gpx.length} Touren.`);
     }
 
     async function importFullBackup(event) {
@@ -779,7 +783,7 @@
       if (data.format !== 'smarthub-full-backup') { showNotification('Kein gültiges Komplett-Backup.', 'error'); return; }
       const ok = await modalConfirm({
         title: 'Backup einspielen?',
-        message: `Einstellungen (${Object.keys(data.settings || {}).length}), To-dos (${(data.todos || []).length}) und Klima-Archiv (${(data.climate || []).length} Tage) werden zusammengeführt. Neuere lokale Werte bleiben erhalten.`,
+        message: `Einstellungen (${Object.keys(data.settings || {}).length}), To-dos (${(data.todos || []).length}), Klima-Archiv (${(data.climate || []).length} Tage) und Touren (${(data.gpx || []).length}) werden zusammengeführt. Neuere Werte bleiben erhalten.`,
         confirmLabel: 'Einspielen'
       });
       if (!ok) return;
@@ -810,6 +814,19 @@
           });
           for (const [loc, days] of Object.entries(byLoc)) {
             try { await apiFetch('/api/climate', { method: 'POST', body: JSON.stringify({ loc, days }) }); } catch (e) { /* D1 evtl. aus */ }
+          }
+        }
+        // 4. GPX-Touren in die Cloud zurückspielen — LWW-Schutz (Plan7-7): eine
+        // vorhandene NEUERE Tour wird NIE mit einer aelteren aus dem Backup
+        // ueberschrieben (gpx-data-integrity). Die IndexedDB des GPX-Viewers holt
+        // sich die Cloud-Aenderungen beim naechsten Sync.
+        if (Array.isArray(data.gpx) && data.gpx.length) {
+          const existing = {};
+          try { (await apiFetch('/api/gpx') || []).forEach(a => { existing[a.uid] = a.updatedAt || 0; }); } catch (e) { /* Liste evtl. nicht abrufbar → dann nur neue anlegen */ }
+          for (const a of data.gpx) {
+            if (!a || !a.uid || !Array.isArray(a.points)) continue;
+            if (existing[a.uid] !== undefined && (a.updatedAt || 0) <= existing[a.uid]) continue; // aelter/gleich → nicht ueberschreiben
+            try { await apiFetch('/api/gpx', { method: 'POST', body: JSON.stringify(a) }); } catch (e) { /* einzelne Tour ueberspringen */ }
           }
         }
         await Store.flush();
