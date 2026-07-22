@@ -260,7 +260,18 @@
       if (!el || !window.Store || !Store.isAdmin) { if (el) el.classList.add('hidden'); return; }
       let dumps = [];
       try { const d = await apiFetch('/api/backup-dump?list=1'); dumps = d.dumps || []; }
-      catch (e) { el.classList.add('hidden'); return; } // ohne R2/Admin ausblenden
+      catch (e) {
+        // Plan7-3: nur wenn das Feature fehlt (R2/Endpunkt nicht da) ausblenden.
+        // Ein transienter Fehler darf NICHT still als "keine Backups" erscheinen —
+        // sichtbar machen + Retry statt Fehler zu verschleiern.
+        if (e && e.unavailable) { el.classList.add('hidden'); return; }
+        el.classList.remove('hidden');
+        el.innerHTML = '<span class="block text-[10px] text-slate-500 uppercase font-semibold mb-1">Server-Backups (R2)</span>'
+          + '<p class="text-[11px] text-amber-400">Backup-Liste konnte nicht geladen werden. '
+          + '<button data-onclick="renderServerBackups" class="underline decoration-dotted underline-offset-2 hover:text-white">Erneut versuchen</button></p>';
+        updateIcons();
+        return;
+      }
       el.classList.remove('hidden');
       const rows = dumps.length ? dumps.map(d => `
         <div class="flex items-center justify-between gap-2 py-1">

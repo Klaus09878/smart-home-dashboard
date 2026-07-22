@@ -58,3 +58,19 @@ bestehende Eintraege aktualisieren statt duplizieren.
   bewusste Akzent darf als Design-Entscheidung leicht darunter bleiben.
 - **Referenz:** `tests/a11y.spec.js` (disableRules), `.lighthouserc.json`
   (`categories:accessibility` ≥ 0,90).
+
+### KB-3: Ladepfade muessen „leer" von „fehlgeschlagen" unterscheiden
+- **Bereich/Tags:** ui, states, error-handling
+- **Symptom:** Ein `apiFetch`-Ladepfad faengt jeden Fehler und zeigt danach eine
+  leere/versteckte Liste — ein transienter Netzfehler ist damit unsichtbar und
+  wirkt wie „keine Daten" (Beispiel: Server-Backup-Panel wurde bei jedem Fehler
+  ausgeblendet).
+- **Ursache (bestaetigt):** Ein `catch`, der `unavailable` (Feature/Endpunkt/R2
+  nicht vorhanden) nicht von einem echten transienten Fehler trennt.
+- **Praevention (dauerhaft):** In Ladepfaden `err.unavailable` gesondert
+  behandeln (Feature aus → ausblenden/Hinweis ist ok), jeden anderen Fehler
+  **sichtbar** machen mit „Erneut versuchen". Nie einen echten Fehler als leeren
+  Zustand tarnen (Domaenenregel „kein stiller Fallback"). Mutationen zeigen
+  bereits `showNotification(..., 'error')` — Ladepfade genauso ehrlich halten.
+- **Referenz:** `app-settings.js` `renderServerBackups` (Plan7-3);
+  Skill `climateflow-data-quality`/`cloudflare-security-sync`.
