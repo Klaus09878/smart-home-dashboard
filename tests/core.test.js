@@ -414,6 +414,28 @@ test('dailyTrend: erkennt anhaltend steigende Feuchte, ignoriert Rauschen', () =
   assert.strictEqual(core.dailyTrend([{ day: '2026-01-01', h_avg: 60 }]), null);
 });
 
+test('ventilationForecast: findet trockenste beneficial Stunde, ignoriert feuchtere', () => {
+  const now = Date.UTC(2026, 0, 1, 6, 0, 0);
+  const hourly = { time: [], temperature_2m: [], relative_humidity_2m: [] };
+  const spec = [[8, 90], [5, 80], [2, 70], [15, 60]]; // t°C, rF% je Folgestunde
+  for (let i = 0; i < spec.length; i++) {
+    hourly.time.push((now + (i + 1) * 3600000) / 1000);
+    hourly.temperature_2m.push(spec[i][0]);
+    hourly.relative_humidity_2m.push(spec[i][1]);
+  }
+  const inAH = core.getAbsoluteHumidity(22, 60); // hohe Innenfeuchte
+  const fc = core.ventilationForecast(inAH, hourly, { nowMs: now, hours: 6 });
+  assert.strictEqual(fc.hours.length, 4);
+  assert.ok(fc.best, 'sollte eine beste Stunde finden');
+  // Beste = trockenste Aussenluft (niedrigste outAH über alle Fensterstunden)
+  const minOut = Math.min(...fc.hours.map(h => h.outAH));
+  assert.ok(Math.abs(fc.best.outAH - minOut) < 0.001, `best.outAH=${fc.best.outAH} min=${minOut}`);
+  // invalide Eingabe → leeres, ehrliches Ergebnis (kein Vorschlag)
+  const empty = core.ventilationForecast(null, hourly, { nowMs: now });
+  assert.strictEqual(empty.best, null);
+  assert.strictEqual(empty.hours.length, 0);
+});
+
 test('expandRecurring: wöchentlich expandiert im Fenster, EXDATE ausgenommen', () => {
   const events = [{
     startMs: Date.UTC(2026, 6, 7, 10, 0, 0), // Di 07.07.2026 12:00 Berlin ~ 10:00Z

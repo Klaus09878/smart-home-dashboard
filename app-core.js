@@ -928,6 +928,26 @@
           console.error('Fehler beim Lüftungsberater:', e);
         }
 
+        // 3a. Bester Lüftungszeitpunkt heute (Plan7-10): trockenste kommende Stunde
+        try {
+          const bt = document.getElementById('vent-best-time');
+          if (bt) {
+            const inAH = getAbsoluteHumidity(curTempIn, curHumIn);
+            const fc = ventilationForecast(inAH, appState.outsideData && appState.outsideData.hourly, { hours: 14 });
+            if (fc.best) {
+              bt.textContent = `Bester Lüftungszeitpunkt heute: ${formatTime(new Date(fc.best.ms))} Uhr — Außenluft ${fc.best.benefit.toFixed(1)} g/m³ trockener.`;
+              bt.classList.remove('hidden');
+            } else if (fc.hours.length) {
+              bt.textContent = 'Heute bringt Lüften kaum Entfeuchtung — die Außenluft ist nicht trockener als drinnen.';
+              bt.classList.remove('hidden');
+            } else {
+              bt.classList.add('hidden');
+            }
+          }
+        } catch (e) {
+          console.error('Fehler beim Lüftungszeitpunkt:', e);
+        }
+
         // 3b. Schimmelrisiko & Lüftungsfenster-Prognose
         try {
           computeMoldRisk(curTempIn, curHumIn, curTempOut, !!weather);
