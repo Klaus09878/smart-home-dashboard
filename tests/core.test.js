@@ -436,6 +436,24 @@ test('ventilationForecast: findet trockenste beneficial Stunde, ignoriert feucht
   assert.strictEqual(empty.hours.length, 0);
 });
 
+test('comfortBudget: zaehlt Tage im Zielkorridor + aktuelle Serie', () => {
+  const th = { tempMin: 19, tempMax: 24, humMin: 40, humMax: 60 };
+  const rows = [
+    { day: '2026-01-01', t_avg: 21, h_avg: 50 }, // grün
+    { day: '2026-01-02', t_avg: 26, h_avg: 50 }, // zu warm
+    { day: '2026-01-03', t_avg: 22, h_avg: 45 }, // grün
+    { day: '2026-01-04', t_avg: 21, h_avg: 55 }, // grün (letzter)
+    { day: '2026-01-05', t_avg: 20, h_avg: 58 }  // grün (letzter)
+  ];
+  const b = core.comfortBudget(rows, th);
+  assert.strictEqual(b.totalDays, 5);
+  assert.strictEqual(b.greenDays, 4);
+  assert.strictEqual(b.pct, 80);
+  assert.strictEqual(b.streak, 3); // die letzten 3 Tage grün
+  // leere Eingabe → null
+  assert.strictEqual(core.comfortBudget([], th), null);
+});
+
 test('expandRecurring: wöchentlich expandiert im Fenster, EXDATE ausgenommen', () => {
   const events = [{
     startMs: Date.UTC(2026, 6, 7, 10, 0, 0), // Di 07.07.2026 12:00 Berlin ~ 10:00Z

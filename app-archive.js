@@ -111,6 +111,12 @@
           ? `Die Luftfeuchte steigt seit ${trend.days} Tagen an (${trend.fromValue} % → ${trend.toValue} %) — regelmäßiges Lüften beugt Schimmel vor.`
           : `Die Luftfeuchte sinkt seit ${trend.days} Tagen (${trend.fromValue} % → ${trend.toValue} %).`);
       }
+      // Klima-Budget (Plan7-11): Tage im Zielkorridor + aktuelle Serie.
+      const budget = comfortBudget(rows, getThresholds());
+      if (budget && budget.totalDays >= 5) {
+        sentences.push(`${budget.greenDays} von ${budget.totalDays} Tagen im Zielkorridor (${budget.pct} %)`
+          + (budget.streak >= 2 ? ` — aktuelle Serie: ${budget.streak} Tage in Folge.` : '.'));
+      }
       if (!sentences.length) { el.classList.add('hidden'); return; }
       el.classList.remove('hidden');
       el.innerHTML = `<p class="text-[10px] uppercase font-semibold text-slate-500 mb-1.5 flex items-center gap-1.5"><i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-400"></i> Einblick</p>`
