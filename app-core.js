@@ -1005,6 +1005,60 @@
       } catch (err) {
         console.error('Fataler Fehler in renderActiveView:', err);
       }
+      renderRoomComparison();
+    }
+
+    // Raum-Vergleichs-Matrix (Plan7-9): alle Standorte nebeneinander
+    // (Temp/Feuchte/Komfort). Aktiver Standort aus dem geladenen State; andere per
+    // kleiner Vorschau, hoechstens alle 5 min neu geholt. Fehlt ein Standort/Feed,
+    // steht dort ein ehrlicher Leerzustand statt eines Fantasiewerts.
+    async function renderRoomComparison() {
+      const el = document.getElementById('room-comparison');
+      if (!el) return;
+      appState.roomMatrixCache = appState.roomMatrixCache || {};
+      const rooms = await Promise.all(LOCATIONS.map(async loc => {
+        let latest = null, stale = false;
+        try {
+          if (loc.id === appState.activeLocId && appState.insideData && appState.insideData.length) {
+            latest = appState.insideData[appState.insideData.length - 1];
+          } else if (!appState.isDemoMode) {
+            const c = appState.roomMatrixCache[loc.id];
+            if (c && Date.now() - c.at < 5 * 60 * 1000) { latest = c.latest; stale = c.stale; }
+            else {
+              const data = await fetchFeeds(loc, { results: 50 });
+              const proc = processRawFeeds((data && data.feeds) || [], loc.fields);
+              const al = calibratedAligned(loc.id, proc.aligned);
+              latest = al.length ? al[al.length - 1] : null;
+              stale = !!(data && data._stale);
+              appState.roomMatrixCache[loc.id] = { at: Date.now(), latest, stale };
+            }
+          }
+        } catch (e) { latest = null; }
+        return { loc, latest, stale };
+      }));
+      el.innerHTML = rooms.map(({ loc, latest, stale }) => {
+        const name = escapeHtml(getLocationName(loc.id));
+        const activeTag = loc.id === appState.activeLocId ? ' <span class="text-[9px] text-teal-400 uppercase font-semibold">aktiv</span>' : '';
+        if (!latest) {
+          const hint = appState.isDemoMode ? 'nur aktiver Raum im Demo' : 'nicht erreichbar';
+          return `<div class="panel rounded-xl p-3"><p class="text-xs font-semibold text-slate-300 truncate">${name}${activeTag}</p><p class="text-[11px] text-slate-500 mt-2">${hint}</p></div>`;
+        }
+        const th = getThresholds(loc.id);
+        const t = latest.temp, h = latest.humidity;
+        const cs = comfortScore(t, h, null, th);
+        const csColor = cs == null ? 'text-slate-400' : cs >= 80 ? 'text-emerald-400' : cs >= 55 ? 'text-amber-400' : 'text-red-400';
+        const hColor = h > th.humMax ? 'text-red-400' : h < th.humMin ? 'text-blue-400' : 'text-slate-100';
+        const staleDot = stale ? ' <span class="text-[9px] text-amber-400" title="letzte bekannte Werte">•</span>' : '';
+        return `<div class="panel rounded-xl p-3">
+            <p class="text-xs font-semibold text-slate-300 truncate">${name}${activeTag}${staleDot}</p>
+            <div class="mt-2 grid grid-cols-3 gap-1 text-center">
+              <div><p class="text-[9px] text-slate-500 uppercase">Temp</p><p class="text-sm font-mono tabular-nums text-slate-100">${t.toFixed(1)}°</p></div>
+              <div><p class="text-[9px] text-slate-500 uppercase">Feuchte</p><p class="text-sm font-mono tabular-nums ${hColor}">${h.toFixed(0)}%</p></div>
+              <div><p class="text-[9px] text-slate-500 uppercase">Komfort</p><p class="text-sm font-mono tabular-nums ${csColor}">${cs == null ? '–' : cs}</p></div>
+            </div>
+          </div>`;
+      }).join('');
+      updateIcons();
     }
 
     // Trend calculator

@@ -110,6 +110,15 @@ test('ClimateFlow: Chart ist barrierefrei (aria + Datentabelle)', async ({ page 
   await expect(page.locator('.chart-a11y-table table').first()).toBeVisible();
 });
 
+test('ClimateFlow: Raum-Vergleichs-Matrix rendert (Plan7-9)', async ({ page }) => {
+  await routeOpenMeteo(page);
+  await page.goto('/index.html#climate');
+  await waitReady(page);
+  // Beide Standorte erscheinen als Kacheln (aktiver mit Demo-Werten, der andere
+  // mit ehrlichem Leerzustand "nur aktiver Raum im Demo").
+  await expect(page.locator('#room-comparison > div')).toHaveCount(2, { timeout: 15000 });
+});
+
 test('ClimateFlow: Chart-Karte klappt ein und aus', async ({ page }) => {
   await routeOpenMeteo(page);
   await page.goto('/index.html#climate');
