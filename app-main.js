@@ -75,6 +75,7 @@
         loadHubWeather();
         loadHubPreviews();
         loadGpxWidget();
+        loadPushupWidget();
         renderTodos();
         syncTodos();
         loadHubForecast();

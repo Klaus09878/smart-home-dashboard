@@ -59,6 +59,51 @@
       } catch (e) { /* Widget optional */ }
     }
 
+    // Liegestütz-Widget: Fragt den API-Endpunkt /api/pushups ab
+    async function loadPushupWidget() {
+      try {
+        const totalEl = document.getElementById('hub-pushup-total');
+        if (!totalEl) return;
+
+        let data = null;
+        try {
+          const res = await fetch('/api/pushups?limit=50');
+          if (res.ok) data = await res.json();
+        } catch (e) { /* Fallback */ }
+
+        if (!data || !data.summary) {
+          totalEl.innerText = '–';
+          const stEl = document.getElementById('hub-pushup-status-text');
+          if (stEl) stEl.innerText = 'Bereit';
+          return;
+        }
+
+        const sum = data.summary;
+        totalEl.innerText = `${sum.currentTotal}`;
+
+        const dot = document.getElementById('hub-pushup-status-dot');
+        const stText = document.getElementById('hub-pushup-status-text');
+        if (sum.currentTotal <= 0) {
+          if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block shrink-0';
+          if (stText) stText.innerText = 'Schuldenfrei';
+        } else if (sum.currentTotal <= 20) {
+          if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-400 inline-block shrink-0';
+          if (stText) stText.innerText = 'Moderat offen';
+        } else {
+          if (dot) dot.className = 'w-1.5 h-1.5 rounded-full bg-rose-500 inline-block shrink-0';
+          if (stText) stText.innerText = 'Offene Schulden';
+        }
+
+        const todayEl = document.getElementById('hub-pushup-today');
+        if (todayEl) todayEl.innerText = `${sum.todayDone || 0} Wdh.`;
+
+        const streakEl = document.getElementById('hub-pushup-streak');
+        if (streakEl) streakEl.innerText = `Offen: ${sum.todayOpen || 0} · Rekord: ${sum.recordSession || 0}`;
+      } catch (err) {
+        /* Widget optional */
+      }
+    }
+
     // ============ Hub-Widgets: Layout (Drag & Drop + Ein-/Ausblenden) ============
     // Reihenfolge in localStorage 'hub_widget_order', ausgeblendete Widgets in
     // 'hub_widget_hidden'. Gezogen wird am Griff-Symbol (erscheint beim Hover).

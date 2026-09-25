@@ -1,0 +1,3 @@
+[submodule "projects/pushups"]
+	path = projects/pushups
+	url = https://github.com/Klaus09878/pushup-tracker.git

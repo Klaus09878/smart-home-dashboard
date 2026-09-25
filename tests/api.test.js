@@ -394,6 +394,82 @@ test('feeds: Last-Known-Good liefert letzte Werte bei ThingSpeak-Ausfall', async
   } finally { global.fetch = origFetch; global.caches = origCaches; }
 });
 
+test('pushups: POST single JSON, GET summary und format=csv', async () => {
+  const mod = await loadEndpoint('api/pushups');
+  const env = { DB: createD1(), PUSHUP_TOKEN: 'secret-test-token' };
+
+  // 1) Single JSON Entry via Basic Auth
+  const postRes1 = await call(mod, ctx('POST', '/api/pushups', {
+    env,
+    auth: 'test',
+    body: { delta: 15, type: 'open', timestamp: '2026-09-25T10:00:00' }
+  }));
+  assert.strictEqual(postRes1.status, 200);
+  const postData1 = await postRes1.json();
+  assert.strictEqual(postData1.currentTotal, 15);
+
+  // 2) Zweiter Eintrag (done) via Basic Auth
+  const postRes2 = await call(mod, ctx('POST', '/api/pushups', {
+    env,
+    auth: 'test',
+    body: { delta: -15, type: 'done', timestamp: '2026-09-25T10:15:00' }
+  }));
+  assert.strictEqual(postRes2.status, 200);
+  const postData2 = await postRes2.json();
+  assert.strictEqual(postData2.currentTotal, 0);
+
+  // 3) Bulk Items als Array via Basic Auth
+  const postRes3 = await call(mod, ctx('POST', '/api/pushups', {
+    env,
+    auth: 'test',
+    body: { items: [
+      { delta: 10, type: 'open', timestamp: '2026-09-25T11:00:00' },
+      { delta: -5, type: 'done', timestamp: '2026-09-25T11:05:00' }
+    ]}
+  }));
+  assert.strictEqual(postRes3.status, 200);
+  const postData3 = await postRes3.json();
+  assert.strictEqual(postData3.inserted, 2);
+
+  // 4) GET JSON Summary
+  const getRes = await call(mod, ctx('GET', '/api/pushups', { env, auth: 'test' }));
+  assert.strictEqual(getRes.status, 200);
+  const getData = await getRes.json();
+  assert.strictEqual(getData.records.length, 4);
+  assert.strictEqual(getData.summary.currentTotal, 5); // 15 - 15 + 10 - 5 = 5
+  assert.strictEqual(getData.summary.totalDone, 20);   // 15 + 5
+  assert.strictEqual(getData.summary.totalOpen, 25);   // 15 + 10
+
+  // 5) GET format=csv
+  const getCsvRes = await call(mod, ctx('GET', '/api/pushups?format=csv', { env, auth: 'test' }));
+  assert.strictEqual(getCsvRes.status, 200);
+  const csvText = await getCsvRes.text();
+  assert.ok(csvText.includes('timestamp;delta;type;total'));
+  assert.ok(csvText.includes(';open;'));
+
+  // 6) Token-Auth: ohne Credentials, aber mit PUSHUP_TOKEN im Bearer Header
+  const tokenReq = new Request('https://test.local/api/pushups', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer secret-test-token', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ delta: 5, type: 'open' })
+  });
+  const tokenRes = await call(mod, { request: tokenReq, env: { AUTH_USER: 'test', AUTH_PASS: 'test', ...env } });
+  assert.strictEqual(tokenRes.status, 200);
+
+  // 7) Kein Token + kein Auth → 401
+  const noAuthReq = new Request('https://test.local/api/pushups', { method: 'GET' });
+  const noAuthRes = await call(mod, { request: noAuthReq, env: { AUTH_USER: 'test', AUTH_PASS: 'test', ...env } });
+  assert.strictEqual(noAuthRes.status, 401);
+
+  // 8) DELETE einzelner Eintrag
+  const id = getData.records[0].id;
+  const delRes = await call(mod, ctx('DELETE', `/api/pushups?id=${id}`, { env, auth: 'test' }));
+  assert.strictEqual(delRes.status, 200);
+  const delData = await delRes.json();
+  assert.strictEqual(delData.success, true);
+  assert.strictEqual(delData.deletedId, id);
+});
+
 // ---- Runner ----
 (async () => {
   console.log('functions/api – Server-Endpunkte (node:sqlite)');

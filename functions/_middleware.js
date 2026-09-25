@@ -6,7 +6,7 @@ import { authenticateAsync, sessionUserFromCookie, syntheticBasicHeader, registe
 // /login.html per 308 auf /login um — BEIDE Varianten muessen public sein,
 // sonst entsteht eine Redirect-Schleife (Middleware -> /login.html -> 308
 // -> /login -> Middleware -> ...).
-const PUBLIC_PATHS = ['/login', '/login.html', '/login.js', '/api/login', '/tailwind.css', '/manifest.webmanifest', '/favicon.ico'];
+const PUBLIC_PATHS = ['/login', '/login.html', '/login.js', '/api/login', '/api/pushups', '/tailwind.css', '/manifest.webmanifest', '/favicon.ico'];
 const PUBLIC_PREFIXES = ['/vendor/', '/icons/'];
 function isPublic(pathname) {
   return PUBLIC_PATHS.includes(pathname) || PUBLIC_PREFIXES.some(p => pathname.startsWith(p));

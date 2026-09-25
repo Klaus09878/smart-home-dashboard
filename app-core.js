@@ -392,6 +392,7 @@
     // Wrapper fuer die Event-Delegation (P2-8): ersetzen fruehere Inline-Handler
     // mit mehreren Anweisungen bzw. Ausdruecken (CSP ohne unsafe-inline).
     function goToGpx() { location.href = 'gpx.html'; }
+    function goToPushups() { location.href = 'projects/pushups/'; }
     function refreshHubCalendar() { loadHubCalendar(true); showNotification('Kalender aktualisiert.'); }
     function obConfigureNtfy() { configureNtfy(); setTimeout(renderOnboardingStep, 100); }
     function obConfigureIcal() { configureIcal(); setTimeout(renderOnboardingStep, 100); }
